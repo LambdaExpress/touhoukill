@@ -2673,8 +2673,6 @@ StandardCardPackage::StandardCardPackage()
 
     // clang-format on
 
-    skills << new FakeMoveSkill("dismantle");
-
     foreach (Card *card, cards)
         card->setParent(this);
 }

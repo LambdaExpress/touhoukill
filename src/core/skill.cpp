@@ -544,44 +544,6 @@ int SlashNoDistanceLimitSkill::getDistanceLimit(const Player *from, const Card *
         return 0;
 }
 
-FakeMoveSkill::FakeMoveSkill(const QString &name)
-    : TriggerSkill(QString("#%1-fake-move").arg(name))
-    , name(name)
-{
-    events << BeforeCardsMove << CardsMoveOneTime;
-    frequency = Compulsory;
-    global = true;
-}
-
-int FakeMoveSkill::getPriority() const
-{
-    return 10;
-}
-
-bool FakeMoveSkill::effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail>, QVariant &) const
-{
-    return true;
-}
-
-QList<SkillInvokeDetail> FakeMoveSkill::triggerable(TriggerEvent, const Room *room, const QVariant &) const
-{
-    ServerPlayer *owner = nullptr;
-    foreach (ServerPlayer *p, room->getAllPlayers()) {
-        if (p->hasSkill(this)) {
-            owner = p;
-            break;
-        }
-    }
-
-    QString flag = QString("%1_InTempMoving").arg(name);
-    foreach (ServerPlayer *p, room->getAllPlayers()) {
-        if (p->hasFlag(flag))
-            return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, owner, p, nullptr, true);
-    }
-
-    return QList<SkillInvokeDetail>();
-}
-
 EquipSkill::EquipSkill(const QString &name)
     : TriggerSkill(name)
 {

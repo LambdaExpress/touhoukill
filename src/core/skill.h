@@ -290,22 +290,6 @@ protected:
     QString name;
 };
 
-// a nasty way for 'fake moves', usually used in the process of multi-card chosen
-class FakeMoveSkill : public TriggerSkill
-{
-    Q_OBJECT
-
-public:
-    explicit FakeMoveSkill(const QString &skillname);
-
-    int getPriority() const override;
-    QList<SkillInvokeDetail> triggerable(TriggerEvent triggerEvent, const Room *room, const QVariant &data) const override;
-    bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override;
-
-private:
-    QString name;
-};
-
 class EquipSkill : public TriggerSkill
 {
     Q_OBJECT
