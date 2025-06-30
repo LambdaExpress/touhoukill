@@ -862,9 +862,9 @@ public:
         QString pattern;
 
         if (use.card->isNDTrick())
-            pattern = "BasicCard+^Jink,EquipCard|.|.|shehuo";
+            pattern = "BasicCard+^Jink,EquipCard|.|.|sqchuangshi";
         else
-            pattern = "TrickCard+^Nullification,EquipCard|.|.|shehuo";
+            pattern = "TrickCard+^Nullification,EquipCard|.|.|sqchuangshi";
 
         //for ai
         player->tag["shehuo_target"] = QVariant::fromValue(target);

@@ -144,7 +144,7 @@ bool ExpPattern::matchOne(const Player *player, const Card *card, QString exp) c
 
         if (ids.isEmpty()) {
             // TODO: Consider decoupling ExpPattern since "sqchuangshi" or "shehuo" is rather a tag than place
-            if (place == "sqchuangshi" || place == "shehuo")
+            if (place == "sqchuangshi")
                 checkpoint = true;
         } else {
             foreach (int id, ids) {
@@ -176,10 +176,10 @@ bool ExpPattern::matchOne(const Player *player, const Card *card, QString exp) c
                                 checkpoint = true;
                                 break;
                             }
-                    } else if (p == "sqchuangshi" || p == "shehuo") {
+                    } else if (p == "sqchuangshi") {
                         if ((card->getEffectiveId() >= 0 && !player->hasEquip(card)))
                             checkpoint = true;
-                    } else if (p == "benwo" && (card->isVirtualCard() || !player->getHandcards().contains(Sanguosha->getCard(card->getId())))) {
+                    } else if (p == "benwo" && card->isVirtualCard()) {
                         return false;
                     } else if (!player->getPile(p).isEmpty() && player->getPile(p).contains(id)) {
                         checkpoint = true;

@@ -22,6 +22,7 @@ config = {
 		"gxs",
 		"hld",
 		-- "swy",
+		-- "jsj",
 		"wai",
 		"touhougod"
 	},
@@ -81,6 +82,7 @@ config = {
 		"TH17",
 		"TH18",
 		-- "TH19",
+		-- "TH20",
 		"TH99",
 		"THNDJ",
 		"TouhouGod",

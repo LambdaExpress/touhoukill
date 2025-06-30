@@ -103,36 +103,8 @@ end
 -- None needed
 
 -- 【崩落】一名角色的结束阶段开始时，若你于此回合内不因使用而失去过手牌，你可以使用一张非锦囊牌。
--- 照抄sqchuangshi
+-- 照抄sqchuangshi，写在shehuo里，pattern和shehuo是一样的，拆不了函数
 -- shanlei+bengluo = 延时卖血，保守的话暂时先卖剩2血，之后再看看怎么调
-sgs.ai_skill_use["BasicCard+^Jink,EquipCard|.|.|sqchuangshi"] = function(self, prompt, method)
-	local cards =  self:getCards("sqchuangshi", "hs")
-	self:sortByUseValue(cards)
-	for _, card in ipairs(cards) do
-		if card:getTypeId() == sgs.Card_TypeBasic and not card:isKindOf("Jink") then
-			local dummy_use = { isDummy = true, to = sgs.SPlayerList() }
-			self:useBasicCard(card, dummy_use)
-			if dummy_use.card then
-				if dummy_use.to:isEmpty() then
-					return dummy_use.card:toString()
-				else
-					local target_objectname = {}
-					for _, p in sgs.qlist(dummy_use.to) do
-						table.insert(target_objectname, p:objectName())
-					end
-					return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
-				end
-			end
-		elseif card:getTypeId() == sgs.Card_TypeEquip then
-			local dummy_use = { isDummy = true }
-			self:useEquipCard(card, dummy_use)
-			if dummy_use.card then
-				return dummy_use.card:toString()
-			end
-		end
-	end
-	return "."
-end
 
 -- 【沦溺】其他角色的出牌阶段开始时，你可以将你装备区里的一张牌置入其装备区（若已有同类型的牌则替换之），若如此做，此阶段结束时，其获得其装备区里所有的牌。
 -- 看注释吧

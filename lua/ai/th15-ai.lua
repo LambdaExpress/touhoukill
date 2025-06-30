@@ -181,20 +181,48 @@ end
 
 --稀神探女
 --[舌祸]
-sgs.ai_skill_use["BasicCard+^Jink,EquipCard|.|.|shehuo"] = function(self, prompt, method)
-	local target = self.player:getTag("shehuo_target"):toPlayer()
-	if not target or not self:isEnemy(target) then return "." end
-	local cards =  self:getCards("Slash", "hs")
-	local target_objectname = {}
+sgs.ai_skill_use["BasicCard+^Jink,EquipCard|.|.|sqchuangshi"] = function(self, prompt, method)
+	if string.sub(prompt, 1, #"@shehuo_use") == "@shehuo_use" then
+		local target = self.player:getTag("shehuo_target"):toPlayer()
+		if not target or not self:isEnemy(target) then return "." end
+		local cards =  self:getCards("Slash", "hs")
+		local target_objectname = {}
 
-	if #cards > 0 then
-		table.insert(target_objectname, target:objectName())
-		return cards[1]:toString() .. "->" .. table.concat(target_objectname, "+")
+		if #cards > 0 then
+			table.insert(target_objectname, target:objectName())
+			return cards[1]:toString() .. "->" .. table.concat(target_objectname, "+")
+		end
+	elseif string.sub(prompt, 1, #"@bengluo-use") == "@bengluo-use" then
+		local cards =  self:getCards("sqchuangshi", "hs")
+		self:sortByUseValue(cards)
+		for _, card in ipairs(cards) do
+			if card:getTypeId() == sgs.Card_TypeBasic and not card:isKindOf("Jink") then
+				local dummy_use = { isDummy = true, to = sgs.SPlayerList() }
+				self:useBasicCard(card, dummy_use)
+				if dummy_use.card then
+					if dummy_use.to:isEmpty() then
+						return dummy_use.card:toString()
+					else
+						local target_objectname = {}
+						for _, p in sgs.qlist(dummy_use.to) do
+							table.insert(target_objectname, p:objectName())
+						end
+						return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+					end
+				end
+			elseif card:getTypeId() == sgs.Card_TypeEquip then
+				local dummy_use = { isDummy = true }
+				self:useEquipCard(card, dummy_use)
+				if dummy_use.card then
+					return dummy_use.card:toString()
+				end
+			end
+		end
 	end
 	return "."
 end
 --反手使用锦囊 （弃疗、、、）
-sgs.ai_skill_use["TrickCard+^Nullification,EquipCard|.|.|shehuo"] = function(self, prompt, method)
+sgs.ai_skill_use["TrickCard+^Nullification,EquipCard|.|.|sqchuangshi"] = function(self, prompt, method)
 	local target = self.player:getTag("shehuo_target"):toPlayer()
 	if not target or not self:isEnemy(target) then return "." end
 	--local cards =  self:getCards("Slash", "hs")
