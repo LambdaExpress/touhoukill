@@ -142,18 +142,8 @@ void ServerPlayer::clearOnePrivatePile(QString pile_name)
 
     DummyCard *dummy = new DummyCard(pile);
     CardMoveReason reason(CardMoveReason::S_REASON_REMOVE_FROM_PILE, objectName());
-    bool notifyLog = true;
-    QString new_name = pile_name;
-    if (new_name.startsWith("#")) {
-        foreach (QString flag, getFlagList()) {
-            //if (flag.endsWith("_InTempMoving"))
-            if (flag == new_name.mid(1) + "_InTempMoving") {
-                notifyLog = false;
-                break;
-            }
-        }
-    }
-    room->throwCard(dummy, reason, nullptr, nullptr, notifyLog);
+
+    room->throwCard(dummy, reason, nullptr, nullptr, true);
     dummy->deleteLater();
 
     piles.remove(pile_name);
@@ -393,20 +383,12 @@ void ServerPlayer::removeCard(const Card *card, Place place)
         WrappedCard *wrapped = Sanguosha->getWrappedCard(card->getEffectiveId());
         removeEquip(wrapped);
 
-        bool show_log = true;
-        foreach (QString flag, flags) {
-            if (flag.endsWith("_InTempMoving")) {
-                show_log = false;
-                break;
-            }
-        }
-        if (show_log) {
-            LogMessage log;
-            log.type = "$Uninstall";
-            log.card_str = wrapped->toString();
-            log.from = this;
-            room->sendLog(log);
-        }
+        LogMessage log;
+        log.type = "$Uninstall";
+        log.card_str = wrapped->toString();
+        log.from = this;
+        room->sendLog(log);
+
         break;
     }
     case PlaceDelayedTrick: {

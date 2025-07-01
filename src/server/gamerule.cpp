@@ -413,8 +413,6 @@ bool GameRule::effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<Skil
                         foreach (const QString &flag, p->getFlagList()) {
                             if (flag == "Global_GongxinOperator")
                                 p->setFlags("-" + flag);
-                            else if (flag.endsWith("_InTempMoving"))
-                                room->setPlayerFlag(p, "-" + flag);
                         }
                     }
 

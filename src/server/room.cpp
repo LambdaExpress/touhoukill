@@ -4049,8 +4049,6 @@ bool Room::useCard(const CardUseStruct &use, bool add_history)
                 foreach (const QString &flag, p->getFlagList()) {
                     if (flag == "Global_GongxinOperator")
                         p->setFlags("-" + flag);
-                    else if (flag.endsWith("_InTempMoving"))
-                        setPlayerFlag(p, "-" + flag);
                 }
             }
 

@@ -2256,12 +2256,6 @@ void RoomScene::keepGetCardLog(const CardsMoveStruct &move)
 {
     if (move.card_ids.isEmpty())
         return;
-    if ((move.to != nullptr) && (move.to_place == Player::PlaceHand || move.to_place == Player::PlaceEquip || move.to_place == Player::PlaceSpecial)
-        && move.from_place != Player::DrawPile) {
-        foreach (QString flag, move.to->getFlagList())
-            if (flag.endsWith("_InTempMoving"))
-                return;
-    }
 
     // private pile
     if (move.to_place == Player::PlaceSpecial && !move.to_pile_name.isNull() && !move.to_pile_name.startsWith('#')) {
