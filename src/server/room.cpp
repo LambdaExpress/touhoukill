@@ -383,7 +383,14 @@ void Room::updateStateItem()
 
 void Room::killPlayer(ServerPlayer *victim, DamageStruct *reason)
 {
-    ServerPlayer *killer = reason != nullptr ? reason->from : nullptr;
+    DeathStruct death;
+    death.who = victim;
+    death.damage = reason;
+    QVariant data = QVariant::fromValue(death);
+
+    if (thread->trigger(BeforeDeath, this, data))
+        return;
+    death = data.value<DeathStruct>();
 
     victim->setAlive(false);
 
@@ -396,13 +403,14 @@ void Room::killPlayer(ServerPlayer *victim, DamageStruct *reason)
 
     m_alivePlayers.removeOne(victim);
 
-    DeathStruct death;
-    death.who = victim;
-    death.damage = reason;
-    QVariant data = QVariant::fromValue(death);
     thread->trigger(BeforeGameOverJudge, this, data);
+    death = data.value<DeathStruct>();
 
     updateStateItem();
+
+    ServerPlayer *killer = reason != nullptr ? reason->from : nullptr;
+    if (death.useViewAsKiller)
+        killer = death.viewAsKiller;
 
     LogMessage log;
     log.type = killer != nullptr ? (killer == victim ? "#Suicide" : "#Murder") : "#Contingency";
@@ -2018,6 +2026,7 @@ const Card *Room::askForCardShow(ServerPlayer *player, ServerPlayer *requester, 
     s.args << reason << QString("_%1_").arg(card->toString());
     QVariant decisionData = QVariant::fromValue(s);
     thread->trigger(ChoiceMade, this, decisionData);
+
     return card;
 }
 

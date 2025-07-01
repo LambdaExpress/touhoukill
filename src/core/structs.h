@@ -712,8 +712,9 @@ enum TriggerEvent
     Dying,
     QuitDying,
     AskForPeaches,
-    AskForPeachesDone,
-    Death,
+    AskForPeachesDone = 49,
+    BeforeDeath = 91,
+    Death = 50,
     BuryVictim,
     BeforeGameOverJudge,
     GameOverJudge,
@@ -767,7 +768,7 @@ enum TriggerEvent
     GeneralHidden,
     GeneralRemoved,
 
-    NumOfEvents
+    NumOfEvents = 92,
 };
 
 Q_DECLARE_METATYPE(DamageStruct)
