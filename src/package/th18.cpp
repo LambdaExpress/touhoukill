@@ -780,15 +780,510 @@ public:
     }
 };
 
-#ifdef DESCRIPTION
-["misumaru"] = "玉造魅须丸", ["#misumaru"] = "真正的勾玉匠人", ["zhuyu"] = "铸玉",
-                             [":zhuyu"]
-    = "摸牌阶段结束时，你可以展示牌堆底的三张牌，然后可以弃置一张牌并选择一项：依次使用其中与之花色相同的能使用的牌；或将其中与之花色不同的牌置入弃牌堆。选择后若余下的"
-      "牌花色相同，你将之当【杀】使用或交给一名角色。",
-                             ["shuzhu"] = "戍珠", [":shuzhu"] = "其他角色的弃牌阶段开始时，若其手牌数大于其手牌上限，你可以展示其一张手牌并将之置于牌堆底或弃置之。",
-                             ;
-;
-#endif
+namespace {
+bool zhuyuUsable(const Player *p, const Card *c)
+{
+    if (c->isVirtualCard())
+        return false;
+    if (!StringList2IntList(p->property("zhuyu").toString().split("+")).contains(c->getId()))
+        return false;
+    if (c->getSuitString() != p->property("zhuyuSuit").toString())
+        return false;
+    if (p->isCardLimited(c, Card::MethodUse))
+        return false;
+    if (c->isKindOf("Jink") || c->isKindOf("Nullification"))
+        return false;
+    if (c->targetFixed(p))
+        return true;
+
+    bool targetSelectable = false;
+    QList<const Player *> ps = p->getAliveSiblings();
+    ps << p;
+    foreach (const Player *o, ps) {
+        if (c->targetFilter({}, o, p) && !p->isProhibited(o, c)) {
+            targetSelectable = true;
+            break;
+        }
+    }
+    return targetSelectable;
+}
+} // namespace
+
+ZhuyuUseDiscardPileCard::ZhuyuUseDiscardPileCard()
+{
+    will_throw = false;
+    handling_method = Card::MethodNone;
+    m_skillName = "_zhuyu";
+}
+
+bool ZhuyuUseDiscardPileCard::targetFixed(const Player *Self) const
+{
+    if (subcardsLength() > 1)
+        return true;
+
+    const Card *c = Sanguosha->getCard(subcards.first());
+    if (!zhuyuUsable(Self, c))
+        return true;
+
+    return c->targetFixed(Self);
+}
+
+bool ZhuyuUseDiscardPileCard::targetsFeasible(const QList<const Player *> &targets, const Player *Self) const
+{
+    if (subcardsLength() > 1)
+        return targets.isEmpty();
+
+    const Card *c = Sanguosha->getCard(subcards.first());
+    if (!zhuyuUsable(Self, c))
+        return targets.isEmpty();
+
+    return c->targetsFeasible(targets, Self);
+}
+
+bool ZhuyuUseDiscardPileCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
+{
+    if (subcardsLength() > 1)
+        return false;
+
+    const Card *c = Sanguosha->getCard(subcards.first());
+    if (!zhuyuUsable(Self, c))
+        return false;
+
+    return c->targetFilter(targets, to_select, Self) && !Self->isProhibited(to_select, c, targets);
+}
+
+const Card *ZhuyuUseDiscardPileCard::validate(CardUseStruct &use) const
+{
+    Room *room = use.from->getRoom();
+    QList<int> il = StringList2IntList(use.from->property("zhuyuUsed").toString().split("+"));
+    il << subcards;
+    room->setPlayerProperty(use.from, "zhuyuUsed", IntList2StringList(il).join("+"));
+
+    if (subcardsLength() > 1) {
+        Q_ASSERT(use.to.isEmpty());
+        return use.card;
+    }
+
+    const Card *card = Sanguosha->getCard(subcards.first());
+    if (!zhuyuUsable(use.from, card)) {
+        Q_ASSERT(use.to.isEmpty());
+        return use.card;
+    }
+
+    return card;
+}
+
+void ZhuyuUseDiscardPileCard::use(Room *room, const CardUseStruct &card_use) const
+{
+    room->throwCard(card_use.card, nullptr);
+}
+
+ZhuyuSlashCard::ZhuyuSlashCard()
+{
+    will_throw = false;
+    handling_method = Card::MethodNone;
+    m_skillName = "_zhuyu";
+}
+
+bool ZhuyuSlashCard::targetsFeasible(const QList<const Player *> &targets, const Player *Self) const
+{
+    if (targets.length() == 1)
+        return true;
+
+    Slash s(Card::SuitToBeDecided, -1);
+    s.addSubcards(subcards);
+    return s.isAvailable(Self) && s.targetsFeasible(targets, Self);
+}
+
+bool ZhuyuSlashCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
+{
+    if (targets.isEmpty())
+        return true;
+
+    Slash s(Card::SuitToBeDecided, -1);
+    s.addSubcards(subcards);
+    return s.isAvailable(Self) && s.targetFilter(targets, to_select, Self) && !Self->isProhibited(to_select, &s);
+}
+
+const Card *ZhuyuSlashCard::validate(CardUseStruct &cardUse) const
+{
+    Slash *s = new Slash(Card::SuitToBeDecided, -1);
+    s->addSubcards(subcards);
+    s->setSkillName("_zhuyu");
+
+    QList<const Player *> ps;
+    foreach (ServerPlayer *p, cardUse.to)
+        ps << p;
+
+    bool canSlash = false;
+
+    if (s->isAvailable(cardUse.from) && s->targetsFeasible(ps, cardUse.from))
+        canSlash = true;
+
+    QString choice = "slash";
+
+    if (cardUse.to.length() == 1) {
+        if ((!canSlash) || (cardUse.to.first() == cardUse.from) || !cardUse.from->isOnline())
+            choice = "give";
+        else
+            choice = cardUse.from->getRoom()->askForChoice(cardUse.from, "zhuyu", "slash+give", QVariant::fromValue(cardUse));
+    }
+
+    if (choice == "slash")
+        return s;
+
+    delete s;
+    return cardUse.card;
+}
+
+void ZhuyuSlashCard::onEffect(const CardEffectStruct &effect) const
+{
+    CardMoveReason r(CardMoveReason::S_REASON_GIVE, effect.from->objectName(), effect.to->objectName(), getSkillName(), {});
+    effect.to->getRoom()->obtainCard(effect.to, this, r);
+}
+
+class ZhuyuVS : public ViewAsSkill
+{
+public:
+    ZhuyuVS(const QString &base)
+        : ViewAsSkill(base)
+    {
+        expand_pile = "*" + objectName();
+    }
+
+    bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const override
+    {
+        QString pattern = Sanguosha->getCurrentCardUsePattern();
+        if ((pattern == "@@zhuyu-card1!" || pattern == "@@zhuyu-card2!")) {
+            if (selected.isEmpty()) {
+                if (zhuyuUsable(Self, to_select))
+                    return true;
+            } else if (selected.length() == 1) {
+                if (zhuyuUsable(Self, selected.first()))
+                    return false;
+            } // else if selected.length > 1 - impossible
+        }
+
+        if (pattern == "@@zhuyu-card1!") {
+            if (to_select->getSuitString() != Self->property("zhuyuSuit").toString())
+                return true;
+        }
+
+        if (pattern == "@@zhuyu-card3!") {
+            QList<int> ids = StringList2IntList(Self->property("zhuyu").toString().split("+"));
+            QList<int> usedIds = StringList2IntList(Self->property("zhuyuUsed").toString().split("+"));
+            if (ids.contains(to_select->getId()) && !usedIds.contains(to_select->getId()))
+                return true;
+        }
+        return false;
+    }
+
+    const Card *viewAs(const QList<const Card *> &cards) const override
+    {
+        QString pattern = Sanguosha->getCurrentCardUsePattern();
+        if ((pattern == "@@zhuyu-card1!" || pattern == "@@zhuyu-card2!") && cards.length() == 1 && zhuyuUsable(Self, cards.first())) {
+            ZhuyuUseDiscardPileCard *c = new ZhuyuUseDiscardPileCard;
+            c->addSubcards(cards);
+            return c;
+        }
+
+        if (pattern == "@@zhuyu-card1!") {
+            QList<int> ids = StringList2IntList(Self->property("zhuyu").toString().split("+"));
+            foreach (const Card *c, cards)
+                ids.removeAll(c->getId());
+            foreach (int id, ids) {
+                const Card *c = Sanguosha->getCard(id);
+                if (c->getSuitString() != Self->property("zhuyuSuit").toString())
+                    return nullptr;
+            }
+
+            ZhuyuUseDiscardPileCard *c = new ZhuyuUseDiscardPileCard;
+            c->addSubcards(cards);
+            return c;
+        }
+
+        if (pattern == "@@zhuyu-card3!") {
+            QList<int> ids = StringList2IntList(Self->property("zhuyu").toString().split("+"));
+            QList<int> usedIds = StringList2IntList(Self->property("zhuyuUsed").toString().split("+"));
+            foreach (int id, usedIds)
+                ids.removeAll(id);
+            foreach (const Card *card, cards)
+                ids.removeAll(card->getId());
+
+            if (ids.isEmpty()) {
+                ZhuyuSlashCard *c = new ZhuyuSlashCard;
+                c->addSubcards(cards);
+                return c;
+            }
+        }
+
+        return nullptr;
+    }
+
+    bool isEnabledAtPlay(const Player *) const override
+    {
+        return false;
+    }
+
+    bool isEnabledAtResponse(const Player *, const QString &pattern) const override
+    {
+        return pattern.startsWith("@@zhuyu-card");
+    }
+};
+
+class Zhuyu : public TriggerSkill
+{
+public:
+    Zhuyu()
+        : TriggerSkill("zhuyu")
+    {
+        events = {EventPhaseEnd};
+        view_as_skill = new ZhuyuVS(objectName());
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *, const QVariant &data) const override
+    {
+        ServerPlayer *p = data.value<ServerPlayer *>();
+        if (p->isAlive() && p->hasSkill(this) && p->getPhase() == Player::Draw)
+            return {SkillInvokeDetail(this, p, p)};
+
+        return {};
+    }
+
+    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        QList<int> ids = room->getNCards(3, false, true);
+        room->returnToDrawPile(ids, true);
+
+        LogMessage logShowCard;
+        logShowCard.type = "$ShowCard";
+        logShowCard.from = invoke->invoker;
+        logShowCard.card_str = IntList2StringList(ids).join("+");
+        room->sendLog(logShowCard);
+
+        room->fillAG(ids);
+
+        room->setPlayerProperty(invoke->invoker, objectName().toUtf8().constData(), IntList2StringList(ids).join("+"));
+        const Card *c = room->askForCard(invoke->invoker, "..", "zhuyu-discard1", {}, QString(), 0);
+
+        // TODO: record this card in event BeforeCardsMove?
+        // Since there are no FilterSkill which changes the suit now, temporarily ignore it
+        if (c != nullptr) {
+            c = Sanguosha->getCard(c->getEffectiveId());
+            room->setPlayerProperty(invoke->invoker, "zhuyuSuit", c->getSuitString());
+
+            QList<int> usedIds;
+
+            try {
+                forever {
+                    bool usable = false;
+                    foreach (int id, ids) {
+                        if (!usedIds.contains(id)) {
+                            const Card *idCard = Sanguosha->getCard(id);
+                            if (zhuyuUsable(invoke->invoker, idCard)) {
+                                usable = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!usable) {
+                        if (usedIds.isEmpty()) {
+                            foreach (int id, ids) {
+                                const Card *idCard = Sanguosha->getCard(id);
+                                if (idCard->getSuit() != c->getSuit())
+                                    usedIds << id;
+                            }
+
+                            if (!usedIds.isEmpty()) {
+                                DummyCard d(usedIds);
+                                room->throwCard(&d, nullptr);
+                            }
+                        }
+                        break;
+                    }
+
+                    QString pattern = "@@zhuyu-card2";
+                    QString prompt = "zhuyu-use2";
+                    int notifyIndex = 2;
+                    if (usedIds.isEmpty()) {
+                        pattern = "@@zhuyu-card1";
+                        prompt = "zhuyu-use1";
+                        notifyIndex = 1;
+                    }
+
+                    // AI: Is it possible directly using the original card?
+                    // need deduplicate items during setPlayerProperty
+                    if (!room->askForUseCard(invoke->invoker, pattern + "!", prompt + ":::" + c->getSuitString(), notifyIndex)) {
+                        if (usedIds.isEmpty()) {
+                            foreach (int id, ids) {
+                                const Card *idCard = Sanguosha->getCard(id);
+                                if (idCard->getSuit() != c->getSuit())
+                                    usedIds << id;
+                            }
+
+                            if (!usedIds.isEmpty()) {
+                                DummyCard d(usedIds);
+                                room->throwCard(&d, nullptr);
+                                break;
+                            }
+                        }
+
+                        // code reaches here, either there are card used, or there are no card to discard. So force use
+                        {
+                            const Card *useCard = nullptr;
+                            ServerPlayer *target = nullptr;
+                            foreach (int id, ids) {
+                                if (!usedIds.contains(id)) {
+                                    const Card *idCard = Sanguosha->getCard(id);
+                                    if (zhuyuUsable(invoke->invoker, idCard)) {
+                                        useCard = idCard;
+                                        if (!idCard->targetFixed(invoke->invoker)) {
+                                            foreach (ServerPlayer *t, room->getAlivePlayers()) {
+                                                if (idCard->targetFilter({}, t, invoke->invoker) && !invoke->invoker->isProhibited(t, idCard)) {
+                                                    target = t;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (useCard != nullptr)
+                                    break;
+                            }
+
+                            if (useCard == nullptr) {
+                                Q_UNREACHABLE();
+
+                                // Make it more ... somewhat ... clear?
+                                LogMessage l;
+                                l.type = "#ZhuyuForceUseBug";
+                                l.from = invoke->invoker;
+                                room->sendLog(l);
+
+                                JsonArray skillCommand;
+                                skillCommand << (objectName() + "Bug") << ("forceUseBug:" + invoke->invoker->objectName());
+                                QList<ServerPlayer *> notified;
+                                foreach (ServerPlayer *p, room->getAlivePlayers()) {
+                                    if (p->isOnline()) {
+                                        notified << p;
+                                        p->m_commandArgs = skillCommand;
+                                    }
+                                }
+                                room->doBroadcastRequest(notified, QSanProtocol::S_COMMAND_INVOKE_SKILL);
+
+                                // we have no choice but...
+                                break;
+                            } else {
+                                usedIds << useCard->getId();
+
+                                CardUseStruct use;
+                                use.from = invoke->invoker;
+                                use.card = useCard;
+                                if (!use.card->targetFixed(use.from))
+                                    use.to << target;
+                                room->useCard(use);
+                            }
+                        }
+
+                        room->setPlayerProperty(invoke->invoker, "zhuyuUsed", IntList2StringList(usedIds).join("+"));
+                    } else {
+                        usedIds = StringList2IntList(invoke->invoker->property("zhuyuUsed").toString().split("+"));
+                    }
+
+                    if (usedIds.length() == ids.length())
+                        break;
+                }
+
+                if (usedIds.length() < ids.length()) {
+                    Card::Suit s = Card::NoSuitBlack; // there must be no actual card be NoSuitBlack. but may be NoSuit.
+                    bool same = true;
+                    foreach (int id, ids) {
+                        if (!usedIds.contains(id)) {
+                            const Card *idCard = Sanguosha->getCard(id);
+                            if (s == Card::NoSuitBlack) {
+                                s = idCard->getSuit();
+                            } else if (s != idCard->getSuit()) {
+                                same = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (same) {
+                        // AI: use original card for Slash
+                        if (!room->askForUseCard(invoke->invoker, "@@zhuyu-card3!", "zhuyu-slash1", 3)) {
+                            DummyCard d;
+                            foreach (int id, ids) {
+                                if (!usedIds.contains(id))
+                                    d.addSubcard(id);
+                            }
+
+                            CardMoveReason r(CardMoveReason::S_REASON_GIVE, invoke->invoker->objectName(), invoke->invoker->objectName(), objectName(), {});
+                            room->obtainCard(invoke->invoker, &d, r);
+                        }
+                    }
+                }
+            } catch (TriggerEvent) {
+                room->setPlayerProperty(invoke->invoker, objectName().toUtf8().constData(), QString());
+                room->setPlayerProperty(invoke->invoker, "zhuyuSuit", QString());
+                room->setPlayerProperty(invoke->invoker, "zhuyuUsed", QString());
+                room->clearAG();
+                throw;
+            }
+
+            room->setPlayerProperty(invoke->invoker, objectName().toUtf8().constData(), QString());
+            room->setPlayerProperty(invoke->invoker, "zhuyuSuit", QString());
+            room->setPlayerProperty(invoke->invoker, "zhuyuUsed", QString());
+            room->clearAG();
+        } else {
+            room->getThread()->delay();
+            room->setPlayerProperty(invoke->invoker, objectName().toUtf8().constData(), QString());
+            room->clearAG();
+        }
+
+        return false;
+    }
+};
+
+class Shuzhu : public TriggerSkill
+{
+public:
+    Shuzhu()
+        : TriggerSkill("shuzhu")
+    {
+        events = {EventPhaseStart};
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *room, const QVariant &data) const override
+    {
+        ServerPlayer *p = data.value<ServerPlayer *>();
+        QList<SkillInvokeDetail> d;
+        if (p->isAlive() && p->getPhase() == Player::Discard && p->getHandcardNum() > p->getMaxCards()) {
+            foreach (ServerPlayer *o, room->getOtherPlayers(p)) {
+                if (o->hasSkill(this))
+                    d << SkillInvokeDetail(this, o, o, p);
+            }
+        }
+
+        return d;
+    }
+
+    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        int id = room->askForCardChosen(invoke->invoker, invoke->targets.first(), "hs", objectName());
+        room->showCard(invoke->targets.first(), id);
+
+        QString choice = "put";
+        if (invoke->invoker->canDiscard(invoke->targets.first(), id, objectName()))
+            choice = room->askForChoice(invoke->invoker, objectName(), "put+discard", id);
+        if (choice == "discard")
+            room->throwCard(id, invoke->targets.first(), invoke->invoker);
+        else
+            room->moveCardsToEndOfDrawpile({id}, true);
+
+        return false;
+    }
+};
 
 TiaosuoCard::TiaosuoCard()
 {
@@ -1400,8 +1895,8 @@ TH18Package::TH18Package()
     sannyo->addSkill(new Boxi);
 
     General *misumaru = new General(this, "misumaru", "hld");
-    misumaru->addSkill(new Skill("zhuyu"));
-    misumaru->addSkill(new Skill("shuzhu"));
+    misumaru->addSkill(new Zhuyu);
+    misumaru->addSkill(new Shuzhu);
 
     General *tsukasa = new General(this, "tsukasa", "hld", 3);
     tsukasa->addSkill(new Tiaosuo);
@@ -1425,6 +1920,8 @@ TH18Package::TH18Package()
     addMetaObject<BoxiUseOrObtainCard>();
     addMetaObject<TiaosuoCard>();
     addMetaObject<JuezhuCard>();
+    addMetaObject<ZhuyuSlashCard>();
+    addMetaObject<ZhuyuUseDiscardPileCard>();
 }
 
 ADD_PACKAGE(TH18)

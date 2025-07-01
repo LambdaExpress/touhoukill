@@ -52,6 +52,36 @@ public:
     void use(Room *room, const CardUseStruct &card_use) const override;
 };
 
+class ZhuyuUseDiscardPileCard : public SkillCard
+{
+    Q_OBJECT
+
+public:
+    Q_INVOKABLE ZhuyuUseDiscardPileCard();
+
+    bool targetFixed(const Player *Self) const override;
+    bool targetsFeasible(const QList<const Player *> &targets, const Player *Self) const override;
+    bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
+    const Card *validate(CardUseStruct &cardUse) const override;
+    void use(Room *room, const CardUseStruct &card_use) const override;
+};
+
+class ZhuyuSlashCard : public SkillCard
+{
+    Q_OBJECT
+
+public:
+    Q_INVOKABLE ZhuyuSlashCard();
+
+    // Card interface
+
+public:
+    bool targetsFeasible(const QList<const Player *> &targets, const Player *Self) const override;
+    bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
+    const Card *validate(CardUseStruct &cardUse) const override;
+    void onEffect(const CardEffectStruct &effect) const override;
+};
+
 class TH18Package : public Package
 {
     Q_OBJECT

@@ -179,8 +179,9 @@ bool ExpPattern::matchOne(const Player *player, const Card *card, QString exp) c
                     } else if (p == "sqchuangshi") {
                         if ((card->getEffectiveId() >= 0 && !player->hasEquip(card)))
                             checkpoint = true;
-                    } else if (p == "benwo" && card->isVirtualCard()) {
-                        return false;
+                    } else if (p == "benwo") {
+                        if (!card->isVirtualCard())
+                            checkpoint = true;
                     } else if (!player->getPile(p).isEmpty() && player->getPile(p).contains(id)) {
                         checkpoint = true;
                     }

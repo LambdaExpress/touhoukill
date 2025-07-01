@@ -2750,13 +2750,17 @@ public:
                 // TODO: CHECK isAvailable FUNCTION OF ALL CARDS!!!!!!
                 // TODO: add 3rd parameter to isProhibited
                 if (Sanguosha->matchExpPattern(pattern, player, card) && !player->isCardLimited(card, Card::MethodUse)) {
+                    canUse = card->targetFixed(player);
+                    if (canUse)
+                        break;
                     foreach (ServerPlayer *t, room->getAlivePlayers()) {
-                        if (card->targetFilter(QList<const Player *>(), t, player) && !player->isProhibited(t, card)) {
+                        if (card->targetFilter({}, t, player) && !player->isProhibited(t, card)) {
                             canUse = true;
                             break;
                         }
                     }
                 }
+
                 if (canUse)
                     break;
             }
@@ -2775,8 +2779,12 @@ public:
                         // TODO: CHECK isAvailable FUNCTION OF ALL CARDS!!!!!!
                         // TODO: add 3rd parameter to isProhibited
                         if (Sanguosha->matchExpPattern(pattern, player, card) && !player->isCardLimited(card, Card::MethodUse)) {
+                            if (card->targetFixed(player)) {
+                                useCard = card;
+                                break;
+                            }
                             foreach (ServerPlayer *t, room->getAlivePlayers()) {
-                                if (card->targetFilter(QList<const Player *>(), t, player) && !player->isProhibited(t, card)) {
+                                if (card->targetFilter({}, t, player) && !player->isProhibited(t, card)) {
                                     useCard = card;
                                     target = t;
                                     break;
