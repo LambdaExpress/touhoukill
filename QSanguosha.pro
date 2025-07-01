@@ -76,6 +76,7 @@ SOURCES += \
     src/package/th17.cpp \
     src/package/th18.cpp \
     src/package/th19.cpp \
+    src/package/th20.cpp \
     src/package/th99.cpp \
     src/package/thndj.cpp \
     src/package/touhougod.cpp \
@@ -185,6 +186,7 @@ HEADERS += \
     src/package/th17.h \
     src/package/th18.h \
     src/package/th19.h \
+    src/package/th20.h \
     src/package/th99.h \
     src/package/thndj.h \
     src/package/touhougod.h \
@@ -271,6 +273,7 @@ macx{
 
 DEFINES += "QSGS_VERSION=\\\"$$VERSION\\\""
 DEFINES += "QSGS_VERSIONNUMBER=\\\"$$VERSIONNUMBER\\\""
+DEFINES += QT_NO_DEPRECATED_WARNINGS
 
 LIBS += -L.
 win32-msvc*{
