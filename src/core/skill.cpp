@@ -208,11 +208,6 @@ bool ViewAsSkill::isEnabledAtResponse(const Player *, const QString &pattern) co
     return false;
 }
 
-QStringList ViewAsSkill::getDialogCardOptions() const
-{
-    return QStringList();
-}
-
 bool ViewAsSkill::isEnabledAtNullification(const ServerPlayer *) const
 {
     return false;

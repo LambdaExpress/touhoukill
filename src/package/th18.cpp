@@ -7,25 +7,441 @@
 #include "roomthread.h"
 #include "skill.h"
 #include "structs.h"
+#include "th10.h"
 
 #include <algorithm>
 #include <cmath>
 
-#undef DESCRIPTION
+SimaoCard::SimaoCard()
+{
+}
 
-#ifdef DESCRIPTION
-["chimata"] = "天弓千亦",
-    ["#chimata"] = "无主物之神", ["simao"] = "司贸",
-    [":simao"] = "<font color=\"green\"><b>出牌阶段限一次，</b></font>你可以令二至四名有牌的角色各弃置一张牌，然后以其中一名角色为起点，这些角色各获得这些弃置的牌中一张牌。",
-    ["liuneng"] = "流能", [":liuneng"] = "你可以视为使用一张其他角色于当前回合内因使用、打出或弃置而失去的基本牌或普通锦囊牌，<font color=\"green\"><b>每回合限一次。</b></font>",
-    ["shirong"] = "市荣",
-    [":shirong"] = "<font color=\"orange\"><b>主公技，</b></font><font "
-                   "color=\"green\"><b>其他龙势力角色的出牌阶段限一次，</b></font>若你手牌数小于你的手牌上限，其可以弃置一张牌，然后你摸一张牌。",
-    ["shirong_attach"] = "市荣",
-    [":shirong_attach"] = "<font color=\"green\"><b>出牌阶段限一次，</b></font>若你属于龙势力且拥有主公技“市荣”的角色的手牌数小于其手牌上限，你可以弃置一张牌，然后其摸一张牌。",
-    ;
-;
-#endif
+bool SimaoCard::targetsFeasible(const QList<const Player *> &targets, const Player * /*Self*/) const
+{
+    return targets.length() >= 2 && targets.length() <= 4;
+}
+
+bool SimaoCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player * /*Self*/) const
+{
+    return targets.length() < 4 && !to_select->isNude();
+}
+
+void SimaoCard::use(Room *room, const CardUseStruct &use) const
+{
+    QList<int> discard;
+
+    foreach (ServerPlayer *p, use.to) {
+        if (!p->isNude()) {
+            const Card *c = room->askForCard(p, "..!", "simao-discard1");
+            if (c != nullptr) {
+                discard << c->getEffectiveId();
+            } else {
+                QList<int> i = p->forceToDiscard(1, true);
+                if (i.isEmpty())
+                    room->showAllCards(p);
+                else
+                    room->throwCard(i.first(), p);
+                discard << i;
+            }
+        }
+    }
+
+    QList<int> toget;
+    foreach (int id, discard) {
+        if (room->getCardPlace(id) == Player::DiscardPile)
+            toget << id;
+    }
+
+    if (toget.isEmpty())
+        return;
+
+    room->fillAG(toget);
+
+    ServerPlayer *start = room->askForPlayerChosen(use.from, use.to, getSkillName(), "simao-starter");
+
+    QList<ServerPlayer *> correctSeq;
+    bool b = false;
+    foreach (ServerPlayer *p, use.to) {
+        if (b || (p == start)) {
+            b = true;
+            correctSeq << p;
+        }
+    }
+
+    foreach (ServerPlayer *p, use.to) {
+        if (p == start)
+            break;
+        correctSeq << p;
+    }
+
+    try {
+        foreach (ServerPlayer *p, correctSeq) {
+            int id = room->askForAG(p, toget, false, getSkillName());
+            room->takeAG(p, id, true, {}, Player::DiscardPile);
+            toget.removeAll(id);
+            discard = toget;
+            foreach (int id, discard) {
+                if (room->getCardPlace(id) != Player::DiscardPile) {
+                    room->takeAG(nullptr, id, false);
+                    toget.removeAll(id);
+                }
+            }
+
+            if (toget.isEmpty())
+                break;
+        }
+    } catch (TriggerEvent) {
+        room->clearAG();
+        throw;
+    }
+    room->clearAG();
+}
+
+class Simao : public ZeroCardViewAsSkill
+{
+public:
+    Simao()
+        : ZeroCardViewAsSkill("simao")
+    {
+    }
+
+    bool isEnabledAtPlay(const Player *player) const override
+    {
+        return !player->hasUsed("SimaoCard");
+    }
+
+    const Card *viewAs() const override
+    {
+        return new SimaoCard;
+    }
+};
+
+ShirongCard::ShirongCard()
+{
+    will_throw = true;
+    m_skillName = "shirong_attach";
+}
+
+bool ShirongCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
+{
+    return targets.isEmpty() && Self != to_select && to_select->hasLordSkill("shirong") && !to_select->hasFlag("shirongInvoked")
+        && to_select->getHandcardNum() < to_select->getMaxCards();
+}
+
+void ShirongCard::onEffect(const CardEffectStruct &effect) const
+{
+    Room *room = effect.to->getRoom();
+    room->setPlayerFlag(effect.to, "shirongInvoked");
+    effect.to->drawCards(1, "shirong");
+}
+
+class ShirongVS : public OneCardViewAsSkill
+{
+public:
+    ShirongVS()
+        : OneCardViewAsSkill("shirong_attach")
+    {
+        attached_lord_skill = true;
+        filter_pattern = ".!";
+    }
+
+    bool shouldBeVisible(const Player *Self) const override
+    {
+        return (Self != nullptr) && Self->getKingdom() == "hld";
+    }
+
+    bool isEnabledAtPlay(const Player *player) const override
+    {
+        if (player->isNude() || !shouldBeVisible(player))
+            return false;
+        foreach (const Player *p, player->getAliveSiblings()) {
+            if (p->hasLordSkill("shirong") && !p->hasFlag("shirongInvoked"))
+                return true;
+        }
+        return false;
+    }
+
+    const Card *viewAs(const Card *originalCard) const override
+    {
+        ShirongCard *sr = new ShirongCard;
+        sr->addSubcard(originalCard);
+        return sr;
+    }
+};
+
+class Shirong : public TriggerSkill
+{
+public:
+    Shirong()
+        : TriggerSkill("shirong$")
+    {
+        events << GameStart << EventAcquireSkill << EventLoseSkill << EventPhaseChanging << Revive;
+    }
+
+    void record(TriggerEvent triggerEvent, Room *room, QVariant &data) const override
+    {
+        if (triggerEvent != EventPhaseChanging) {
+            static QString attachName = "shirong_attach";
+            QList<ServerPlayer *> aqs;
+            foreach (ServerPlayer *p, room->getAllPlayers()) {
+                if (p->hasLordSkill(this, true))
+                    aqs << p;
+            }
+
+            if (aqs.length() > 1) {
+                foreach (ServerPlayer *p, room->getAllPlayers()) {
+                    if (!p->hasLordSkill(attachName, true))
+                        room->attachSkillToPlayer(p, attachName);
+                }
+            } else if (aqs.length() == 1) {
+                foreach (ServerPlayer *p, room->getAllPlayers()) {
+                    if (p->hasLordSkill(this, true) && p->hasLordSkill(attachName, true))
+                        room->detachSkillFromPlayer(p, attachName, true);
+                    else if (!p->hasLordSkill(this, true) && !p->hasLordSkill(attachName, true))
+                        room->attachSkillToPlayer(p, attachName);
+                }
+            } else { // the case that aqs is empty
+                foreach (ServerPlayer *p, room->getAllPlayers()) {
+                    if (p->hasLordSkill(attachName, true))
+                        room->detachSkillFromPlayer(p, attachName, true);
+                }
+            }
+        } else {
+            PhaseChangeStruct phase_change = data.value<PhaseChangeStruct>();
+            if (phase_change.from != Player::Play)
+                return;
+            QList<ServerPlayer *> players = room->getOtherPlayers(phase_change.player);
+            foreach (ServerPlayer *p, players) {
+                if (p->hasFlag("shirongInvoked"))
+                    room->setPlayerFlag(p, "-shirongInvoked");
+            }
+        }
+    }
+};
+
+namespace {
+const QString LiunengBeforeTagName = "liuneng" + QString::number(static_cast<int>(BeforeCardsMove));
+const QString LiunengAfterTagName = "liuneng" + QString::number(static_cast<int>(CardsMoveOneTime));
+const QString LiunengSetProperty = "liuneng" + QString::number(static_cast<int>(EventAcquireSkill));
+} // namespace
+
+class LiunengVS : public ZeroCardViewAsSkill
+{
+public:
+    LiunengVS(const QString &base)
+        : ZeroCardViewAsSkill(base)
+    {
+        response_or_use = true;
+    }
+
+    bool isEnabledAtPlay(const Player *player) const override
+    {
+        if (player->hasFlag(objectName()))
+            return false;
+
+        QStringList classNames = player->property(objectName().toUtf8().constData()).toString().split("+");
+        foreach (const QString &cl, classNames) {
+            Card *c = Sanguosha->cloneCard(cl);
+            DELETE_OVER_SCOPE(Card, c);
+            c->setSkillName(objectName());
+            if (c->isAvailable(player))
+                return true;
+        }
+
+        return false;
+    }
+
+    bool isEnabledAtResponse(const Player *player, const QString &pattern) const override
+    {
+        if (player->hasFlag(objectName()))
+            return false;
+
+        if (Sanguosha->getCurrentCardUseReason() != CardUseStruct::CARD_USE_REASON_RESPONSE_USE)
+            return false;
+
+        if (player->isCurrent()) {
+            if (!player->isInMainPhase())
+                return false;
+        } else {
+            foreach (const Player *p, player->getSiblings()) {
+                if (p->isCurrent()) {
+                    if (!p->isInMainPhase())
+                        return false;
+                    break;
+                }
+            }
+        }
+
+        const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
+        if (cardPattern == nullptr)
+            return false;
+
+        QStringList classNames = player->property(objectName().toUtf8().constData()).toString().split("+");
+        foreach (const QString &cl, classNames) {
+            Card *c = Sanguosha->cloneCard(cl);
+            DELETE_OVER_SCOPE(Card, c)
+            c->setSkillName(objectName());
+            if (cardPattern->match(player, c))
+                return true;
+        }
+
+        return false;
+    }
+
+    bool isEnabledAtNullification(const ServerPlayer *player) const override
+    {
+        if (player->hasFlag(objectName()))
+            return false;
+
+        if (player->isCurrent()) {
+            if (!player->isInMainPhase())
+                return false;
+        } else {
+            foreach (const Player *p, player->getSiblings()) {
+                if (p->isCurrent()) {
+                    if (!p->isInMainPhase())
+                        return false;
+                    break;
+                }
+            }
+        }
+
+        return player->property(objectName().toUtf8().constData()).toString().contains("Nullification");
+    }
+
+    const Card *viewAs() const override
+    {
+        Card *c = Sanguosha->cloneCard(Self->tag.value(objectName()).toString());
+        if (c != nullptr) {
+            c->setSkillName(objectName());
+            c->setShowSkill(objectName());
+            return c;
+        }
+
+        return nullptr;
+    }
+};
+
+class Liuneng : public TriggerSkill
+{
+public:
+    Liuneng()
+        : TriggerSkill("liuneng")
+    {
+        events = {BeforeCardsMove, CardsMoveOneTime, EventPhaseChanging, EventAcquireSkill, EventLoseSkill, PreCardUsed};
+        global = true;
+        view_as_skill = new LiunengVS(objectName());
+    }
+
+    QDialog *getDialog() const override
+    {
+        return QijiDialog::getInstance(objectName());
+    }
+
+    void record(TriggerEvent triggerEvent, Room *room, QVariant &data) const override
+    {
+        if (triggerEvent == EventPhaseChanging) {
+            PhaseChangeStruct st = data.value<PhaseChangeStruct>();
+            if (st.to == Player::NotActive) {
+                foreach (ServerPlayer *p, room->getAllPlayers()) {
+                    p->tag.remove(LiunengBeforeTagName);
+                    p->tag.remove(LiunengAfterTagName);
+                    if (p->tag.contains(LiunengSetProperty)) {
+                        p->tag.remove(LiunengSetProperty);
+                        room->setPlayerProperty(p, objectName().toUtf8().constData(), QString());
+                    }
+
+                    room->setPlayerFlag(p, "-" + objectName());
+                }
+            }
+
+            return;
+        }
+
+        if (triggerEvent == PreCardUsed) {
+            CardUseStruct use = data.value<CardUseStruct>();
+            if (use.card->getSkillName() == objectName())
+                room->setPlayerFlag(use.from, objectName());
+
+            return;
+        }
+
+        bool modified = false;
+        if (triggerEvent == BeforeCardsMove || triggerEvent == CardsMoveOneTime) {
+            CardsMoveOneTimeStruct move = data.value<CardsMoveOneTimeStruct>();
+            for (int i = 0; i < move.card_ids.length(); ++i) {
+                const Card *card = room->getCard(move.card_ids.at(i));
+                if ((card->getTypeId() == Card::TypeBasic || card->isNDTrick()) && move.from != nullptr
+                    && (move.from_places.at(i) == Player::PlaceHand || move.from_places.at(i) == Player::PlaceEquip)
+                    && (((move.reason.m_reason & CardMoveReason::S_MASK_BASIC_REASON) == CardMoveReason::S_REASON_USE)
+                        || ((move.reason.m_reason & CardMoveReason::S_MASK_BASIC_REASON) == CardMoveReason::S_REASON_RESPONSE)
+                        || ((move.reason.m_reason & CardMoveReason::S_MASK_BASIC_REASON) == CardMoveReason::S_REASON_DISCARD))) {
+                    QVariantMap m;
+                    if (move.from->tag.contains(LiunengBeforeTagName))
+                        m = move.from->tag[LiunengBeforeTagName].toMap();
+                    QString cardKey = QString::number(move.card_ids.at(i));
+
+                    if (triggerEvent == BeforeCardsMove) {
+                        m[cardKey] = card->objectName();
+                    } else {
+                        QString className = card->objectName();
+
+                        if (m.contains(cardKey)) {
+                            className = m[cardKey].toString();
+                            m.remove(cardKey);
+                        }
+
+                        QStringList c;
+                        if (move.from->tag.contains(LiunengAfterTagName))
+                            c = move.from->tag[LiunengAfterTagName].toStringList();
+                        if (!c.contains(className))
+                            c << className;
+                        move.from->tag[LiunengAfterTagName] = c;
+                        modified = true;
+                    }
+
+                    move.from->tag[LiunengBeforeTagName] = m;
+                }
+            }
+        }
+
+        if (triggerEvent == EventAcquireSkill || triggerEvent == EventLoseSkill) {
+            SkillAcquireDetachStruct st = data.value<SkillAcquireDetachStruct>();
+            if (st.skill == this)
+                modified = true;
+        }
+
+        if (modified) {
+            foreach (ServerPlayer *p, room->getAllPlayers()) {
+                if (!p->hasSkill(this)) {
+                    if (p->tag.contains(LiunengSetProperty)) {
+                        p->tag.remove(LiunengSetProperty);
+                        room->setPlayerProperty(p, objectName().toUtf8().constData(), QString());
+                    }
+                } else {
+                    QStringList prop1;
+                    QStringList prop;
+                    if (p->tag.contains(LiunengSetProperty))
+                        prop1 = p->tag[LiunengSetProperty].toStringList();
+
+                    foreach (ServerPlayer *p2, room->getOtherPlayers(p)) {
+                        QStringList c;
+                        if (p2->tag.contains(LiunengAfterTagName))
+                            c = p2->tag[LiunengAfterTagName].toStringList();
+                        foreach (const QString &cn, c)
+                            prop << cn;
+                    }
+
+                    if (prop1.toSet() != prop.toSet()) {
+                        prop1 = prop.toSet().toList();
+                        p->tag[LiunengSetProperty] = prop1;
+                        room->setPlayerProperty(p, objectName().toUtf8().constData(), prop1.join("+"));
+                    }
+                }
+            }
+        }
+    }
+};
 
 class Cizhao : public TriggerSkill
 {
@@ -1875,9 +2291,9 @@ TH18Package::TH18Package()
     : Package("th18")
 {
     General *chimata = new General(this, "chimata$", "hld");
-    chimata->addSkill(new Skill("simao"));
-    chimata->addSkill(new Skill("liuneng"));
-    chimata->addSkill(new Skill("shirong$"));
+    chimata->addSkill(new Simao);
+    chimata->addSkill(new Liuneng);
+    chimata->addSkill(new Shirong);
 
     General *mike = new General(this, "mike", "hld", 3);
     mike->addSkill(new Cizhao);
@@ -1922,6 +2338,10 @@ TH18Package::TH18Package()
     addMetaObject<JuezhuCard>();
     addMetaObject<ZhuyuSlashCard>();
     addMetaObject<ZhuyuUseDiscardPileCard>();
+    addMetaObject<SimaoCard>();
+    addMetaObject<ShirongCard>();
+
+    skills << new ShirongVS;
 }
 
 ADD_PACKAGE(TH18)

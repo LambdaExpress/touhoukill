@@ -73,12 +73,32 @@ class ZhuyuSlashCard : public SkillCard
 public:
     Q_INVOKABLE ZhuyuSlashCard();
 
-    // Card interface
-
-public:
     bool targetsFeasible(const QList<const Player *> &targets, const Player *Self) const override;
     bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
     const Card *validate(CardUseStruct &cardUse) const override;
+    void onEffect(const CardEffectStruct &effect) const override;
+};
+
+class SimaoCard : public SkillCard
+{
+    Q_OBJECT
+
+public:
+    Q_INVOKABLE SimaoCard();
+
+    bool targetsFeasible(const QList<const Player *> &targets, const Player *Self) const override;
+    bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
+    void use(Room *room, const CardUseStruct &use) const override;
+};
+
+class ShirongCard : public SkillCard
+{
+    Q_OBJECT
+
+public:
+    Q_INVOKABLE ShirongCard();
+
+    bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
     void onEffect(const CardEffectStruct &effect) const override;
 };
 

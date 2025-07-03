@@ -587,6 +587,10 @@ void QijiDialog::popup()
             } else if (object_name == "shende") {
                 if (card->isKindOf("BasicCard"))
                     validPatterns << card->objectName();
+            } else if (object_name == "liuneng") {
+                QStringList wangXl = Self->property("liuneng").toString().split("+");
+                if (wangXl.contains(card->objectName()))
+                    validPatterns << card->objectName();
             } else {
                 if (card->isNDTrick() || card->isKindOf("BasicCard"))
                     validPatterns << card->objectName();
@@ -760,6 +764,7 @@ public:
         : OneCardViewAsSkill("qiji")
     {
         filter_pattern = ".|.|.|hand";
+        // response_or_use = true; // It should be "true" but...
     }
 
     static QStringList responsePatterns()
