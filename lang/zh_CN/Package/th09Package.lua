@@ -10,7 +10,7 @@ return
 	["designer:suika"] = "星野梦美☆",
 
 	["illustrator:suika"] = "りすたる",
-	["origin:suika"] = "p号：36915940；个人id：87950",
+	["origin:suika"] = "p号：36915940，个人id：87950",
 	["illustrator:suika_1"] = "ryosios",
 	["origin:suika_1"] = "p号：16940878，个人id：1508165", --（作者表态可以用）
 	["illustrator:suika_2"] = "キツネ",
@@ -24,15 +24,15 @@ return
 	["illustrator:suika_6"] = "阿桜",
 	["origin:suika_6"] = "p号：24157010，个人id：39753",--(貌似ok)
 	["illustrator:suika_7"] = "たみく",
-	["origin:suika_7"] = "p号：85669957；个人id：20926215",
+	["origin:suika_7"] = "p号：85669957，个人id：20926215",
 	["illustrator:suika_8"] = "Goback",
-	["origin:suika_8"] = "p号：80083721；个人id：5846268",
+	["origin:suika_8"] = "p号：80083721，个人id：5846268",
 	["illustrator:suika_9"] = "まあち",
-	["origin:suika_9"] = "p号：71292988；个人id：23177484",
+	["origin:suika_9"] = "p号：71292988，个人id：23177484",
 	["illustrator:suika_10"] = "純",
-	["origin:suika_10"] = "p号：66365230；个人id：209109",
+	["origin:suika_10"] = "p号：66365230，个人id：209109",
 	["illustrator:suika_11"] = "桐野",
-	["origin:suika_11"] = "p号：44318977；个人id：3297691",
+	["origin:suika_11"] = "p号：44318977，个人id：3297691",
 
 	["zuiyue"] = "醉月",
 	[":zuiyue"] = "出牌阶段，若你于此阶段内使用过非基本牌，你可以视为使用【酒】。",
@@ -244,9 +244,9 @@ return
 	["illustrator:hatate_4"] = "c7肘",
 	["origin:hatate_4"] = "p号：29166434，个人id：217707",
 	["illustrator:hatate_5"] = "緋比ユキ",
-	["origin:hatate_5"] = "p号：73661881；个人id：14037377",
+	["origin:hatate_5"] = "p号：73661881，个人id：14037377",
 	["illustrator:hatate_6"] = "キヌコ",
-	["origin:hatate_6"] = "p号：90380642；个人id：462527",
+	["origin:hatate_6"] = "p号：90380642，个人id：462527",
 
 	["kuaizhao"] = "快照",
 	[":kuaizhao"] = "摸牌阶段结束时，你可以弃置一张牌并展示你攻击范围内的一名角色的手牌，选择一项：1.摸X张牌（X为其中的基本牌数且至多为2）；2.依次视为使用其中至多X张不同名的黑色的基本牌或普通锦囊牌。",
@@ -267,7 +267,7 @@ return
 	["designer:kokoro"] = "三国有单",
 
 	["illustrator:kokoro"] = "ゾウノセ",
-	["origin:kokoro"] = "p号：38863400",
+	["origin:kokoro"] = "p号：38863400，个人id：2622803",
 	["illustrator:kokoro_1"] = "薄稀",
 	["origin:kokoro_1"] = "p号：36237520",
 	["illustrator:kokoro_2"] = "藤宮ふみや",
@@ -277,7 +277,7 @@ return
 	["illustrator:kokoro_4"] = "NEKO♨BFG1 II",
 	["origin:kokoro_4"] = "p号：38162749，个人id：2600911",
 	["illustrator:kokoro_5"] = "ちろたた/tirotata",
-	["origin:kokoro_5"] = "p号：68574773；个人id：4743526",
+	["origin:kokoro_5"] = "p号：68574773，个人id：4743526",
 
 
 	["nengwu"] = "能舞",
@@ -298,7 +298,7 @@ return
 	["designer:sumireko"] = "星野梦美☆",
 
 	["illustrator:sumireko"] = "りひと",
-	["origin:sumireko"] = "p号：53754910",
+	["origin:sumireko"] = "p号：53754910，个人id：1463626",
 	["illustrator:sumireko_1"] = "チマQ",
 	["origin:sumireko_1"] = "p号：50538452",
 	["illustrator:sumireko_2"] = "うらないし",
@@ -321,7 +321,7 @@ return
 	["designer:sumireko_sp"] = "bullytou",
 
 	["illustrator:sumireko_sp"] = "EO@例大祭ひ19ab",
-	["origin:sumireko_sp"] = "p号：50349017；个人id：3261838",
+	["origin:sumireko_sp"] = "p号：50349017，个人id：3261838",
 
 	["mengxiang"] = "梦乡",
 	[":mengxiang"] = "你可以跳过出牌阶段，若如此做，此回合的弃牌阶段结束时，你可以依次观看至多X名角色（X为你于此阶段内弃置的牌的牌数）的手牌并可以使用各自的一张手牌，以此法使用非基本牌结算结束后，失去此牌的角色摸一张牌。",
@@ -346,7 +346,7 @@ return
 	["designer:yorigamis"] = "bullytou",
 
 	["illustrator:yorigamis"] = "ひそな",
-	["origin:yorigamis"] = "p号：66714217；个人id：173260",
+	["origin:yorigamis"] = "p号：66714217，个人id：173260",
 
 	["jianshe"] = "俭奢",
 	[":jianshe"] = "其他角色的结束阶段开始时，你可以弃置一张牌，令其选择一项：1.交给你一张牌；2.摸一张牌，然后失去1点体力。",
@@ -366,11 +366,11 @@ return
 	["designer:kokoro_sp"] = "223",
 
 	["illustrator:kokoro_sp"] = "Ny速@3日目V23a",
-	["origin:kokoro_sp"] = "p号：37640183；个人id：218591",
+	["origin:kokoro_sp"] = "p号：37640183，个人id：218591",
 	["illustrator:kokoro_sp_1"] = "poppy",
-	["origin:kokoro_sp_1"] = "p号：38073917；个人id：3596054",
+	["origin:kokoro_sp_1"] = "p号：38073917，个人id：3596054",
 	["illustrator:kokoro_sp_2"] = "ぢせ",
-	["origin:kokoro_sp_2"] = "p号：75568924；个人id：4790",
+	["origin:kokoro_sp_2"] = "p号：75568924，个人id：4790",
 
 	["mianling"] = "面灵",
 	[":mianling"] = "<font color=\"blue\"><b>锁定技，</b></font>当你从牌堆获得牌时，你将牌堆顶等量的牌置于人物牌上称为“面”，然后若“面”数大于存活角色数，你将X张的“面”置入弃牌堆（X为两者之差）；你能使用“面”，以此法使用牌结算完毕后，你须弃置一张牌或失去1点体力。",

@@ -18,7 +18,7 @@ return{
 	["illustrator:kanako_4"] = "栗",
 	["origin:kanako_4"] = "p号：44206123，个人id：36168",
 	["illustrator:kanako_5"] = "京田スズカ",
-	["origin:kanako_5"] = "p号：77299232；个人id：3718340",
+	["origin:kanako_5"] = "p号：77299232，个人id：3718340",
 
 	["shende"] = "神德",
 	[":shende"] = "当你使用或打出【杀】时，或于弃牌阶段弃置【杀】后，你可以摸一张牌，然后将一张手牌置于人物牌上，称为“神德”；你可以将两张“神德”当任意基本牌使用。",
@@ -54,7 +54,7 @@ return{
 	["illustrator:suwako_6"] = " UGUME ",
 	["origin:suwako_6"] = "p号：44628917，个人id：1457830",
 	["illustrator:suwako_7"] = "Goback",
-	["origin:suwako_7"] = "p号：78661165；个人id：5846268",
+	["origin:suwako_7"] = "p号：78661165，个人id：5846268",
 
 	["bushu"] = "不输",
 	[":bushu"] = "当你或一名在你攻击范围内的角色受到伤害后，若其存活，你可以与来源拼点：当你赢后，其回复1点体力；当你没赢后，你获得来源的拼点牌。",
@@ -259,7 +259,7 @@ return{
 	["illustrator:minoriko_3"] = "shinia",
 	["origin:minoriko_3"] = "p号：31553367，个人id：44778",
 	["illustrator:minoriko_4"] = "Tonan",
-	["origin:minoriko_4"] = "p号：112520210；个人id：10847637",
+	["origin:minoriko_4"] = "p号：112520210，个人id：10847637",
 
 	["fengrang"] = "丰穰",
 	[":fengrang"] = "<font color=\"green\"><b>出牌阶段限一次，</b></font>你可以视为使用【五谷丰登】。",
@@ -273,7 +273,7 @@ return{
 	["designer:shizuha"] = "星野梦美☆",
 
 	["illustrator:shizuha"] = "Sui.",
-	["origin:shizuha"] = "p号：30609152",
+	["origin:shizuha"] = "p号：30609152，个人id：304123",
 	["illustrator:shizuha_1"] = "c7肘",
 	["origin:shizuha_1"] = "p号：42826425，个人id：217707",
 	["illustrator:shizuha_2"] = "平賀まつり",
@@ -283,7 +283,7 @@ return{
 	["illustrator:shizuha_4"] = "ポップル",
 	["origin:shizuha_4"] = "p号：7048869，个人id：888775",
 	["illustrator:shizuha_5"] = "海緒ユカ",
-	["origin:shizuha_5"] = "p号：47759499；个人id：179619",
+	["origin:shizuha_5"] = "p号：47759499，个人id：179619",
 
 	["jiliao"] = "寂寥",
 	[":jiliao"] = "<font color=\"green\"><b>出牌阶段限一次，</b></font>你可以令一名角色获得其装备区里的所有牌（可以为零），然后若其手牌数大于其手牌上限，你可以弃置其一张手牌。",

@@ -9,11 +9,11 @@ return {
 	["designer:okina"] = "三国有单",
 
 	["illustrator:okina"] = "べらぼう",
-	["origin:okina"] = "p号：64759772；个人id：6259229",
+	["origin:okina"] = "p号：64759772，个人id：6259229",
 	["illustrator:okina_1"] = "多多良葛三",
-	["origin:okina_1"] = "p号：74273117；个人id：20972118",
+	["origin:okina_1"] = "p号：74273117，个人id：20972118",
 	["illustrator:okina_2"] = "かめぱすた",
-	["origin:okina_2"] = "p号：99276414；个人id：49675420",
+	["origin:okina_2"] = "p号：99276414，个人id：49675420",
 
 	["mishen"] = "秘神",
 	[":mishen"] = "你可以横置人物牌或装备区的一张牌并视为使用【调虎离山】。",
@@ -31,7 +31,7 @@ return {
 	["designer:okina_sp"] = "辰焰天明",
 
 	["illustrator:okina_sp"] = "河CY",
-	["origin:okina_sp"] = "p号：74071512；个人id：3869665",
+	["origin:okina_sp"] = "p号：74071512，个人id：3869665",
 
 	["menfei"] = "门扉",
 	[":menfei"] = "出牌阶段，若所有角色均没有“扉”标记，你可以令一名角色获得“扉”标记。当你使用牌结算完毕后，你将“扉”标记转移给拥有该标记的角色的下家。",
@@ -45,7 +45,7 @@ return {
 	["designer:eternity"] = "七曜",
 
 	["illustrator:eternity"] = "minusT",
-	["origin:eternity"] = "p号：65972608；个人id：15772166",
+	["origin:eternity"] = "p号：65972608，个人id：15772166",
 
 	["diexing"] = "蝶形",
 	[":diexing"] = "<font color=\"blue\"><b>锁定技，</b></font>当你受到伤害后，你摸两张牌；当你一次性失去至少两张手牌后，你回复1点体力。",
@@ -58,11 +58,11 @@ return {
 	["designer:nemuno"] = "三国有单",
 
 	["illustrator:nemuno"] = "针鼠修罗",
-	["origin:nemuno"] = "p号：62793220；个人id：3442252",
+	["origin:nemuno"] = "p号：62793220，个人id：3442252",
 	["illustrator:nemuno_1"] = "gla",
-	["origin:nemuno_1"] = "p号：62791460；个人id：6303597",
+	["origin:nemuno_1"] = "p号：62791460，个人id：6303597",
 	["illustrator:nemuno_2"] = "相生青唯",
-	["origin:nemuno_2"] = "p号：62843426；个人id：16301",
+	["origin:nemuno_2"] = "p号：62843426，个人id：16301",
 
 	["shengyu"]= "圣域",
 	[":shengyu"] = "<font color=\"blue\"><b>锁定技，</b></font>当你使用【杀】或普通锦囊指定一名其他角色为目标后，你令其选择一项：横置其装备区里所有颜色相同的牌；或于此牌结算完毕前不能使用或打出颜色相同的牌。",
@@ -76,7 +76,7 @@ return {
 	["designer:aun"] = "七曜",
 
 	["illustrator:aun"] = "针鼠修罗",
-	["origin:narumi"] = "p号：62808139；个人id：3442252",
+	["origin:narumi"] = "p号：62808139，个人id：3442252",
 
 	["xunfo"] = "寻佛",
 	[":xunfo"] = "<font color=\"blue\"><b>锁定技，</b></font>当主公摸牌（因此技能而摸牌的除外）或回复体力时，若你的手牌数小于5，你摸一张牌。",
@@ -89,13 +89,13 @@ return {
 	["designer:narumi"] = "七曜",
 
 	["illustrator:narumi"] = "サクラメ",
-	["origin:narumi"] = "p号：68269792；个人id：91140",
+	["origin:narumi"] = "p号：68269792，个人id：91140",
 	["illustrator:narumi_1"] = "いづる",
-	["origin:narumi_1"] = "p号：66385505；个人id：18445234",
+	["origin:narumi_1"] = "p号：66385505，个人id：18445234",
 	["illustrator:narumi_2"] = "白山ゆーき",
-	["origin:narumi_2"] = "p号：110712973；个人id：5771665",
+	["origin:narumi_2"] = "p号：110712973，个人id：5771665",
 	["illustrator:narumi_3"] = "皆村春樹",
-	["origin:narumi_3"] = "p号：66672618；个人id：6098",
+	["origin:narumi_3"] = "p号：66672618，个人id：6098",
 
 	["puti"] = "菩提",
 	[":puti"] = "出牌阶段开始时，你可以检索一张锦囊牌并获得之，然后你选择一项：你弃置一张手牌，或你于此阶段内不能使用【杀】。",
@@ -110,7 +110,7 @@ return {
 	["designer:satono"] = "三国有单",
 
 	["illustrator:satono"] = "kirero",
-	["origin:satono"] = "p号：66385589；个人id：35490",
+	["origin:satono"] = "p号：66385589，个人id：35490",
 
 	["guwu"] = "鼓舞",
 	[":guwu"] = "当当前回合角色使用普通锦囊牌时，若选择目标有其上家或下家，你可以横置人物牌或装备区里的一张牌，并令一名角色成为此牌的额外目标。",
@@ -128,7 +128,7 @@ return {
 	["designer:mai"] = "三国有单",
 
 	["illustrator:mai"] = "kirero",
-	["origin:mai"] = "p号：66385589；个人id：35490",
+	["origin:mai"] = "p号：66385589，个人id：35490",
 
 	["kuangwu"] = "狂舞",
 	[":kuangwu"] = "当当前回合角色使用基本牌时，若选择目标有其上家或下家，你可以横置人物牌或装备区里的一张牌，并令一名角色成为此牌的额外目标。",
@@ -147,13 +147,13 @@ return {
 	["designer:lilywhite_sp"] = "dawda",
 
 	["illustrator:lilywhite_sp"] = "名乗る名は無い",
-	["origin:lilywhite_sp"] = "p号：56488470；个人id：2022926",
+	["origin:lilywhite_sp"] = "p号：56488470，个人id：2022926",
 	["illustrator:lilywhite_sp_1"] = "ぢせ",
-	["origin:lilywhite_sp_1"] = "p号：81187146；个人id：4790",
+	["origin:lilywhite_sp_1"] = "p号：81187146，个人id：4790",
 	["illustrator:lilywhite_sp_2"] = "ゆたまろ*",
-	["origin:lilywhite_sp_2"] = "p号：56683839；个人id：1566535",
+	["origin:lilywhite_sp_2"] = "p号：56683839，个人id：1566535",
 	["illustrator:lilywhite_sp_3"] = "ゆたまろ",
-	["origin:lilywhite_sp_3"] = "p号：66592374；个人id：1566535",
+	["origin:lilywhite_sp_3"] = "p号：66592374，个人id：1566535",
 
 	["huazhao"] = "花朝",
 	["spring"] = "春",

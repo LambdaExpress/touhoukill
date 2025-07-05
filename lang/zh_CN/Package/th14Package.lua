@@ -8,7 +8,7 @@ return{
 	["designer:shinmyoumaru"] = "三国有单",
 
 	["illustrator:shinmyoumaru"] = "ミイル",
-	["origin:shinmyoumaru"] = "p号：38962368",
+	["origin:shinmyoumaru"] = "p号：38962368，个人id：220062",
 	["illustrator:shinmyoumaru_1"] = "東天紅",
 	["origin:shinmyoumaru_1"] = "p号：39094589",
 	["illustrator:shinmyoumaru_2"] = "BoboMaster",
@@ -31,7 +31,7 @@ return{
 	["designer:raiko"] = "星野梦美☆",
 
 	["illustrator:raiko"] = "伊吹のつ",
-	["origin:raiko"] = "p号：41891311",
+	["origin:raiko"] = "p号：41891311，个人id：7013",
 	["illustrator:raiko_1"] = "泉水茜",
 	["origin:raiko_1"] = "p号：39316689",
 
@@ -66,7 +66,7 @@ return{
 	["designer:benben"] = "星野梦美☆",
 
 	["illustrator:benben"] = "neko",
-	["origin:benben"] = "p号：38047797",
+	["origin:benben"] = "p号：38047797，个人id：2600911",
 	["illustrator:benben_1"] = "会帆",
 	["origin:benben_1"] = "p号：41942420",
 
@@ -84,7 +84,7 @@ return{
 	["designer:yatsuhashi"] = "星野梦美☆",
 
 	["illustrator:yatsuhashi"] = "neko",
-	["origin:yatsuhashi"] = "p号：38047797",
+	["origin:yatsuhashi"] = "p号：38047797，个人id：2600911",
 	["illustrator:yatsuhashi_1"] = "ウミガラス",
 	["origin:yatsuhashi_1"] = "p号：41847626",
 
@@ -103,19 +103,19 @@ return{
 	["designer:kagerou"] = "星野梦美☆",
 
 	["illustrator:kagerou"] = "myaaco",
-	["origin:kagerou"] = "p号：38562704",
+	["origin:kagerou"] = "p号：38562704，个人id：141026",
 	["illustrator:kagerou_1"] = "kirero",
 	["origin:kagerou_1"] = "p号：40434726",
 	["illustrator:kagerou_2"] = "伊吹のつ",
 	["origin:kagerou_2"] = "p号：43453443，个人id：7013",
 	["illustrator:kagerou_3"] = "いちやん",
-	["origin:kagerou_3"] = "p号：50904786；个人id：3096443",
+	["origin:kagerou_3"] = "p号：50904786，个人id：3096443",
 	["illustrator:kagerou_4"] = "ゆっ",
-	["origin:kagerou_4"] = "p号：56464172；个人id：972314",
+	["origin:kagerou_4"] = "p号：56464172，个人id：972314",
 	["illustrator:kagerou_5"] = "えふぇ",
-	["origin:kagerou_5"] = "p号：49855739；个人id：292644",
+	["origin:kagerou_5"] = "p号：49855739，个人id：292644",
 	["illustrator:kagerou_6"] = "かぎのに",
-	["origin:kagerou_6"] = "p号：85809622；个人id：986719",
+	["origin:kagerou_6"] = "p号：85809622，个人id：986719",
 
 	["langying"] = "狼影",
 	[":langying"] = "当你需要使用/打出【闪】时，你可以获得你装备区里的所有牌，视为使用/打出【闪】。",
@@ -137,9 +137,9 @@ return{
 	["illustrator:sekibanki_3"] = "60枚",
 	["origin:sekibanki_3"] = "p号：45067831，个人id：3322006",
 	["illustrator:sekibanki_4"] = "なまうに",
-	["origin:sekibanki_4"] = "p号：66386135；个人id：11091471",
+	["origin:sekibanki_4"] = "p号：66386135，个人id：11091471",
 	["illustrator:sekibanki_5"] = "O絃",
-	["origin:sekibanki_5"] = "p号：119405177；个人id：6935448",
+	["origin:sekibanki_5"] = "p号：119405177，个人id：6935448",
 
 	["feitou"] = "飞头",
 	["#feitou_slash"]= "飞头",
@@ -179,7 +179,7 @@ return{
 	["designer:seija_sp"] = "bullytou",
 
 	["illustrator:seija_sp"] = "BoboMaster",
-	["origin:seija_sp"] = "p号：43810270",
+	["origin:seija_sp"] = "p号：43810270，个人id：2686423",
 
 	["tianxie"] = "天邪", -- 天蝎？
 	[":tianxie"] = "当一张基本牌或普通锦囊牌对你结算结束后，若此牌未对你生效，你可以摸一张牌，否则你可以令此牌使用者弃置一张牌。",

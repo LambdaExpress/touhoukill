@@ -186,7 +186,7 @@ return{
 	["illustrator:yuyuko_slm"] = "みや",
 	["origin:yuyuko_slm"] = "p号：22766094，个人id：41977",
 	["illustrator:yuyuko_slm_1"] = ".SIN",
-	["origin:yuyuko_slm_1"] = "p号：72973111；个人id：1763655",
+	["origin:yuyuko_slm_1"] = "p号：72973111，个人id：1763655",
 	["illustrator:yuyuko_slm_2"] = "一葉モカ",
 	["origin:yuyuko_slm_2"] = "p号：17232914，个人id：464525",
 	["illustrator:yuyuko_slm_3"] = "はいばね",

@@ -117,7 +117,7 @@ return{
 	["illustrator:patchouli_3"] = "miya9",
 	["origin:patchouli_3"] = "p号：7603627，个人id：110090",
 	["illustrator:patchouli_4"] = "猫車",
-	["origin:patchouli_4"] = "p号：62602701；个人id：167342",
+	["origin:patchouli_4"] = "p号：62602701，个人id：167342",
 	["illustrator:patchouli_5"] = "木子翔",
 	["origin:patchouli_5"] = "p号：33195548，个人id：652180",
 
@@ -161,7 +161,7 @@ return{
 	["illustrator:cirno"] = "Lota",
 	["origin:cirno"] = "p号：65350083，个人id：5384499",
 	["illustrator:cirno_1"] = "かずま",
-	["origin:cirno_1"] = "p号：63736548；个人id：17511699",
+	["origin:cirno_1"] = "p号：63736548，个人id：17511699",
 	["illustrator:cirno_2"] = "あくぁまりん",
 	["origin:cirno_2"] = "p号：1441901，个人id：70728",
 	["illustrator:cirno_3"] = "しょういん",
@@ -229,17 +229,17 @@ return{
 	["illustrator:koakuma_4"] = "cercis",
 	["origin:koakuma_4"] = "未知",
 	["illustrator:koakuma_5"] = "ふぁみ",
-	["origin:koakuma_5"] = "p号：60405503；个人id：5860132",
+	["origin:koakuma_5"] = "p号：60405503，个人id：5860132",
 	["illustrator:koakuma_6"] = "七月夏希",
-	["origin:koakuma_6"] = "p号：65485601；个人id：2030438",
+	["origin:koakuma_6"] = "p号：65485601，个人id：2030438",
 	["illustrator:koakuma_7"] = "双月える",
-	["origin:koakuma_7"] = "p号：64804286；个人id：683771",
+	["origin:koakuma_7"] = "p号：64804286，个人id：683771",
 	["illustrator:koakuma_8"] = "七月夏希",
-	["origin:koakuma_8"] = "p号：79877126；个人id：2030438",
+	["origin:koakuma_8"] = "p号：79877126，个人id：2030438",
 	["illustrator:koakuma_9"] = "sakusyo",
-	["origin:koakuma_9"] = "p号：78702541；个人id：2128441",
+	["origin:koakuma_9"] = "p号：78702541，个人id：2128441",
 	["illustrator:koakuma_10"] = "ののこ",
-	["origin:koakuma_10"] = "p号：69956163；个人id：2458",
+	["origin:koakuma_10"] = "p号：69956163，个人id：2458",
 
 
 	["moqi"] = "魔契",
@@ -255,7 +255,7 @@ return{
 	["designer:daiyousei"] = "星野梦美☆",
 
 	["illustrator:daiyousei"] = "ジョンディー",
-	["origin:daiyousei"] = "p号：59562964",
+	["origin:daiyousei"] = "p号：59562964，个人id：1686747",
 	["illustrator:daiyousei_1"] = "伊吹のつ",
 	["origin:daiyousei_1"] = "p号：34272295，个人id：7013",
 	["illustrator:daiyousei_2"] = "うぬ",
@@ -275,9 +275,9 @@ return{
 	["designer:sakuya_sp"] = "星野梦美☆",
 
 	["illustrator:sakuya_sp"] = "羽々斬",
-	["origin:sakuya_sp"] = "p号：47540364,个人id：2179695",
+	["origin:sakuya_sp"] = "p号：47540364，个人id：2179695",
 	["illustrator:sakuya_sp_1"] = " 老D ",
-	["origin:sakuya_sp_1"] = "p号：49665855,个人id：6317889",
+	["origin:sakuya_sp_1"] = "p号：49665855，个人id：6317889",
 
 	["mizong"]= "觅踪",
 	[":mizong"]= "<font color=\"blue\"><b>锁定技，</b></font>出牌阶段开始时，你选择一名其他角色并判定：当黑色判定牌生效后，你获得之；若结果为红色，你于此回合内与其距离视为1且对其使用【杀】无次数限制。",
@@ -292,9 +292,9 @@ return{
 	["designer:satsuki"] = "辰焰天明",
 
 	["illustrator:satsuki"] = "kaze",
-	["origin:satsuki"] = "p号：46647754 个人id：2579204",
+	["origin:satsuki"] = "p号：46647754，个人id：2579204",
 	["illustrator:satsuki_1"] = "久蒼穹",
-	["origin:satsuki_1"] = "p号：118078258；个人id：66038798",
+	["origin:satsuki_1"] = "p号：118078258，个人id：66038798",
 
 	["xiaoyin"]= "消隐",
 	[":xiaoyin"]= "其他角色的出牌阶段开始时，若你在其攻击范围内，你可以令其摸一张牌，然后其将一张牌当【调虎离山】对你使用（其他角色不是此牌的合法目标）。",
@@ -313,7 +313,7 @@ return{
 	["designer:rumia_sp"] = "三国有单",
 
 	["illustrator:rumia_sp"] = "Koissa",
-	["origin:rumia_sp"] = "p号：68459580 个人id：2845504",
+	["origin:rumia_sp"] = "p号：68459580，个人id：2845504",
 
 	["shixue"]= "嗜血",
 	[":shixue"]= "<font color=\"blue\"><b>锁定技，</b></font>当你造成1点伤害后，你回复1点体力；当你不以此法回复体力时，若你不处于濒死状态，防止此体力回复效果并摸两张牌。",

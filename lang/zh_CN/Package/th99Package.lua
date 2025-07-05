@@ -87,7 +87,7 @@ return{
 	["illustrator:renko_3"] = "An2A",
 	["origin:renko_3"] = "个人id：173876",
 	["illustrator:renko_4"] = "たみく",
-	["origin:renko_4"] = "p号：85151423；个人id：20926215",
+	["origin:renko_4"] = "p号：85151423，个人id：20926215",
 
 	["shitu"] = "识途",
 	[":shitu"] = "非额外的回合结束时，你可以令一名角色获得一个仅有相应阶段的额外回合：若此回合内你未造成过伤害，有摸牌阶段；若此回合内你使用过牌且仅你失去过牌，有出牌阶段。",
@@ -112,7 +112,7 @@ return{
 	["illustrator:merry_3"] = "An2A",
 	["origin:merry_3"] = "个人id：173876",
 	["illustrator:merry_4"] = "七月夏希",
-	["origin:merry_4"] = "p号：77544270；个人id：2030438",
+	["origin:merry_4"] = "p号：77544270，个人id：2030438",
 
 	["mengxian"] = "梦现",
 	[":mengxian"] = "<font color=\"purple\"><b>觉醒技，</b></font>准备阶段开始时，若“境界”数不小于3，你减1点体力上限，然后回复1点体力并获得“乱影”（当其他角色使用基本牌时，你可以将一张与此牌颜色相同的“境界”交给其，令此牌无效）。",
@@ -183,7 +183,7 @@ return{
 	["#sunny"] = "闪耀的日之光",
 
 	["illustrator:sunny"] = "鏡 Area",
-	["origin:sunny"] = "p号：62118590",
+	["origin:sunny"] = "p号：62118590，个人id：2623593",
 
 	["illustrator:sunny_1"] = "NAbyssor",
 	["origin:sunny_1"] = "p号：13854664，个人id：467511",
@@ -207,7 +207,7 @@ return{
 	["designer:lunar"] = "星野梦美☆",
 
 	["illustrator:lunar"] = "鏡 Area",
-	["origin:lunar"] = "p号：62887113",
+	["origin:lunar"] = "p号：62887113，个人id：2623593",
 	["illustrator:lunar_1"] = "NEKO",
 	["origin:lunar_1"] = "p号：28822375，个人id：2600911",
 	["illustrator:lunar_2"] = "ke-ta",
@@ -237,7 +237,7 @@ return{
 	["designer:star"] = "三国有单",
 
 	["illustrator:star"] = "鏡 Area",
-	["origin:star"] = "p号：64175769",
+	["origin:star"] = "p号：64175769，个人id：2623593",
 
 	["illustrator:star_1"] = "和茶",
 	["origin:star_1"] = "p号：38503262，个人id：3312169",
@@ -262,7 +262,7 @@ return{
 	["designer:kasen"] = "三国有单",
 
 	["illustrator:kasen"] = "ニッカ",
-	["origin:kasen"] = "p号：17069244",
+	["origin:kasen"] = "p号：17069244，个人id：225778",
 	["illustrator:kasen_1"] = "ダバディ",
 	["origin:kasen_1"] = "p号：21568756",
 	["illustrator:kasen_2"] = "かがよ",
@@ -304,7 +304,7 @@ return{
 	["designer:cirno_sp"] = "bullytou",
 
 	["illustrator:cirno_sp"] = "隂宅",
-	["origin:cirno_sp"] = "p号：无,个人id：979179",
+	["origin:cirno_sp"] = "p号：无，个人id：979179",
 	["illustrator:cirno_sp_1"] = "ゆき",
 	["origin:cirno_sp_1"] = "p号：20341828，个人id：20341828",
 	["illustrator:cirno_sp_2"] = "玉之けだま",
@@ -327,9 +327,9 @@ return{
 	["designer:mamizou_sp"] = "星野梦美☆",
 
 	["illustrator:mamizou_sp"] = "抽风男",
-	["origin:mamizou_sp"] = "p号：44181708,个人id：9838093",
+	["origin:mamizou_sp"] = "p号：44181708，个人id：9838093",
 	["illustrator:mamizou_sp_1"] = "りひと",
-	["origin:mamizou_sp_1"] = "p号：53048830,个人id：1463626",
+	["origin:mamizou_sp_1"] = "p号：53048830，个人id：1463626",
 	["illustrator:mamizou_sp_2"] = "Cube85",
 	["origin:mamizou_sp_2"] = "p号：56868591，个人id：1490102",
 
@@ -350,13 +350,13 @@ return{
 	["designer:reisen2"] = "辰焰天明",
 
 	["illustrator:reisen2"] = " 小龍 ",
-	["origin:reisen2"] = "p号：56463981,个人id：8780063",
+	["origin:reisen2"] = "p号：56463981，个人id：8780063",
 	["illustrator:reisen2_1"] = "くろぬこネーロ",
-	["origin:reisen2_1"] = "p号：33268695,个人id：335493",
+	["origin:reisen2_1"] = "p号：33268695，个人id：335493",
 	["illustrator:reisen2_2"] = "まほろ",
-	["origin:reisen2_2"] = "p号：80398268；个人id：30112361",
+	["origin:reisen2_2"] = "p号：80398268，个人id：30112361",
 	["illustrator:reisen2_3"] = "碧葉",
-	["origin:reisen2_3"] = "p号：95817518；个人id：68073396",
+	["origin:reisen2_3"] = "p号：95817518，个人id：68073396",
 
 	["sixiang"] = "思乡",
 	[":sixiang"] = "<font color=\"blue\"><b>锁定技，</b></font>一名角色的准备阶段开始时，若你不处于连环状态，你回复1点体力，然后横置。",
@@ -372,7 +372,7 @@ return{
 	["designer:kasen_sp"] = "dawda",
 
 	["illustrator:kasen_sp"] = "井戸さん",
-	["origin:kasen_sp"] = "p号：29151823；个人id：75376",
+	["origin:kasen_sp"] = "p号：29151823，个人id：75376",
 
 	["zhuozhi"] = "酌志",
 	[":zhuozhi"] = "<font color=\"green\"><b>出牌阶段限一次，</b></font>你可以将一张基本牌当【以逸待劳】使用（选择目标含你）。此牌结算结束时，你展示一张手牌，然后获得一张与之类别相同的于此牌结算时因弃置而置入弃牌堆的牌。",

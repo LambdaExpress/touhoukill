@@ -6,6 +6,10 @@ return {
 
 	["chimata"] = "天弓千亦" ,
 	["#chimata"] = "无主物之神" ,
+	["designer:chimata"] = "dawda",
+	["illustrator:chimata"] = "Di2fraction",
+	["origin:chimata"] = "p号：132088193，个人id：117238795",
+
 	["simao"] = "司贸",
 	[":simao"] = "<font color=\"green\"><b>出牌阶段限一次，</b></font>你可以令二至四名有牌的角色各弃置一张牌，然后以其中一名角色为起点，这些角色各获得这些弃置的牌中一张牌。",
 	["simao-discard1"] = "请弃置 1 张牌，包括装备",
@@ -19,6 +23,10 @@ return {
 
 	["mike"] = "豪德寺三花" ,
 	["#mike"] = "生意兴隆的吉祥物" ,
+	["designer:mike"] = "dawda",
+	["illustrator:mike"] = "染院（そめいん）",
+	["origin:mike"] = "p号：123519389，个人id：36917325",
+
 	["cizhao"] = "次招",
 	[":cizhao"] = "其他角色的出牌阶段开始时，你可以将一张牌交给其，令其选择一项：1.摸一张牌，然后与除其外的角色的距离于此回合内+2；2.弃置一张牌，然后与除其外的角色的距离于此回合内-1。",
 	["#cizhao-distance"] = "次招",
@@ -31,6 +39,10 @@ return {
 
 	["takane"] = "山城高岭" ,
 	["#takane"] = "深山的经商妖怪" ,
+	["designer:takane"] = "dawda",
+	["illustrator:takane"] = "白河",
+	["origin:takane"] = "p号：104872263，个人id：18258356",
+
 	["yingji"] = "营计",
 	[":yingji"] = "一名角色的出牌阶段结束时，若其于此阶段内使用的最后一张牌是普通锦囊牌并在弃牌堆里，你可以将之置于你的人物牌上称为“货”；当一名角色于其出牌阶段内使用第一张牌时，若此牌是基本牌且你人物牌上有“货”，你可以获得此基本牌，然后其获得一张“货”。",
 	["goods"] = "货",
@@ -42,6 +54,10 @@ return {
 
 	["sannyo"] = "驹草山如" ,
 	["#sannyo"] = "栖息于高地的山女郎" ,
+	["designer:sannyo"] = "dawda",
+	["illustrator:sannyo"] = "Dedmaster373",
+	["origin:sannyo"] = "p号：108532818，个人id：19185794",
+
 	["boxi"] = "博戏",
 	[":boxi"] = "<font color=\"green\"><b>出牌阶段限一次，</b></font>你可以顺时或逆时针令所有有牌的角色逐个展示一张牌，然后你可以再展示一张牌。均展示后，你弃置这些展示的牌中牌数唯一最多的花色牌，令展示牌数最少（可并列）的花色牌的角色各摸一张牌，最后你可以使用或获得一张因此次弃置而置入弃牌堆的牌。<br/><br/>&nbsp; 操作：选择上家 - 顺时针，选择下家 - 逆时针",
 	["#boxiCl"] = "%from 发动 %arg 选择了 %arg2。",
@@ -53,6 +69,10 @@ return {
 
 	["misumaru"] = "玉造魅须丸" ,
 	["#misumaru"] = "真正的勾玉匠人" ,
+	["designer:takane"] = "dawda",
+	["illustrator:takane"] = "一本たたら",
+	["origin:takane"] = "p号：131173075，个人id：87193739",
+
 	["zhuyu"] = "铸玉",
 	[":zhuyu"] = "摸牌阶段结束时，你可以展示牌堆底的三张牌，然后可以弃置一张牌并选择一项：依次使用其中与之花色相同的能使用的牌；或将其中与之花色不同的牌置入弃牌堆。选择后若余下的牌花色相同，你将之当【杀】使用或交给一名角色。",
 	["#ZhuyuForceUseBug"] = "%from 的“铸玉”强制使用牌流程出现问题，请保存录像并联系开发者。",
@@ -71,6 +91,10 @@ return {
 
 	["tsukasa"] = "菅牧典" ,
 	["#tsukasa"] = "耳边低语的邪恶白狐" ,
+	["designer:tsukasa"] = "dawda",
+	["illustrator:tsukasa"] = "Coco",
+	["origin:tsukasa"] = "p号：121333899，个人id：97584412",
+
 	["tiaosuo"] = "挑唆",
 	[":tiaosuo"] = "其他角色的出牌阶段开始时，你可以将一张黑色牌交给其并横置或重置其和另一名角色，然后其于此阶段内：使用【杀】的次数+1且无距离限制；使用【杀】或【决斗】不能选择与其人物牌横竖放置状态不同的角色为目标。",
 	["tiaosuo-ts"] = "挑唆 %src 的出牌阶段开始，你可以将一张黑色牌交给 %src，并选择一名需要同时“连环”的目标。",
@@ -83,6 +107,10 @@ return {
 
 	["megumu"] = "饭纲丸龙" ,
 	["#megumu"] = "鸦天狗的首领" ,
+	["designer:megumu"] = "dawda",
+	["illustrator:megumu"] = "一本たたら",
+	["origin:megumu"] = "p号：118123646，个人id：87193739",
+
 	["fgwlshezheng"] = "涉政",
 	[":fgwlshezheng"] = "当你于出牌阶段内使用牌时，你可以将牌堆底的一张牌置入弃牌堆，若两张牌颜色：相同，你于此阶段内使用的本牌和下一张牌不计入使用次数限制；不同，你弃置一张牌。",
 	["fgwlshezheng:i"] = "摄政你使用的 %arg2 为 %arg。你可以将牌堆底的一张牌置入弃牌堆。",
@@ -93,6 +121,10 @@ return {
 
 	["momoyo"] = "姬虫百百世" ,
 	["#momoyo"] = "漆黑的噬龙者" ,
+	["designer:momoyo"] = "dawda",
+	["illustrator:momoyo"] = "arcera",
+	["origin:momoyo"] = "p号：112577770，个人id：60075095",
+
 	["juezhu"] = "掘珠",
 	[":juezhu"] = "<font color=\"green\"><b>出牌阶段限一次，</b></font>你可以选择所有手牌数不小于你的其他角色，令其各选择一项：1.令你摸一张牌；2.摸一张牌，然后你可以终止此流程并视为对其使用【决斗】。",
 	["juezhu:letdraw"] = "令其摸 1 张牌",
