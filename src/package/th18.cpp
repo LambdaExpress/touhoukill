@@ -239,13 +239,16 @@ public:
         if (player->hasFlag(objectName()))
             return false;
 
-        QStringList classNames = player->property(objectName().toUtf8().constData()).toString().split("+");
-        foreach (const QString &cl, classNames) {
-            Card *c = Sanguosha->cloneCard(cl);
-            DELETE_OVER_SCOPE(Card, c);
-            c->setSkillName(objectName());
-            if (c->isAvailable(player))
-                return true;
+        QString classNameStr = player->property(objectName().toUtf8().constData()).toString();
+        if (!classNameStr.isEmpty()) {
+            QStringList classNames = classNameStr.split("+");
+            foreach (const QString &cl, classNames) {
+                Card *c = Sanguosha->cloneCard(cl);
+                DELETE_OVER_SCOPE(Card, c);
+                c->setSkillName(objectName());
+                if (c->isAvailable(player))
+                    return true;
+            }
         }
 
         return false;
@@ -276,13 +279,16 @@ public:
         if (cardPattern == nullptr)
             return false;
 
-        QStringList classNames = player->property(objectName().toUtf8().constData()).toString().split("+");
-        foreach (const QString &cl, classNames) {
-            Card *c = Sanguosha->cloneCard(cl);
-            DELETE_OVER_SCOPE(Card, c)
-            c->setSkillName(objectName());
-            if (cardPattern->match(player, c))
-                return true;
+        QString classNameStr = player->property(objectName().toUtf8().constData()).toString();
+        if (!classNameStr.isEmpty()) {
+            QStringList classNames = classNameStr.split("+");
+            foreach (const QString &cl, classNames) {
+                Card *c = Sanguosha->cloneCard(cl);
+                DELETE_OVER_SCOPE(Card, c)
+                c->setSkillName(objectName());
+                if (cardPattern->match(player, c))
+                    return true;
+            }
         }
 
         return false;
