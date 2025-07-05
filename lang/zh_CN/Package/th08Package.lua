@@ -36,7 +36,7 @@ return
 	["designer:eirin"] = "星野梦美☆",
 
 	["illustrator:eirin"] = "ryosios",
-	["origin:eirin"] = "p号：50353643,，个人id：1508165",
+	["origin:eirin"] = "p号：50353643，个人id：1508165",
 	["illustrator:eirin_1"] = "ふうりん",
 	["origin:eirin_1"] = "p号：29195668，个人id：174971",
 	["illustrator:eirin_2"] = "なむこ",

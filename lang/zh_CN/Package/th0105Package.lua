@@ -12,7 +12,7 @@ return {
 	["illustrator:mima_1"] = "Cro",
 	["origin:mima_1"] = "p号：4117188，个人id：185077",
 	["illustrator:mima_2"] = "カタケイ",
-	["origin:mima_2"] = "p号：43376152,，个人id：90042",
+	["origin:mima_2"] = "p号：43376152，个人id：90042",
 	["illustrator:mima_3"] = "カタケイ",
 	["origin:mima_3"] = "p号：50400667，个人id：90042",
 	["illustrator:mima_4"] = "かわやばぐ",

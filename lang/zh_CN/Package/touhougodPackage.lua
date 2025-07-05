@@ -722,7 +722,7 @@ return{
 	["designer:nue_god"] = "三国有单",
 
 	["illustrator:nue_god"] = "ルリア",
-	["origin:nue_god"] = "p号：12490153,，个人id：997454",
+	["origin:nue_god"] = "p号：12490153，个人id：997454",
 
 	["illustrator:nue_god_1"] = " UGUME",
 	["origin:nue_god_1"] = "p号： 3112588",
@@ -750,7 +750,7 @@ return{
 	["designer:marisa_god"] = "三国有单",
 
 	["illustrator:marisa_god"] = "SIRO",
-	["origin:marisa_god"] = "p号：32422143,，个人id：54020",
+	["origin:marisa_god"] = "p号：32422143，个人id：54020",
 	["illustrator:marisa_god_1"] = "りひと",
 	["origin:marisa_god_1"] = "p号：52511368",
 	["illustrator:marisa_god_2"] = " 菊月",
@@ -792,7 +792,7 @@ return{
 	["designer:patchouli_god"] = "三国有单",
 
 	["illustrator:patchouli_god"] = "ryosios",
-	["origin:patchouli_god"] = "p号：41382219,，个人id：1508165",
+	["origin:patchouli_god"] = "p号：41382219，个人id：1508165",
 	["illustrator:patchouli_god_1"] = " NEKO",
 	["origin:patchouli_god_1"] = "p号：34477857",
 
