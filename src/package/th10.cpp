@@ -623,7 +623,7 @@ void QijiDialog::popup()
         DELETE_OVER_SCOPE(Card, card)
         if (object_name == "qiji")
             card->addSubcards(user->getHandcards());
-        if (((object_name == "chuangshi" || play) && card->isAvailable(user) || (!play && cardPattern != nullptr && cardPattern->match(user, card)))
+        if ((((object_name == "chuangshi" || play) && card->isAvailable(user)) || (!play && cardPattern != nullptr && cardPattern->match(user, card)))
             && !user->isCardLimited(card, method))
             checkedPatterns << str;
     }

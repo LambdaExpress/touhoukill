@@ -252,7 +252,7 @@ void XihuaDialog::popup()
     foreach (const QString &str, validPatterns) {
         Card *card = Sanguosha->cloneCard(str);
         DELETE_OVER_SCOPE(Card, card)
-        if (play || (cardPattern != nullptr && cardPattern->match(Self, card)) && !Self->isCardLimited(card, method))
+        if (play || ((cardPattern != nullptr && cardPattern->match(Self, card)) && !Self->isCardLimited(card, method)))
             checkedPatterns << str;
     }
 

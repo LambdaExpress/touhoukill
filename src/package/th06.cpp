@@ -838,7 +838,7 @@ public:
         QStringList ban_list = Sanguosha->getBanPackages();
         foreach (const Card *card, cards) {
             if ((!Self->isCurrent() && card->isKindOf("Peach"))
-                || (Self->isCurrent() && card->isNDTrick() && !card->isKindOf("AOE") && !card->isKindOf("GlobalEffect")) && !ban_list.contains(card->getPackage())) {
+                || ((Self->isCurrent() && card->isNDTrick() && !card->isKindOf("AOE") && !card->isKindOf("GlobalEffect")) && !ban_list.contains(card->getPackage()))) {
                 QString name = card->objectName();
                 if (!checkedPatterns.contains(name) && (pattern != nullptr && pattern->match(Self, card)) && !Self->isCardLimited(card, method))
                     checkedPatterns << name;
@@ -1061,7 +1061,7 @@ void BeishuiDialog::popup()
     foreach (const QString &str, validPatterns) {
         Card *card = Sanguosha->cloneCard(str);
         DELETE_OVER_SCOPE(Card, card)
-        if (play || (cardPattern != nullptr && cardPattern->match(Self, card)) && !Self->isCardLimited(card, method))
+        if (play || ((cardPattern != nullptr && cardPattern->match(Self, card)) && !Self->isCardLimited(card, method)))
             checkedPatterns << str;
     }
     //while responding, if only one pattern were checked, emit click()

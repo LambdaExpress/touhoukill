@@ -1270,7 +1270,7 @@ public:
             QString pattern = Sanguosha->currentRoomState()->getCurrentCardUsePattern();
             const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
 
-            return (cardPattern != nullptr && (to_select->getSuit() == Card::Heart && cardPattern->match(Self, &j))
+            return ((cardPattern != nullptr && (to_select->getSuit() == Card::Heart && cardPattern->match(Self, &j)))
                     || (to_select->getSuit() == Card::Spade && cardPattern->match(Self, &s)) || (to_select->getSuit() == Card::Diamond && cardPattern->match(Self, &a))
                     || (to_select->getSuit() == Card::Club && cardPattern->match(Self, &k)));
         }
