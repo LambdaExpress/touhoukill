@@ -25,7 +25,7 @@ public:
         ServerPlayer *uuz = data.value<ServerPlayer *>();
         if (uuz->isAlive() && uuz->hasSkill(this) && uuz->getPhase() == Player::Play) {
             foreach (ServerPlayer *p, room->getOtherPlayers(uuz)) {
-                if (uuz->getHandcardNum() > p->getHandcardNum() && uuz->canSlash(p, false))
+                if (uuz->getHandcardNum() >= p->getHandcardNum() && uuz->canSlash(p, false))
                     return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, uuz, uuz);
             }
         }
@@ -38,7 +38,7 @@ public:
         QList<ServerPlayer *> targets;
         if (uuz->isAlive() && uuz->hasSkill(this)) {
             foreach (ServerPlayer *p, room->getOtherPlayers(uuz)) {
-                if (uuz->getHandcardNum() > p->getHandcardNum() && uuz->canSlash(p, false))
+                if (uuz->getHandcardNum() >= p->getHandcardNum() && uuz->canSlash(p, false))
                     targets << p;
             }
         }
@@ -69,7 +69,7 @@ public:
 
     bool viewFilter(const QList<const Card *> &, const Card *to_select) const override
     {
-        return to_select->isEquipped() && !Self->isJilei(to_select);
+        return to_select->getTypeId() == Card::TypeEquip && !Self->isJilei(to_select);
     }
 
     const Card *viewAs(const QList<const Card *> &cards) const override
@@ -114,7 +114,7 @@ public:
         ServerPlayer *player = data.value<ServerPlayer *>();
         if (player->getPhase() == Player::Play) {
             foreach (ServerPlayer *p, room->findPlayersBySkillName(objectName())) {
-                if (p != player && p->canDiscard(p, "e"))
+                if (p != player && p->canDiscard(p, "hes"))
                     d << SkillInvokeDetail(this, p, p, nullptr, false, player);
             }
         }

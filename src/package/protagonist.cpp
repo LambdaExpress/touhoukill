@@ -1085,7 +1085,7 @@ public:
     Chunxi()
         : TriggerSkill("chunxi")
     {
-        events << CardsMoveOneTime;
+        events = {CardsMoveOneTime, EventPhaseChanging};
         view_as_skill = new ChunxiVS;
     }
 
@@ -1098,21 +1098,21 @@ public:
     {
         if (e == CardsMoveOneTime) {
             if (room->getTag("FirstRound").toBool())
-                return QList<SkillInvokeDetail>();
+                return {};
 
             CardsMoveOneTimeStruct move = data.value<CardsMoveOneTimeStruct>();
             ServerPlayer *reimu = qobject_cast<ServerPlayer *>(move.to);
-            if (reimu != nullptr && reimu->hasSkill(this) && move.to_place == Player::PlaceHand && move.reason.m_skillName != objectName()) {
+            if (reimu != nullptr && reimu->hasSkill(this) && move.to_place == Player::PlaceHand) {
                 foreach (int id, move.card_ids) {
                     if (Sanguosha->getCard(id)->getSuit() == Card::Heart && room->getCardPlace(id) == Player::PlaceHand) {
                         ServerPlayer *owner = room->getCardOwner(id);
-                        if ((owner != nullptr) && owner == reimu)
+                        if ((owner != nullptr) && owner == reimu && !owner->hasFlag(objectName()))
                             return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, reimu, reimu);
                     }
                 }
             }
         }
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
@@ -1148,11 +1148,25 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
+        invoke->invoker->setFlags(objectName());
+
         int obtainId = room->askForCardChosen(invoke->invoker, invoke->targets.first(), "hs", objectName());
         CardMoveReason r(CardMoveReason::S_REASON_ROB, invoke->invoker->objectName(), objectName(), QString());
         room->obtainCard(invoke->invoker, Sanguosha->getCard(obtainId), r, false);
 
         return false;
+    }
+
+    void record(TriggerEvent triggerEvent, Room *, QVariant &data) const override
+    {
+        if (triggerEvent == EventPhaseChanging) {
+            PhaseChangeStruct change = data.value<PhaseChangeStruct>();
+            if (change.to == Player::Start || change.to == Player::Judge || change.to == Player::Draw || change.to == Player::Play || change.to == Player::Discard
+                || change.to == Player::Finish) {
+                if (change.player->hasFlag(objectName()))
+                    change.player->setFlags("-" + objectName());
+            }
+        }
     }
 };
 

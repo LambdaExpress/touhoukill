@@ -620,37 +620,34 @@ public:
     }
 };
 
-class Fanhua : public OneCardViewAsSkill
+class FanhuaVS : public OneCardViewAsSkill
 {
 public:
-    Fanhua()
-        : OneCardViewAsSkill("fanhua")
+    FanhuaVS(const QString &base)
+        : OneCardViewAsSkill(base)
     {
         response_or_use = true;
     }
 
     bool isEnabledAtPlay(const Player *player) const override
     {
-        return Slash::IsAvailable(player);
+        return Slash::IsAvailable(player) && !player->hasFlag(objectName());
     }
 
     bool isEnabledAtResponse(const Player *player, const QString &pattern) const override
     {
-        Slash *card = new Slash(Card::SuitToBeDecided, -1);
-        DELETE_OVER_SCOPE(Slash, card)
-        const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
+        if (!player->hasFlag(objectName())) {
+            Slash *card = new Slash(Card::SuitToBeDecided, -1);
+            DELETE_OVER_SCOPE(Slash, card)
+            const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
 
-        return cardPattern != nullptr && cardPattern->match(player, card);
+            return cardPattern != nullptr && cardPattern->match(player, card);
+        }
+        return false;
     }
 
     bool viewFilter(const Card *to_select) const override
     {
-        // Prohibit NoSuit
-        Card::Suit s = to_select->getSuit();
-        int sx = (1 << (int)(s));
-        if ((sx & 0xF) != sx)
-            return false;
-
         QList<const Player *> ps = Self->getAliveSiblings();
         ps << Self;
 
@@ -680,6 +677,46 @@ public:
         s->setShowSkill(objectName());
         s->addSubcard(originalCard);
         return s;
+    }
+};
+
+class Fanhua : public TriggerSkill
+{
+public:
+    Fanhua()
+        : TriggerSkill("fanhua")
+    {
+        view_as_skill = new FanhuaVS(objectName());
+        events = {PreCardUsed, CardResponded, EventPhaseChanging};
+    }
+
+    void record(TriggerEvent triggerEvent, Room *room, QVariant &data) const override
+    {
+        if (triggerEvent == PreCardUsed || triggerEvent == CardResponded) {
+            const Card *c = nullptr;
+            ServerPlayer *p = nullptr;
+            if (triggerEvent == PreCardUsed) {
+                CardUseStruct use = data.value<CardUseStruct>();
+                c = use.card;
+                p = use.from;
+            } else if (triggerEvent == CardResponded) {
+                CardResponseStruct resp = data.value<CardResponseStruct>();
+                c = resp.m_card;
+                p = resp.m_from;
+            }
+
+            if (c != nullptr && p != nullptr && c->getSkillName() == objectName()) {
+                room->setPlayerFlag(p, objectName());
+            }
+        }
+        if (triggerEvent == EventPhaseChanging) {
+            PhaseChangeStruct change = data.value<PhaseChangeStruct>();
+            if (change.to == Player::Start || change.to == Player::Judge || change.to == Player::Draw || change.to == Player::Play || change.to == Player::Discard
+                || change.to == Player::Finish) {
+                if (change.player->hasFlag(objectName()))
+                    room->setPlayerFlag(change.player, "-" + objectName());
+            }
+        }
     }
 };
 

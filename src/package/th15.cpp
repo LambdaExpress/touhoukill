@@ -211,8 +211,6 @@ public:
     }
 };
 
-// Todo_Fs: decouple Chunhua from GameRule
-// using "room->setTag("SkipGameRule", true);"
 class Chunhua : public TriggerSkill
 {
 public:
@@ -437,20 +435,24 @@ public:
                     DamageStruct d = DamageStruct(effect.card, effect.from, effect.to, 1 + effect.effectValue.first(), DamageStruct::Normal);
                     room->damage(d);
                 } else if (effect.card->hasFlag("chunhua_red")) {
-                    RecoverStruct recover;
-                    recover.card = effect.card;
-                    recover.who = effect.from;
-                    recover.recover = 1 + effect.effectValue.first();
-                    room->recover(effect.to, recover);
+                    QList<ServerPlayer *> targets;
+                    if (!effect.card->hasFlag("chunhua_red_first")) {
+                        effect.card->setFlags("chunhua_red_first");
+                        targets << effect.from;
+                    }
+                    targets << effect.to;
+                    room->drawCards(targets, 1, objectName());
                 }
             } else if (triggerEvent == SlashHit) {
                 SlashEffectStruct effect = data.value<SlashEffectStruct>();
                 if (effect.slash->hasFlag("chunhua_red")) {
-                    RecoverStruct recover;
-                    recover.card = effect.slash;
-                    recover.who = effect.from;
-                    recover.recover = 1 + effect.effectValue.first();
-                    room->recover(effect.to, recover);
+                    QList<ServerPlayer *> targets;
+                    if (!effect.slash->hasFlag("chunhua_red_first")) {
+                        effect.slash->setFlags("chunhua_red_first");
+                        targets << effect.from;
+                    }
+                    targets << effect.to;
+                    room->drawCards(targets, 1, objectName());
                 } else {
                     effect.nature = DamageStruct::Normal;
                     if (effect.drank > 0 || effect.magic_drank > 0) {
@@ -470,7 +472,7 @@ public:
                     room->damage(d);
                 }
             }
-        } while (0);
+        } while (false);
 
         room->setTag("SkipGameRule", true);
         return false;

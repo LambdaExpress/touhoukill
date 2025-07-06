@@ -837,7 +837,6 @@ bool GameRule::effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<Skil
     }
     case SlashHit: {
         SlashEffectStruct effect = data.value<SlashEffectStruct>();
-        //do chunhua effect
         if (effect.slash->getSkillName() == "xianshi") {
             QString xianshi_name;
             QList<const Card *> cards = Sanguosha->findChildren<const Card *>();
