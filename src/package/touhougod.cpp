@@ -1324,22 +1324,23 @@ public:
     Gaoao()
         : TriggerSkill("gaoao")
     {
-        events << BeforeCardsMove;
+        events = {BeforeCardsMove};
         frequency = Compulsory;
     }
 
     QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *room, const QVariant &data) const override
     {
         if (room->getTag("FirstRound").toBool())
-            return QList<SkillInvokeDetail>();
+            return {};
 
         CardsMoveOneTimeStruct move = data.value<CardsMoveOneTimeStruct>();
+
         ServerPlayer *player = qobject_cast<ServerPlayer *>(move.to);
         if (player != nullptr && player->hasSkill(this) && !player->isCurrent()
             && (move.to_place == Player::PlaceHand || move.to_place == Player::PlaceEquip || move.to_place == Player::PlaceDelayedTrick))
-            return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, player, player, nullptr, true);
+            return {SkillInvokeDetail(this, player, player, nullptr, true)};
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
@@ -1347,6 +1348,7 @@ public:
         CardsMoveOneTimeStruct move = data.value<CardsMoveOneTimeStruct>();
         ServerPlayer *player = invoke->invoker;
         QList<int> ids;
+
         foreach (int id, move.card_ids) {
             if (room->getCardPlace(id) != Player::DiscardPile)
                 ids << id;
@@ -1370,6 +1372,7 @@ public:
             }
             room->throwCard(&dummy, reason, nullptr);
         }
+
         return false;
     }
 };

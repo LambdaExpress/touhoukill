@@ -184,25 +184,103 @@ public:
     }
 };
 
+namespace {
+bool clientIsXiufuAvailable(const ClientPlayer *p)
+{
+    foreach (const Card *c, ClientInstance->discarded_list) {
+        if (c->getTypeId() == Card::TypeEquip)
+            return false;
+    }
+
+    QList<const Player *> sib = p->getAliveSiblings();
+    sib << p;
+    foreach (const Player *s, sib) {
+        if (!s->getEquips().isEmpty())
+            return false;
+    }
+
+    return true;
+}
+
+bool serverIsXiufuAvailable(const ServerPlayer *p)
+{
+    Room *r = p->getRoom();
+    foreach (int id, r->getDiscardPile()) {
+        const Card *c = r->getCard(id);
+        if (c->getTypeId() == Card::TypeEquip)
+            return false;
+    }
+
+    QList<const Player *> sib = p->getAliveSiblings();
+    sib << p;
+    foreach (const Player *s, sib) {
+        if (!s->getEquips().isEmpty())
+            return false;
+    }
+
+    return true;
+}
+
+} // namespace
+
 XiufuCard::XiufuCard()
 {
     will_throw = false;
     handling_method = Card::MethodNone;
 }
 
-bool XiufuCard::targetFilter(const QList<const Player *> &targets, const Player *, const Player *) const
+bool XiufuCard::targetFilter(const QList<const Player *> &targets, const Player *, const Player *Self) const
 {
+    const ClientPlayer *clientSelf = qobject_cast<const ClientPlayer *>(Self);
+    const ServerPlayer *serverSelf = qobject_cast<const ServerPlayer *>(Self);
+
+    bool draw = false;
+
+    if (clientSelf != nullptr)
+        draw = clientIsXiufuAvailable(clientSelf);
+    else if (serverSelf != nullptr)
+        draw = serverIsXiufuAvailable(serverSelf);
+    else
+        return false;
+
+    if (draw)
+        return false;
+
     return targets.isEmpty();
 }
 
+bool XiufuCard::targetsFeasible(const QList<const Player *> &targets, const Player *Self) const
+{
+    const ClientPlayer *clientSelf = qobject_cast<const ClientPlayer *>(Self);
+    const ServerPlayer *serverSelf = qobject_cast<const ServerPlayer *>(Self);
+
+    bool draw = false;
+
+    if (clientSelf != nullptr)
+        draw = clientIsXiufuAvailable(clientSelf);
+    else if (serverSelf != nullptr)
+        draw = serverIsXiufuAvailable(serverSelf);
+    else
+        return false;
+
+    return draw != targets.isEmpty();
+}
+
+void XiufuCard::use(Room *room, const CardUseStruct &card_use) const
+{
+    if (serverIsXiufuAvailable(card_use.from) && subcards.isEmpty())
+        card_use.from->drawCards(2, getSkillName());
+    else if (!subcards.isEmpty())
+        SkillCard::use(room, card_use);
+}
+
+// TODO: remove coupling
 void XiufuCard::onEffect(const CardEffectStruct &effect) const
 {
     ServerPlayer *mori = effect.from;
     Room *room = mori->getRoom();
     //process move
     int xiufu_id = subcards.first();
-    if (xiufu_id == -1)
-        return;
 
     const EquipCard *equip = qobject_cast<const EquipCard *>(Sanguosha->getCard(xiufu_id)->getRealCard());
     ServerPlayer *target = effect.to;
@@ -230,11 +308,11 @@ void XiufuCard::onEffect(const CardEffectStruct &effect) const
     room->moveCardsAtomic(exchangeMove, true);
 }
 
-class Xiufu : public OneCardViewAsSkill
+class Xiufu : public ViewAsSkill
 {
 public:
     Xiufu()
-        : OneCardViewAsSkill("xiufu")
+        : ViewAsSkill("xiufu")
     {
         expand_pile = "#xiufu_temp";
     }
@@ -244,7 +322,29 @@ public:
         return !player->hasUsed("XiufuCard") || (player->getMark("@xiufudebug") > 0);
     }
 
-    bool viewFilter(const Card *to_select) const override
+    bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const override
+    {
+        if (clientIsXiufuAvailable(Self))
+            return false;
+
+        if (selected.isEmpty())
+            return viewFilter(to_select);
+
+        return false;
+    }
+
+    const Card *viewAs(const QList<const Card *> &cards) const override
+    {
+        if (clientIsXiufuAvailable(Self))
+            return new XiufuCard;
+        if (cards.length() == 1)
+            return viewAs(cards.first());
+
+        return nullptr;
+    }
+
+private: // previous OneCardViewAsSkill interface
+    bool viewFilter(const Card *to_select) const
     {
         foreach (const Card *c, ClientInstance->discarded_list) {
             if (c->getTypeId() == Card::TypeEquip && to_select->getId() == c->getId())
@@ -254,7 +354,7 @@ public:
         return false;
     }
 
-    const Card *viewAs(const Card *originalCard) const override
+    const Card *viewAs(const Card *originalCard) const
     {
         XiufuCard *c = new XiufuCard;
         c->addSubcard(originalCard);

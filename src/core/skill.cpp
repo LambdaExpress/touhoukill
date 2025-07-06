@@ -369,7 +369,7 @@ bool TriggerSkill::cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDeta
     } else {
         if (invoke->invoker != nullptr) {
             //for ai
-            invoke->invoker->tag[this->objectName()] = data;
+            invoke->invoker->tag[objectName()] = data;
             QVariant notify_data = data;
             if (invoke->preferredTarget != nullptr)
                 notify_data = QVariant::fromValue(invoke->preferredTarget);

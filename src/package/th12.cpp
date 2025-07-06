@@ -548,8 +548,14 @@ public:
     {
         CardUseStruct use = data.value<CardUseStruct>();
         room->doAnimate(QSanProtocol::S_ANIMATE_INDICATE, invoke->invoker->objectName(), use.from->objectName());
-        int id = room->askForCardChosen(invoke->invoker, use.from, "hs", objectName(), false, Card::MethodDiscard);
-        room->throwCard(id, use.from, invoke->invoker);
+        int id = room->askForCardChosen(invoke->invoker, use.from, "hs", objectName(), false, Card::MethodNone);
+
+        room->showCard(use.from, id);
+
+        if (Sanguosha->getCard(id)->isKindOf("Slash"))
+            room->obtainCard(invoke->invoker, id);
+        else if (invoke->invoker->canDiscard(use.from, id, objectName()))
+            room->throwCard(id, use.from, invoke->invoker);
         return false;
     }
 };
