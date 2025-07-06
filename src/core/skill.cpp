@@ -360,7 +360,7 @@ bool TriggerSkill::cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDeta
             if (!invoke->invoker->hasShownSkill(this))
                 return invoke->invoker->askForSkillInvoke(this, data);
 
-            if (invoke->showhidden) {
+            if (invoke->showHidden) {
                 room->notifySkillInvoked(invoke->invoker, objectName());
                 room->sendLog("#TriggerSkill", invoke->invoker, objectName());
             }

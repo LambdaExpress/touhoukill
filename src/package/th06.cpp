@@ -1593,7 +1593,7 @@ static void do_sishu(ServerPlayer *player)
 
 void SishuCard::onUse(Room *room, const CardUseStruct &card_use) const
 {
-    room->doLightbox("$sishuAnimate", 4000);
+    room->doLightbox("$sishuAnimate");
     SkillCard::onUse(room, card_use);
 }
 
@@ -2129,7 +2129,7 @@ public:
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
         room->addPlayerMark(invoke->invoker, objectName());
-        room->doLightbox("$ziyeAnimate", 4000);
+        room->doLightbox("$ziyeAnimate");
         room->sendLog("#ZiyeWake", invoke->invoker, objectName());
         room->notifySkillInvoked(invoke->invoker, objectName());
         if (room->changeMaxHpForAwakenSkill(invoke->invoker))

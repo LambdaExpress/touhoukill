@@ -1054,7 +1054,7 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->doLightbox("$huanzaiAnimate", 4000);
+        room->doLightbox("$huanzaiAnimate");
         invoke->invoker->gainMark("@clock", 1);
         room->removePlayerMark(invoke->invoker, "@huanzai");
 
@@ -1083,7 +1083,7 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->doLightbox("$shanghunAnimate", 4000);
+        room->doLightbox("$shanghunAnimate");
         invoke->invoker->gainMark("@clock", 1);
         room->removePlayerMark(invoke->invoker, "@shanghun");
         return false;
@@ -3049,7 +3049,7 @@ void ChaowoCard::use(Room *room, const CardUseStruct &card_use) const
     }
 
     room->setPlayerMark(source, "@chaowo", 0);
-    room->doLightbox("$chaowoAnimate", 4000);
+    room->doLightbox("$chaowoAnimate");
 
     QString toChange = sameNameGenerals.first()->objectName();
     QStringList sameNameGeneralNames;
@@ -3334,7 +3334,7 @@ public:
     {
         ServerPlayer *player = invoke->invoker;
         room->addPlayerMark(player, objectName());
-        room->doLightbox("$gaizongAnimate", 4000);
+        room->doLightbox("$gaizongAnimate");
         room->sendLog("#GaizongWake", player, objectName());
         room->notifySkillInvoked(player, objectName());
         if (room->changeMaxHpForAwakenSkill(player)) {
@@ -4118,7 +4118,7 @@ public:
         DamageStruct damage = data.value<DamageStruct>();
         ServerPlayer *player = invoke->invoker;
         room->removePlayerMark(player, "@huanming");
-        room->doLightbox("$huanmingAnimate", 4000);
+        room->doLightbox("$huanmingAnimate");
         room->doAnimate(QSanProtocol::S_ANIMATE_INDICATE, player->objectName(), damage.to->objectName());
 
         int source_Hp = player->getHp();
@@ -4748,7 +4748,7 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->doLightbox("$tonglingAnimate", 4000);
+        room->doLightbox("$tonglingAnimate");
         room->removePlayerMark(invoke->invoker, "@tongling");
         const General *general = invoke->targets.first()->getGeneral();
         QString new_general = invoke->targets.first()->isMale() ? "sujiang" : "sujiangf";
@@ -4826,7 +4826,7 @@ bool RumoCard::targetsFeasible(const QList<const Player *> &targets, const Playe
 }
 void RumoCard::onUse(Room *room, const CardUseStruct &card_use) const
 {
-    room->doLightbox("$rumoAnimate", 4000);
+    room->doLightbox("$rumoAnimate");
     SkillCard::onUse(room, card_use);
 }
 

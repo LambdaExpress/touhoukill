@@ -2208,7 +2208,7 @@ bool MoyanCard::targetFilter(const QList<const Player *> &targets, const Player 
 
 void MoyanCard::onUse(Room *room, const CardUseStruct &card_use) const
 {
-    room->doLightbox("$moyanAnimate", 4000);
+    room->doLightbox("$moyanAnimate");
     SkillCard::onUse(room, card_use);
 }
 

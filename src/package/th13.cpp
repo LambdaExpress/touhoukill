@@ -41,7 +41,7 @@ public:
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
         room->addPlayerMark(invoke->invoker, objectName());
-        room->doLightbox("$shenggeAnimate", 4000);
+        room->doLightbox("$shenggeAnimate");
         room->sendLog("#ShenggeWake", invoke->invoker, objectName());
         room->notifySkillInvoked(invoke->invoker, objectName());
         if (room->changeMaxHpForAwakenSkill(invoke->invoker))

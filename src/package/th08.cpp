@@ -1643,7 +1643,7 @@ JinxiCard::JinxiCard()
 
 void JinxiCard::onUse(Room *room, const CardUseStruct &card_use) const
 {
-    room->doLightbox("$jinxiAnimate", 4000);
+    room->doLightbox("$jinxiAnimate");
     SkillCard::onUse(room, card_use);
 }
 

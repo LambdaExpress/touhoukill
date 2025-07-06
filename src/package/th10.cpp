@@ -1746,7 +1746,7 @@ public:
         DamageStruct damage = data.value<DamageStruct>();
 
         room->removePlayerMark(invoke->invoker, "@zhongyan");
-        room->doLightbox("$zhongyanAnimate", 4000);
+        room->doLightbox("$zhongyanAnimate");
         room->doAnimate(QSanProtocol::S_ANIMATE_INDICATE, invoke->invoker->objectName(), damage.from->objectName());
 
         int x = damage.from->getLostHp();

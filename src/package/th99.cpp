@@ -604,7 +604,7 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->doLightbox("$mengxianAnimate", 4000);
+        room->doLightbox("$mengxianAnimate");
         room->sendLog("#MengxianWake", invoke->invoker, objectName(), QList<ServerPlayer *>(), QString::number(invoke->invoker->getPile("jingjie").length()));
         room->notifySkillInvoked(invoke->invoker, objectName());
         room->addPlayerMark(invoke->invoker, "mengxian");
@@ -875,7 +875,7 @@ public:
     {
         ServerPlayer *toyo = invoke->invoker;
         room->sendLog("#YueshiWake", toyo, "yueshi");
-        room->doLightbox("$yueshiAnimate", 4000);
+        room->doLightbox("$yueshiAnimate");
         room->notifySkillInvoked(toyo, objectName());
         return room->changeMaxHpForAwakenSkill(invoke->invoker, -1);
     }
@@ -2336,7 +2336,7 @@ public:
     bool cost(TriggerEvent e, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &d) const override
     {
         if (TriggerSkill::cost(e, room, invoke, d)) {
-            room->doLightbox("$WanshenAnimate", 4000);
+            room->doLightbox("$WanshenAnimate");
             return room->changeMaxHpForAwakenSkill(invoke->invoker);
         }
         return false;

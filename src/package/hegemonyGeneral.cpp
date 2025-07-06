@@ -1814,7 +1814,7 @@ public:
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
         room->setPlayerMark(invoke->invoker, "xuyu_invoked", 1);
-        room->doLightbox("$xuyuHegemonyAnimate", 4000);
+        room->doLightbox("$xuyuHegemonyAnimate");
         invoke->invoker->removeGeneral(!invoke->invoker->inHeadSkills(objectName()));
 
         // add this to Player::skills, not Player::acquired_skills.
@@ -4021,7 +4021,7 @@ bool DongzhiHegemonyCard::targetFilter(const QList<const Player *> &selected, co
 
 void DongzhiHegemonyCard::onUse(Room *room, const CardUseStruct &card_use) const
 {
-    room->doLightbox("$dongzhiAnimate", 4000);
+    room->doLightbox("$dongzhiAnimate");
     SkillCard::onUse(room, card_use);
 }
 
@@ -4158,7 +4158,7 @@ public:
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
         room->removePlayerMark(invoke->invoker, "@juxian");
-        room->doLightbox("$juxianAnimate", 4000);
+        room->doLightbox("$juxianAnimate");
 
         QList<int> list = room->getNCards(3);
         CardsMoveStruct move(list, nullptr, Player::PlaceTable, CardMoveReason(CardMoveReason::S_REASON_TURNOVER, invoke->invoker->objectName(), objectName(), QString()));

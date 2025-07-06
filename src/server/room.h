@@ -239,7 +239,7 @@ public:
     void broadcastSkillInvoke(const QString &skillName, const QString &category);
     void broadcastSkillInvoke(const QString &skillName, int type);
     void broadcastSkillInvoke(const QString &skillName, bool isMale, int type);
-    void doLightbox(const QString &lightboxName, int duration = 2000);
+    void doLightbox(const QString &lightboxName, int duration = 4100);
     void doAnimate(QSanProtocol::AnimateType type, const QString &arg1 = QString(), const QString &arg2 = QString(), QList<ServerPlayer *> players = QList<ServerPlayer *>());
 
     inline void doAnimate(int type, const QString &arg1 = QString(), const QString &arg2 = QString(), const QList<ServerPlayer *> &players = QList<ServerPlayer *>())

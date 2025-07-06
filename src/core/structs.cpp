@@ -473,7 +473,7 @@ SkillInvokeDetail::SkillInvokeDetail(const TriggerSkill *skill /*= NULL*/, Serve
     , isCompulsory(isCompulsory)
     , triggered(false)
     , preferredTarget(preferredTarget)
-    , showhidden(showHidden)
+    , showHidden(showHidden)
 {
 }
 
@@ -485,7 +485,7 @@ SkillInvokeDetail::SkillInvokeDetail(const TriggerSkill *skill, ServerPlayer *ow
     , isCompulsory(isCompulsory)
     , triggered(false)
     , preferredTarget(preferredTarget)
-    , showhidden(showHidden)
+    , showHidden(showHidden)
 {
     if (target != nullptr)
         targets << target;
