@@ -166,15 +166,13 @@ public:
         return d;
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    bool effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
         DeathStruct death = data.value<DeathStruct>();
         death.viewAsKiller = invoke->owner;
         death.useViewAsKiller = true;
         data = QVariant::fromValue(death);
 
-        room->sendLog("#TriggerSkill", invoke->owner, "tymhwuyu");
-        room->notifySkillInvoked(invoke->owner, objectName());
         return false;
     }
 };
@@ -946,13 +944,6 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        LogMessage log;
-        log.from = invoke->invoker;
-        log.arg = objectName();
-        log.type = "#TriggerSkill";
-        room->sendLog(log);
-        room->notifySkillInvoked(invoke->invoker, objectName());
-
         room->setPlayerProperty(invoke->invoker, "chained", !invoke->invoker->isChained());
         return false;
     }

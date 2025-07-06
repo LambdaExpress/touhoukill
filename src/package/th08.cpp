@@ -21,10 +21,7 @@ public:
     {
         Room *room = player->getRoom();
         int hc_num = player->getHandcardNum();
-        if (card_num != hc_num) {
-            room->sendLog("#TriggerSkill", player, reason);
-            room->notifySkillInvoked(player, reason);
-        }
+
         if (card_num > hc_num)
             player->drawCards(card_num - hc_num, reason);
         else if (card_num < hc_num)
@@ -63,13 +60,11 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    bool effect(TriggerEvent triggerEvent, Room *, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
         if (triggerEvent == EventPhaseChanging) {
             PhaseChangeStruct change = data.value<PhaseChangeStruct>();
             if (change.to == Player::Discard) {
-                room->sendLog("#TriggerSkill", invoke->invoker, "yongheng");
-                room->notifySkillInvoked(invoke->invoker, objectName());
                 invoke->invoker->skip(change.to);
                 adjustHandcardNum(invoke->invoker, 4, "yongheng");
             }
@@ -1723,8 +1718,6 @@ public:
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
         ServerPlayer *player = invoke->targets.first();
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName());
-        room->notifySkillInvoked(invoke->invoker, objectName());
         room->doAnimate(QSanProtocol::S_ANIMATE_INDICATE, invoke->invoker->objectName(), player->objectName());
 
         room->sendLog("#yemangRange", player, "yemang");

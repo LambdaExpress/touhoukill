@@ -1972,8 +1972,6 @@ public:
             }
 
             invoke->invoker->addMark("siyuinvoke");
-            room->sendLog("#TriggerSkill", invoke->invoker, objectName());
-            room->notifySkillInvoked(invoke->invoker, objectName());
 
             room->sendLog("#touhouExtraTurn", invoke->invoker, objectName());
 

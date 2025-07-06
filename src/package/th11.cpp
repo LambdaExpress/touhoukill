@@ -292,8 +292,6 @@ public:
             damage.from = nullptr;
             damage.by_user = false;
 
-            room->sendLog("#TriggerSkill", invoke->invoker, "wunian");
-            room->notifySkillInvoked(invoke->invoker, objectName());
             data = QVariant::fromValue(damage);
         } else if (e == TargetConfirming) {
             CardUseStruct use = data.value<CardUseStruct>();
@@ -412,12 +410,9 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail>, QVariant &data) const override
     {
         CardUseStruct use = data.value<CardUseStruct>();
-        ServerPlayer *player = invoke->invoker;
-        room->sendLog("#TriggerSkill", player, "here");
-        room->notifySkillInvoked(player, objectName());
         if (use.from != nullptr)
             room->sendLog("#HereFilter", use.from, "here");
 
@@ -818,6 +813,10 @@ public:
                 target = ts.first();
             }
             invoke->targets << target;
+
+            room->notifySkillInvoked(invoke->invoker, objectName());
+            room->sendLog("#TriggerSkill", invoke->invoker, objectName());
+
             return true;
         }
 
@@ -826,13 +825,7 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->notifySkillInvoked(invoke->owner, objectName());
         room->doAnimate(QSanProtocol::S_ANIMATE_INDICATE, invoke->invoker->objectName(), invoke->targets.first()->objectName());
-        LogMessage log;
-        log.type = "#TriggerSkill";
-        log.from = invoke->owner;
-        log.arg = objectName();
-        room->sendLog(log);
 
         room->setPlayerProperty(invoke->targets.first(), "chained", true);
         return false;

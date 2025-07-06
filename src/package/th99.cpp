@@ -65,8 +65,6 @@ public:
 
     bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->notifySkillInvoked(invoke->invoker, objectName());
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName());
         if (triggerEvent == EventPhaseChanging)
             invoke->invoker->skip(Player::Discard);
         else if (triggerEvent == EventPhaseStart)
@@ -2077,13 +2075,6 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->notifySkillInvoked(invoke->owner, objectName());
-        LogMessage log;
-        log.type = "#TriggerSkill";
-        log.from = invoke->owner;
-        log.arg = objectName();
-        room->sendLog(log);
-
         room->recover(invoke->invoker, RecoverStruct());
         room->setPlayerProperty(invoke->invoker, "chained", true);
         return false;
@@ -2345,11 +2336,6 @@ public:
     bool cost(TriggerEvent e, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &d) const override
     {
         if (TriggerSkill::cost(e, room, invoke, d)) {
-            LogMessage l;
-            l.type = "#TriggerSkill";
-            l.arg = objectName();
-            l.from = invoke->invoker;
-            room->sendLog(l);
             room->doLightbox("$WanshenAnimate", 4000);
             return room->changeMaxHpForAwakenSkill(invoke->invoker);
         }

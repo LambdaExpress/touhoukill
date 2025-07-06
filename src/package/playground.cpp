@@ -438,25 +438,6 @@ public:
         return r;
     }
 
-    bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
-    {
-        if (TriggerSkill::cost(triggerEvent, room, invoke, data)) {
-            if (invoke->invoker->hasShownSkill(this)) {
-                LogMessage l;
-                l.type = "#TriggerSkill";
-                l.from = invoke->invoker;
-                l.arg = objectName();
-                room->sendLog(l);
-
-                room->notifySkillInvoked(invoke->invoker, objectName());
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail>, QVariant &data) const override
     {
         DrawNCardsStruct st = data.value<DrawNCardsStruct>();
@@ -512,13 +493,6 @@ public:
 
     bool effect(TriggerEvent e, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
-        LogMessage l;
-        l.type = "#TriggerSkill";
-        l.from = invoke->invoker;
-        l.arg = objectName();
-        room->sendLog(l);
-        room->notifySkillInvoked(invoke->invoker, objectName());
-
         if (e == EventPhaseChanging)
             invoke->invoker->skip(Player::Discard);
         else {
@@ -1054,25 +1028,6 @@ public:
         }
 
         return {};
-    }
-
-    bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
-    {
-        if (TriggerSkill::cost(triggerEvent, room, invoke, data)) {
-            if (invoke->invoker->hasShownSkill(this)) {
-                LogMessage l;
-                l.type = "#TriggerSkill";
-                l.from = invoke->invoker;
-                l.arg = objectName();
-                room->sendLog(l);
-
-                room->notifySkillInvoked(invoke->invoker, objectName());
-            }
-
-            return true;
-        }
-
-        return false;
     }
 
     bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override

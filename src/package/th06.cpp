@@ -287,8 +287,6 @@ public:
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail>, QVariant &data) const override
     {
         ServerPlayer *fldl = data.value<ServerPlayer *>();
-        room->sendLog("#TriggerSkill", fldl, objectName());
-        room->notifySkillInvoked(fldl, objectName());
         room->broadcastSkillInvoke(objectName());
 
         JudgeStruct judge;
@@ -2043,9 +2041,7 @@ public:
             data = QVariant::fromValue(use);
 
             QList<int> ids = invoke->invoker->getPile(objectName());
-            room->notifySkillInvoked(invoke->invoker, objectName());
 
-            //room->touhouLogmessage("#TriggerSkill", invoke->invoker, objectName());
             LogMessage mes;
             mes.type = "$Fenghua";
             mes.from = invoke->invoker;
@@ -2092,8 +2088,6 @@ public:
 
     bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
-        room->notifySkillInvoked(invoke->invoker, objectName());
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName());
         if (triggerEvent == PreHpRecover) {
             RecoverStruct r = data.value<RecoverStruct>();
             room->sendLog("#shixue1", invoke->invoker, objectName(), QList<ServerPlayer *>(), QString::number(r.recover));

@@ -274,17 +274,15 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        CardUseStruct use = data.value<CardUseStruct>();
         foreach (ServerPlayer *p, room->getAlivePlayers()) {
             if (p->getMark("@door") > 0) {
                 room->setPlayerMark(p, "@door", 0);
                 break;
             }
         }
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName());
-        room->notifySkillInvoked(invoke->invoker, objectName());
+
         ServerPlayer *next = invoke->tag["door"].value<ServerPlayer *>();
         if (next != nullptr)
             next->gainMark("@door");
@@ -401,25 +399,6 @@ public:
         }
 
         return r;
-    }
-
-    bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
-    {
-        if (TriggerSkill::cost(triggerEvent, room, invoke, data)) {
-            if (invoke->invoker->hasShownSkill(this)) {
-                LogMessage l;
-                l.type = "#TriggerSkill";
-                l.from = invoke->invoker;
-                l.arg = objectName();
-                room->sendLog(l);
-
-                room->notifySkillInvoked(invoke->invoker, objectName());
-            }
-
-            return true;
-        }
-
-        return false;
     }
 
     bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
@@ -544,24 +523,6 @@ public:
         return r;
     }
 
-    bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
-    {
-        if (TriggerSkill::cost(triggerEvent, room, invoke, data)) {
-            if (invoke->invoker->hasShownSkill(this) && triggerEvent == TargetSpecified) {
-                LogMessage l;
-                l.type = "#TriggerSkill";
-                l.arg = objectName();
-                l.from = invoke->invoker;
-                room->sendLog(l);
-
-                room->notifySkillInvoked(invoke->invoker, objectName());
-            }
-            return true;
-        }
-
-        return false;
-    }
-
     bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
         CardUseStruct use = data.value<CardUseStruct>();
@@ -669,24 +630,6 @@ public:
         return r;
     }
 
-    bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
-    {
-        if (TriggerSkill::cost(triggerEvent, room, invoke, data)) {
-            if (invoke->invoker->hasShownSkill(this)) {
-                LogMessage log;
-                log.type = "#TriggerSkill";
-                log.from = invoke->invoker;
-                log.arg = objectName();
-                room->sendLog(log);
-
-                room->notifySkillInvoked(invoke->invoker, objectName());
-            }
-            return true;
-        }
-
-        return false;
-    }
-
     bool effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
         invoke->invoker->drawCards(1, "xunfo");
@@ -708,16 +651,6 @@ public:
     {
         return !player->hasFlag("zhenshe");
     }
-
-    /*bool isEnabledAtResponse(const Player *player, const QString &pattern) const override
-    {
-        return false;
-        SavingEnergy *card = new SavingEnergy(Card::SuitToBeDecided, -1);
-        DELETE_OVER_SCOPE(SavingEnergy, card)
-        const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
-
-        return cardPattern != nullptr && cardPattern->match(player, card);
-    }*/
 
     const Card *viewAs(const Card *originalCard) const override
     {

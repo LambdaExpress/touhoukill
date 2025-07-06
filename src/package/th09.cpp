@@ -521,14 +521,12 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    bool effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail>, QVariant &data) const override
     {
         DamageStruct damage = data.value<DamageStruct>();
 
         QList<ServerPlayer *> logto;
         logto << damage.to;
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName(), logto);
-        room->notifySkillInvoked(invoke->invoker, objectName());
         damage.damage = damage.damage + 2;
         data = QVariant::fromValue(damage);
         return false;
@@ -2323,8 +2321,6 @@ public:
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
         ServerPlayer *player = invoke->invoker;
-        room->notifySkillInvoked(player, objectName());
-        room->sendLog("#TriggerSkill", player, objectName());
         CardUseStruct use = data.value<CardUseStruct>();
         use.from->tag["yishen_target"] = QVariant::fromValue(player);
         QString prompt = "@yishen-discard:" + player->objectName() + ":" + use.card->objectName();

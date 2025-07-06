@@ -1508,12 +1508,9 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    bool effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        ServerPlayer *player = invoke->invoker;
-        room->sendLog("#TriggerSkill", player, objectName());
-        room->notifySkillInvoked(player, objectName());
-        player->turnOver();
+        invoke->invoker->turnOver();
         return false;
     }
 };
@@ -1576,10 +1573,8 @@ public:
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
         ServerPlayer *player = invoke->invoker;
-        room->notifySkillInvoked(player, objectName());
 
         room->setPlayerProperty(player, "maxhp", player->getMaxHp() + 1);
-        room->sendLog("#TriggerSkill", player, objectName());
         room->sendLog("#GainMaxHp", player, QString::number(1));
         room->sendLog("#GetHp", player, QString::number(player->getHp()), QList<ServerPlayer *>(), QString::number(player->getMaxHp()));
         return false;
@@ -1714,8 +1709,6 @@ public:
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
         ServerPlayer *player = invoke->invoker;
-        room->notifySkillInvoked(player, objectName());
-        room->sendLog("#TriggerSkill", player, objectName());
 
         int i = invoke->tag.value("i").toInt();
         if (i == 1)

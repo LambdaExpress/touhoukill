@@ -634,10 +634,8 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    bool effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName());
-        room->notifySkillInvoked(invoke->invoker, objectName());
         invoke->invoker->drawCards(1);
         return false;
     }
@@ -3502,10 +3500,8 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    bool effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName());
-        room->notifySkillInvoked(invoke->invoker, objectName());
         invoke->invoker->drawCards(1);
         return false;
     }
@@ -3621,14 +3617,20 @@ public:
         return d;
     }
 
+    bool cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        room->notifySkillInvoked(invoke->owner, objectName());
+        room->sendLog("#TriggerSkill", invoke->owner, objectName());
+
+        return true;
+    }
+
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
         DrawNCardsStruct qnum = data.value<DrawNCardsStruct>();
         room->doAnimate(QSanProtocol::S_ANIMATE_INDICATE, invoke->owner->objectName(), qnum.player->objectName());
         qnum.n = qnum.n + 1;
         data = QVariant::fromValue(qnum);
-        room->notifySkillInvoked(invoke->owner, objectName());
-        room->sendLog("#TriggerSkill", invoke->owner, objectName());
         return false;
     }
 };
@@ -3672,7 +3674,7 @@ public:
     {
         if (e == HpRecover)
             room->setPlayerFlag(invoke->invoker, "Global_baochunAIFailed");
-        return (invoke->invoker->hasShownSkill(this) || invoke->invoker->askForSkillInvoke(this, data));
+        return TriggerSkill::cost(e, room, invoke, data);
     }
 
     bool effect(TriggerEvent e, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
@@ -3683,8 +3685,6 @@ public:
             if (invoke->invoker != damage.to)
                 draw = false;
         }
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName());
-        room->notifySkillInvoked(invoke->invoker, objectName());
         if (!draw) {
             if (invoke->invoker->canDiscard(invoke->invoker, "hes"))
                 room->askForDiscard(invoke->invoker, objectName(), 1, 1, false, true);

@@ -502,11 +502,9 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    bool effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
         ServerPlayer *player = invoke->invoker;
-        room->sendLog("#TriggerSkill", player, objectName());
-        room->notifySkillInvoked(player, objectName());
 
         QList<Player::Phase> phases = player->getPhases();
         int index = phases.indexOf(Player::Discard, 0);

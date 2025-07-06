@@ -349,7 +349,7 @@ QList<SkillInvokeDetail> TriggerSkill::triggerable(TriggerEvent, const Room *, c
     return QList<SkillInvokeDetail>();
 }
 
-bool TriggerSkill::cost(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const
+bool TriggerSkill::cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const
 {
     if (invoke->isCompulsory) { //for hegemony_mode or reimu_god
         if (invoke->owner == nullptr || invoke->owner != invoke->invoker || frequency == Eternal)
@@ -357,7 +357,13 @@ bool TriggerSkill::cost(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail> 
         if (invoke->invoker != nullptr) {
             if (!invoke->invoker->hasSkill(this, true))
                 return true;
-            return invoke->invoker->hasShownSkill(this) || invoke->invoker->askForSkillInvoke(this, data);
+            if (!invoke->invoker->hasShownSkill(this))
+                return invoke->invoker->askForSkillInvoke(this, data);
+
+            if (invoke->showhidden) {
+                room->notifySkillInvoked(invoke->invoker, objectName());
+                room->sendLog("#TriggerSkill", invoke->invoker, objectName());
+            }
         }
         return true;
     } else {

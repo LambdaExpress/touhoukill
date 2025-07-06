@@ -31,14 +31,10 @@ public:
         return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, a, a, nullptr, true);
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail>, QVariant &data) const override
+    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        ServerPlayer *player = data.value<ServerPlayer *>();
-        room->sendLog("#TriggerSkill", player, objectName());
-        room->notifySkillInvoked(player, objectName());
         room->broadcastSkillInvoke(objectName());
-
-        player->drawCards(1);
+        invoke->invoker->drawCards(1);
 
         return false;
     }
@@ -130,8 +126,6 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName());
-        room->notifySkillInvoked(invoke->invoker, objectName());
         room->broadcastSkillInvoke(objectName());
 
         foreach (ServerPlayer *p, room->getOtherPlayers(invoke->invoker)) {

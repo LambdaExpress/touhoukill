@@ -289,22 +289,6 @@ public:
         return r;
     }
 
-    bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
-    {
-        if (TriggerSkill::cost(triggerEvent, room, invoke, data)) {
-            if (invoke->invoker->hasShownSkill(this)) {
-                LogMessage l;
-                l.type = "#TriggerSkill";
-                l.from = invoke->invoker;
-                l.arg = objectName();
-                room->sendLog(l);
-            }
-            return true;
-        }
-
-        return false;
-    }
-
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
         if (invoke->invoker->getPhase() == Player::Start) {

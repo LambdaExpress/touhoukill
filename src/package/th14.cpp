@@ -79,11 +79,9 @@ public:
         return d;
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    bool effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
         CardUseStruct use = data.value<CardUseStruct>();
-        room->notifySkillInvoked(invoke->invoker, objectName());
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName());
         use.nullified_list << invoke->invoker->objectName();
         data = QVariant::fromValue(use);
         return false;

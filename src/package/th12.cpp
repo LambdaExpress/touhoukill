@@ -210,19 +210,15 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    bool cost(TriggerEvent e, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
-        //for AI
-        CardUseStruct use = data.value<CardUseStruct>();
         room->setTag("weizhuang_use", data);
-        return (invoke->invoker->hasShownSkill(this) || invoke->invoker->askForSkillInvoke(this, data));
+        return TriggerSkill::cost(e, room, invoke, data);
     }
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
         ServerPlayer *player = invoke->invoker;
-        room->notifySkillInvoked(player, objectName());
-        room->sendLog("#TriggerSkill", player, "weizhuang");
         CardUseStruct use = data.value<CardUseStruct>();
         use.from->tag["weizhuang_target"] = QVariant::fromValue(player);
         QString prompt = "@weizhuang-discard:" + player->objectName() + ":" + use.card->objectName();

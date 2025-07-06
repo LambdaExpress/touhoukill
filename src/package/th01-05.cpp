@@ -583,12 +583,8 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    //default cost
-
     bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
-        room->notifySkillInvoked(invoke->invoker, objectName());
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName());
         if (triggerEvent == AfterDrawInitialCards)
             invoke->invoker->drawCards(24);
         else if (triggerEvent == CardsMoveOneTime) {
@@ -1131,6 +1127,7 @@ public:
         : TriggerSkill("mengyan")
     {
         events << Damaged;
+        frequency = Compulsory;
     }
 
     QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *room, const QVariant &data) const override
@@ -1148,8 +1145,6 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->notifySkillInvoked(invoke->invoker, objectName());
-        room->sendLog("#TriggerSkill", invoke->invoker, objectName());
         CardMoveReason reason(CardMoveReason::S_REASON_REMOVE_FROM_PILE, invoke->invoker->objectName(), nullptr, objectName(), "");
         CardsMoveStruct move(invoke->invoker->getPile("dream"), invoke->invoker, Player::DiscardPile, reason);
         room->moveCardsAtomic(move, true);
@@ -2371,13 +2366,6 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        LogMessage l;
-        l.type = "#TriggerSkill";
-        l.from = invoke->invoker;
-        l.arg = objectName();
-        room->sendLog(l);
-        room->notifySkillInvoked(invoke->invoker, objectName());
-
         room->setPlayerMark(invoke->invoker, "drank", 0);
         RecoverStruct r;
         r.reason = objectName();
