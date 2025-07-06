@@ -2062,7 +2062,7 @@ public:
     Shixue()
         : TriggerSkill("shixue")
     {
-        events << PreHpRecover << Damage;
+        events = {PreHpRecover, Damage, EventPhaseStart};
         frequency = Compulsory;
     }
 
@@ -2070,8 +2070,13 @@ public:
     {
         if (triggerEvent == PreHpRecover) {
             RecoverStruct r = data.value<RecoverStruct>();
-            if (r.to->hasSkill(this) && r.reason != objectName() && !r.to->hasFlag("Global_Dying"))
-                return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, r.to, r.to, nullptr, true);
+            if (r.to->hasSkill(this) && r.reason != objectName() && r.to->getHp() > r.to->dyingThreshold())
+                return {SkillInvokeDetail(this, r.to, r.to, nullptr, true)};
+        }
+        if (triggerEvent == EventPhaseStart) {
+            ServerPlayer *p = data.value<ServerPlayer *>();
+            if (p->getPhase() == Player::Start)
+                return {SkillInvokeDetail(this, p, p, nullptr, true)};
         }
         if (triggerEvent == Damage) {
             DamageStruct damage = data.value<DamageStruct>();
@@ -2083,16 +2088,15 @@ public:
                 return d;
             }
         }
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
-    bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        if (triggerEvent == PreHpRecover) {
-            RecoverStruct r = data.value<RecoverStruct>();
-            room->sendLog("#shixue1", invoke->invoker, objectName(), QList<ServerPlayer *>(), QString::number(r.recover));
+        if (triggerEvent != Damage) {
+            room->loseHp(invoke->invoker);
             invoke->invoker->drawCards(2);
-            return true;
+            return false;
         }
         if (invoke->invoker->isWounded()) {
             RecoverStruct recover;

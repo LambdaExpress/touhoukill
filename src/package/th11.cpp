@@ -619,8 +619,11 @@ public:
         if (triggerEvent == PreCardUsed) {
             CardUseStruct use = data.value<CardUseStruct>();
             //since pingyi, we need to record "peach used" for everyone.
-            if (use.from->getPhase() == Player::Play && (use.card->isKindOf("Peach") || use.card->isKindOf("Analeptic")))
+            if (use.from->getPhase() == Player::Play && (use.card->isKindOf("Peach") || use.card->isKindOf("Analeptic") || use.from->hasFlag(objectName() + "1")))
                 room->setPlayerFlag(use.from, "jiuhao");
+            else
+                use.from->setFlags(objectName() + "1");
+
             if (use.card->hasFlag(objectName())) {
                 if (use.m_addHistory) {
                     room->addPlayerHistory(use.from, use.card->getClassName(), -1);
@@ -634,6 +637,7 @@ public:
             if (change.from == Player::Play) {
                 room->setPlayerFlag(change.player, "-jiuhao");
                 room->setPlayerFlag(change.player, "-jiuhaoused");
+                change.player->setFlags("-" + objectName() + "1");
             }
         }
     }

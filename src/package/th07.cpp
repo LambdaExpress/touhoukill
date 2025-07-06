@@ -290,7 +290,7 @@ public:
     }
 };
 
-namespace XijianFunc {
+namespace {
 
 bool checkXijianMove(const Player *src, const Player *dist);
 
@@ -322,7 +322,7 @@ bool checkXijianMove(const Player *src, const Player *dist)
     }
     return false;
 }
-} // namespace XijianFunc
+} // namespace
 
 XijianCard::XijianCard()
 {
@@ -335,11 +335,11 @@ bool XijianCard::targetFilter(const QList<const Player *> &targets, const Player
         if (to_select->isAllNude())
             return false;
         foreach (const Player *p, to_select->getAliveSiblings()) {
-            if (XijianFunc::isXijianPairs(to_select, p))
+            if (isXijianPairs(to_select, p))
                 return true;
         }
     } else if (targets.length() == 1)
-        return XijianFunc::isXijianPairs(targets.first(), to_select);
+        return isXijianPairs(targets.first(), to_select);
     return false;
 }
 
@@ -419,6 +419,35 @@ public:
     }
 };
 
+class XijianRecord : public TriggerSkill
+{
+public:
+    XijianRecord(const QString &base = "xijian")
+        : TriggerSkill("#" + base + "-record")
+        , b(base)
+    {
+        events = {DamageDone, EventPhaseChanging};
+        global = true;
+    }
+
+    void record(TriggerEvent triggerEvent, Room *room, QVariant &data) const override
+    {
+        if (triggerEvent == DamageDone) {
+            DamageStruct d = data.value<DamageStruct>();
+            d.to->setFlags(b);
+        } else {
+            PhaseChangeStruct c = data.value<PhaseChangeStruct>();
+            if (c.to == Player::NotActive) {
+                foreach (ServerPlayer *p, room->getAllPlayers())
+                    p->setFlags("-" + b);
+            }
+        }
+    }
+
+private:
+    QString b;
+};
+
 class Xijian : public TriggerSkill
 {
 public:
@@ -436,15 +465,29 @@ public:
 
     QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *room, const QVariant &data) const override
     {
-        ServerPlayer *yukari = data.value<ServerPlayer *>();
-        if ((yukari != nullptr) && yukari->isAlive() && yukari->getPhase() == Player::Finish && yukari->hasSkill(this)) {
+        QList<SkillInvokeDetail> d;
+
+        ServerPlayer *p = data.value<ServerPlayer *>();
+
+        if (p->isAlive() && p->getPhase() == Player::Finish) {
+            QList<ServerPlayer *> yukari;
+
+            foreach (ServerPlayer *e, room->getAllPlayers()) {
+                if ((e == p || e->hasFlag(objectName())) || e->hasSkill(this))
+                    yukari << e;
+            }
+
             foreach (ServerPlayer *t1, room->getAlivePlayers()) {
-                foreach (ServerPlayer *t2, room->getOtherPlayers(t1))
-                    if (XijianFunc::isXijianPairs(t1, t2))
-                        return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, yukari, yukari);
+                foreach (ServerPlayer *t2, room->getOtherPlayers(t1)) {
+                    if (isXijianPairs(t1, t2)) {
+                        foreach (ServerPlayer *y, yukari)
+                            d << SkillInvokeDetail(this, y, y);
+                    }
+                }
             }
         }
-        return QList<SkillInvokeDetail>();
+
+        return d;
     }
 
     bool cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
@@ -2325,6 +2368,8 @@ TH07Package::TH07Package()
     General *yukari = new General(this, "yukari", "yym", 4, false);
     yukari->addSkill(new Shenyin);
     yukari->addSkill(new Xijian);
+    yukari->addSkill(new XijianRecord);
+    related_skills.insertMulti("xijian", "#xijian-record");
 
     General *ran = new General(this, "ran", "yym", 3, false);
     ran->addSkill(new Shihui);
