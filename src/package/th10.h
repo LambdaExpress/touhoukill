@@ -90,6 +90,19 @@ public:
     void use(Room *room, const CardUseStruct &card_use) const override;
 };
 
+class JiliaoUseCard : public SkillCard
+{
+    Q_OBJECT
+
+public:
+    JiliaoUseCard();
+
+    bool targetFixed(const Player *Self) const override;
+    bool targetsFeasible(const QList<const Player *> &targets, const Player *Self) const override;
+    bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
+    const Card *validate(CardUseStruct &cardUse) const override;
+};
+
 class BujuCard : public SkillCard
 {
     Q_OBJECT

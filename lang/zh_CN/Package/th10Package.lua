@@ -286,8 +286,10 @@ return{
 	["origin:shizuha_5"] = "p号：47759499，个人id：179619",
 
 	["jiliao"] = "寂寥",
-	[":jiliao"] = "<font color=\"green\"><b>出牌阶段限一次，</b></font>你可以令一名角色获得其装备区里的所有牌（可以为零），然后若其手牌数大于其手牌上限，你可以弃置其一张手牌。",
-	["jiliao:throwcard"] = "“寂寥”：<font color=\"#00FF00\"><b>%src </b></font> 的手牌数大于其手牌上限，你可以弃置其一张手牌。" ,
+	[":jiliao"] = "<font color=\"green\"><b>出牌阶段限一次，</b></font>你可以令一名角色获得其装备区里的所有牌（可以为零），然后若其手牌数大于其手牌上限，你可以展示其一张手牌并选择弃置或使用之。",
+	["jiliao:throwcard"] = "“寂寥”：<font color=\"#00FF00\"><b>%src </b></font> 的手牌数大于其手牌上限，你可以展示其一张手牌。" ,
+	["jiliao-show"] = "请选择展示的手牌",
+	["jiliao-use"] = "寂寥你可以使用展示的【%arg】或弃置之",
 	["zhongyan"] = "终焉",
 	["@zhongyan"] = "终焉",
 	[":zhongyan"] = "<font color=\"red\"><b>限定技，</b></font>当你受到其他角色造成的伤害时，你可以防止此伤害，令其失去X点体力（X为其已损失的体力值且至少为1）。",

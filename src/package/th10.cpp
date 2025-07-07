@@ -1663,6 +1663,53 @@ public:
     }
 };
 
+JiliaoUseCard::JiliaoUseCard()
+{
+    will_throw = false;
+}
+
+bool JiliaoUseCard::targetFixed(const Player *Self) const
+{
+    int id = Self->property("jiliao").toString().toInt();
+    const Card *oc = Sanguosha->getCard(id);
+    return oc->targetFixed(Self);
+}
+
+bool JiliaoUseCard::targetsFeasible(const QList<const Player *> &targets, const Player *Self) const
+{
+    int id = Self->property("jiliao").toString().toInt();
+    const Card *oc = Sanguosha->getCard(id);
+    if (oc->canRecast() && targets.length() == 0)
+        return false;
+    return oc->targetsFeasible(targets, Self);
+}
+
+bool JiliaoUseCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
+{
+    int id = Self->property("jiliao").toString().toInt();
+    const Card *oc = Sanguosha->getCard(id);
+    return oc->targetFilter(targets, to_select, Self) && !Self->isProhibited(to_select, oc, targets);
+}
+
+const Card *JiliaoUseCard::validate(CardUseStruct &use) const
+{
+    Room *room = use.from->getRoom();
+    int id = use.from->property("jiliao").toString().toInt();
+    const Card *card = Sanguosha->getCard(id);
+
+    if (room->getCardOwner(id) != use.from) {
+        LogMessage mes;
+        mes.type = "$mengxiang";
+        mes.from = use.from;
+        mes.to << room->getCardOwner(id);
+        mes.arg = "jiliao";
+        mes.card_str = card->toString();
+        room->sendLog(mes);
+    }
+
+    return card;
+}
+
 JiliaoCard::JiliaoCard()
 {
 }
@@ -1686,14 +1733,32 @@ void JiliaoCard::use(Room *room, const CardUseStruct &card_use) const
     move.to_place = Player::PlaceHand;
     move.to = target;
     room->moveCardsAtomic(move, true);
-    if (target->getHandcardNum() <= target->getMaxCards() || !source->canDiscard(target, "hs"))
+    if (target->getHandcardNum() <= target->getMaxCards())
         return;
+
     if (room->askForSkillInvoke(source, "jiliao", QVariant::fromValue(target), "throwcard:" + target->objectName())) {
-        if (target == source)
-            room->askForDiscard(source, "jiliao", 1, 1, false, false);
-        else {
-            int to_throw = room->askForCardChosen(source, target, "hs", "jiliao", false, Card::MethodDiscard);
-            room->throwCard(to_throw, target, source);
+        int to_throw = -1;
+        if (target == source) {
+            const Card *dummy = room->askForExchange(source, getSkillName(), 1, 1, false, "jiliao-show");
+            to_throw = dummy->getEffectiveId();
+            delete dummy;
+        } else {
+            to_throw = room->askForCardChosen(source, target, "hs", "jiliao", false, Card::MethodNone);
+        }
+
+        room->showCard(target, to_throw);
+
+        room->setPlayerProperty(source, "jiliao", QString::number(to_throw));
+
+        bool use = false;
+
+        const Card *c = Sanguosha->getCard(to_throw);
+        if (c->isAvailable(source))
+            use = room->askForUseCard(source, "@@jiliao", "jiliao-use:::" + c->objectName(), 0);
+
+        if (!use) {
+            if (source->canDiscard(target, to_throw))
+                room->throwCard(to_throw, target, (source == target) ? nullptr : source);
         }
     }
 }
@@ -1713,7 +1778,15 @@ public:
 
     const Card *viewAs() const override
     {
+        if (Sanguosha->getCurrentCardUsePattern() == "@@jiliao")
+            return new JiliaoUseCard;
+
         return new JiliaoCard;
+    }
+
+    bool isEnabledAtResponse(const Player *, const QString &pattern) const override
+    {
+        return pattern == "@@jiliao";
     }
 };
 
@@ -1893,6 +1966,7 @@ TH10Package::TH10Package()
     addMetaObject<ShowFengsu>(); // for hegemony
     addMetaObject<XinshangCard>();
     addMetaObject<JiliaoCard>();
+    addMetaObject<JiliaoUseCard>();
     addMetaObject<BujuCard>();
 
     skills << new GongfengVS;
