@@ -79,16 +79,6 @@ public:
     void onEffect(const CardEffectStruct &effect) const override;
 };
 
-class FengrangCard : public SkillCard
-{
-    Q_OBJECT
-
-public:
-    Q_INVOKABLE FengrangCard();
-
-    const Card *validate(CardUseStruct &card_use) const override;
-};
-
 class JiliaoCard : public SkillCard
 {
     Q_OBJECT

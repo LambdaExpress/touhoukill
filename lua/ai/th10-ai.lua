@@ -737,12 +737,9 @@ function fengrang_skill.getTurnUseCard(self)
 	card:setSkillName("fengrang")
 	self:useTrickCard(card, dummy_use)
 	if not dummy_use.card then return nil end
-	return sgs.Card_Parse("@FengrangCard=.")
+	return card
 end
-sgs.ai_skill_use_func.FengrangCard = function(card, use, self)
-	use.card=card
-end
-sgs.ai_use_priority.FengrangCard = sgs.ai_use_priority.AmazingGrace
+
 sgs.ai_use_value.FengrangCard = 3
 sgs.dynamic_value.benefit.FengrangCard = true
 --[收获]

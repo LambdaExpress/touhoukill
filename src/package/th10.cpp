@@ -1597,38 +1597,44 @@ public:
     }
 };
 
-FengrangCard::FengrangCard()
-{
-    target_fixed = true;
-    handling_method = Card::MethodUse;
-    m_skillName = "fengrang";
-}
-
-const Card *FengrangCard::validate(CardUseStruct &) const
-{
-    AmazingGrace *card = new AmazingGrace(Card::NoSuit, 0);
-    card->setSkillName("fengrang");
-    return card;
-}
-
-class Fengrang : public ZeroCardViewAsSkill
+class FengrangVS : public ZeroCardViewAsSkill
 {
 public:
-    Fengrang()
-        : ZeroCardViewAsSkill("fengrang")
+    FengrangVS(const QString &base)
+        : ZeroCardViewAsSkill(base)
     {
     }
 
     bool isEnabledAtPlay(const Player *player) const override
     {
-        AmazingGrace *card = new AmazingGrace(Card::NoSuit, 0);
-        card->deleteLater();
-        return !player->hasUsed("FengrangCard") && card->isAvailable(player);
+        AmazingGrace ag(Card::NoSuit, 0);
+        return !player->hasUsed("FengrangCard") && ag.isAvailable(player);
     }
 
     const Card *viewAs() const override
     {
-        return new FengrangCard;
+        AmazingGrace *ag = new AmazingGrace(Card::NoSuit, 0);
+        ag->setSkillName(objectName());
+        ag->setShowSkill(objectName());
+        return ag;
+    }
+};
+
+class Fengrang : public TriggerSkill
+{
+public:
+    Fengrang()
+        : TriggerSkill("fengrang")
+    {
+        view_as_skill = new FengrangVS(objectName());
+        events = {PreCardUsed};
+    }
+
+    void record(TriggerEvent, Room *room, QVariant &data) const override
+    {
+        CardUseStruct use = data.value<CardUseStruct>();
+        if (use.card->getSkillName() == objectName())
+            room->addPlayerHistory(use.from, "FengrangCard");
     }
 };
 
@@ -1888,7 +1894,6 @@ TH10Package::TH10Package()
     addMetaObject<FengshenCard>();
     addMetaObject<ShowFengsu>(); // for hegemony
     addMetaObject<XinshangCard>();
-    addMetaObject<FengrangCard>();
     addMetaObject<JiliaoCard>();
     addMetaObject<BujuCard>();
 
