@@ -732,16 +732,12 @@ fengrang_skill.name = "fengrang"
 table.insert(sgs.ai_skills, fengrang_skill)
 function fengrang_skill.getTurnUseCard(self)
 	if self.player:hasUsed("FengrangCard") then return nil end
-	local dummy_use = { isDummy = true, to = sgs.SPlayerList() }
 	local card=sgs.cloneCard("amazing_grace", sgs.Card_NoSuit, 0)
 	card:setSkillName("fengrang")
-	self:useTrickCard(card, dummy_use)
-	if not dummy_use.card then return nil end
+	card:setShowSkill("fengrang")
 	return card
 end
 
-sgs.ai_use_value.FengrangCard = 3
-sgs.dynamic_value.benefit.FengrangCard = true
 --[收获]
 sgs.ai_skill_invoke.shouhuo =  true
 

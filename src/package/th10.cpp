@@ -1657,10 +1657,8 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail>, QVariant &data) const override
+    bool effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail>, QVariant &) const override
     {
-        CardEffectStruct effect = data.value<CardEffectStruct>();
-        room->notifySkillInvoked(effect.to, objectName());
         return true;
     }
 };

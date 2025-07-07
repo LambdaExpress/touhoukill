@@ -1092,12 +1092,6 @@ bool Player::hasArmorEffect(const QString &armor_name, bool) const
     if (!tag["Qinggang"].toStringList().isEmpty() || getMark("Armor_Nullified") > 0 || getMark("Equips_Nullified_to_Yourself") > 0)
         return false;
 
-    /*if (!hasFlag("zhanche")) {
-        foreach (const Player *p, getAliveSiblings())
-            if (p->hasFlag("zhanche"))
-                return false;
-    }*/
-
     if (Sanguosha->ViewHas(this, armor_name, "armor") != nullptr)
         return true;
 
@@ -1113,12 +1107,6 @@ bool Player::hasTreasure(const QString &treasure_name, bool) const
 {
     if (getMark("Equips_Nullified_to_Yourself") > 0)
         return false;
-
-    /*if (!hasFlag("zhanche")) {
-        foreach (const Player *p, getAliveSiblings())
-            if (p->hasFlag("zhanche"))
-                return false;
-    }*/
 
     if (Sanguosha->ViewHas(this, treasure_name, "treasure") != nullptr)
         return true;
@@ -1140,7 +1128,7 @@ QList<const Card *> Player::getJudgingArea() const
 }
 
 QList<int> Player::getJudgingAreaID() const
-{ //for marshal
+{
     return judging_area;
 }
 

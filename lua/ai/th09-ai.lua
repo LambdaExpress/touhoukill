@@ -979,11 +979,11 @@ table.insert(sgs.ai_skills, nianli_skill)
 nianli_skill.getTurnUseCard = function(self)
 	-- 要什么NianliCard，直接视为牌就完事了，还不用处理有效性，直接默认AI
 	-- 副作用就是会触发洗牌，但是平时堇子用神秘就会洗牌，所以无所谓啦
+	if self.player.hasUsed("NianliCard") then return end
 	if not self:isWeak(self.player) then
 		local nianliCards={}
 		if not self.player:hasUsed("nianlisnatch") then table.insert(nianliCards, "Snatch") end
 		if not self.player:hasUsed("nianlislash") then table.insert(nianliCards, "Slash") end
-		if 2 - #nianliCards - self.player:usedTimes("nianliextra") > 0 then return end
 
 		local cards = self.room:getNCards(2)
 		self.room:returnToDrawPile(cards)
@@ -991,19 +991,16 @@ nianli_skill.getTurnUseCard = function(self)
 		return sgs.Card_Parse(nianliCards[1] .. ":nianli[to_be_decided:-1]=" .. tostring(n[1]) .. "+" .. tostring(n[2]))
 	end
 end
-sgs.ai_skill_cardask["@nianli-discard1"] = function(self)
-	-- 看看能不能再发动一次
-	if not self:isWeak(self.player) then
-		local cards = sgs.QList2Table(self.player:getHandcards())
-		if #cards > 0 then
-			self:sortByCardNeed(cards)
-			return "$" .. cards[#cards]:getEffectiveId()
-		end
-	end
+sgs.ai_skill_invoke.nianli = function(self)
+	return not self:isWeak(self.player)
 end
-sgs.ai_skill_cardask["@nianli-discard2"] = function(self)
-	-- 给下个人送牌的，暂且忽略吧
-	-- 能看到的就是给下个人送延时锦囊判定牌
+sgs.ai_skill_cardask["@nianli-discard"] = function(self)
+	-- 看看能不能再发动一次
+	local cards = sgs.QList2Table(self.player:getHandcards())
+	if #cards > 0 then
+		self:sortByCardNeed(cards)
+		return "$" .. cards[#cards]:getEffectiveId()
+	end
 end
 
 --[深秘] 暂无想法

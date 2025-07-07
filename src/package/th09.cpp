@@ -1933,7 +1933,7 @@ void NianliDialog::popup()
             card_names << card_name;
     }
 
-    if (card_names.length() == 0) {
+    if (card_names.isEmpty()) {
         emit onButtonClick();
         return;
     }
@@ -2029,13 +2029,12 @@ public:
         // I decided to not use NianliCard for history since it is not AI friendly
         // We can record history in Nianli::record
         // return !player->hasUsed("NianliCard");
-        bool nianlislash = false;
-        bool nianlisnatch = false;
-        if (player->hasUsed("nianlislash"))
-            nianlislash = true;
-        if (player->hasUsed("nianlisnatch"))
-            nianlisnatch = true;
-        return (nianlislash ? 1 : 0) + (nianlisnatch ? 1 : 0) - player->usedTimes("nianliextra") == 0 && !(nianlisnatch && nianlislash);
+
+        bool nianlislash = player->hasUsed("nianlislash");
+        bool nianlisnatch = player->hasUsed("nianlisnatch");
+        bool nianlicard = player->hasUsed("NianliCard");
+
+        return (!nianlislash || !nianlisnatch) && !nianlicard;
     }
 
     const Card *viewAs() const override
@@ -2045,8 +2044,9 @@ public:
             NianliCard *card = new NianliCard;
             card->setUserString(name);
             return card;
-        } else
-            return nullptr;
+        }
+
+        return nullptr;
     }
 };
 
@@ -2074,6 +2074,9 @@ public:
                     room->addPlayerHistory(use.from, "nianlislash");
                 else
                     room->addPlayerHistory(use.from, "nianlisnatch");
+
+                if (!use.from->hasUsed("NianliCard"))
+                    room->addPlayerHistory(use.from, "NianliCard");
             }
         }
     }
@@ -2083,22 +2086,54 @@ public:
         if (triggerEvent == TargetSpecified) {
             CardUseStruct use = data.value<CardUseStruct>();
             if (use.card->getSkillName() == objectName() && use.from != nullptr && use.from->isAlive() && !use.card->isBlack() && !use.card->isRed())
-                return {SkillInvokeDetail(this, use.from, use.from, nullptr, true, nullptr, false)};
+                return {SkillInvokeDetail(this, use.from, use.from)};
         }
         return {};
     }
 
+    bool cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    {
+        CardUseStruct use = data.value<CardUseStruct>();
+        QStringList prompt = {QString(), QString(), QString(), QString(), QString()};
+        if (use.card->isKindOf("Slash")) {
+            prompt[3] = "slash";
+            prompt[4] = "snatch";
+        } else {
+            prompt[3] = "snatch";
+            prompt[4] = "slash";
+        }
+        prompt[0] = "losehp";
+
+        if (room->askForSkillInvoke(invoke->invoker, this, data, prompt.join(":"))) {
+            room->loseHp(invoke->invoker, 1);
+            LogMessage l;
+            l.type = "#nianliextra";
+            l.arg = objectName();
+            l.arg2 = prompt[4];
+            l.from = invoke->invoker;
+            room->sendLog(l);
+            return true;
+        }
+
+        return false;
+    }
+
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
-        room->loseHp(invoke->invoker, 1);
+        room->addPlayerHistory(invoke->invoker, "NianliCard", -invoke->invoker->usedTimes("NianliCard"));
+
+        CardUseStruct use = data.value<CardUseStruct>();
+
+        if (use.card->isKindOf("Slash")) {
+            if (invoke->invoker->hasUsed("nianlisnatch"))
+                room->addPlayerHistory(invoke->invoker, "nianlisnatch", -invoke->invoker->usedTimes("nianlisnatch"));
+        } else {
+            if (invoke->invoker->hasUsed("nianlislash"))
+                room->addPlayerHistory(invoke->invoker, "nianlislash", -invoke->invoker->usedTimes("nianlislash"));
+        }
 
         if (invoke->invoker->isAlive() && !invoke->invoker->isNude()) {
             CardUseStruct use = data.value<CardUseStruct>();
-            int n = 0;
-            if (invoke->invoker->hasUsed("nianlislash"))
-                ++n;
-            if (invoke->invoker->hasUsed("nianlisnatch"))
-                ++n;
 
             QStringList prompt = {QString(), QString(), QString(), QString(), QString()};
             if (use.card->isKindOf("Slash")) {
@@ -2109,7 +2144,7 @@ public:
                 prompt[4] = "slash";
             }
 
-            prompt[0] = "@nianli-discard" + QString::number(n);
+            prompt[0] = "@nianli-discard";
             const Card *c = room->askForCard(invoke->invoker, ".", prompt.join(":"), data, Card::MethodNone);
             if (c != nullptr) {
                 CardsMoveStruct move;
@@ -2117,7 +2152,6 @@ public:
                 move.from = invoke->invoker;
                 move.to_place = Player::DrawPile;
                 room->moveCardsAtomic(move, true);
-                room->addPlayerHistory(invoke->invoker, "nianliextra");
             }
         }
 
