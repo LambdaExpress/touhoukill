@@ -191,11 +191,10 @@ sgs.ai_cardneed.linsa = function(to, card, self)
 end
 
 --天空璋：坂田合欢
+sgs.ai_skill_invoke.shengyu = true
+
 --[磨刀]
-local modao_skill={}
-modao_skill.name="modao"
-table.insert(sgs.ai_skills,modao_skill)
-modao_skill.getTurnUseCard=function(self)
+sgs.ai_skill_use["@@modao"] = function(self)
 	local cards = self.player:getCards("hes")
 	cards=self:touhouAppendExpandPileToList(self.player, cards)
 	cards=sgs.QList2Table(cards)
@@ -207,14 +206,29 @@ modao_skill.getTurnUseCard=function(self)
 			break
 		end
 	end
-	if not card then return nil end
-	local suit = card:getSuitString()
-	local number = card:getNumberString()
+	if not card then return "." end
 	local card_id = card:getEffectiveId()
-	local card_str = ("bone_healing:modao[%s:%s]=%d"):format(suit, number, card_id)
+	local card_str = "bone_healing:modao[to_be_decided,-1]=" .. tostring(card_id)
 	local skillcard = sgs.Card_Parse(card_str)
-	assert(skillcard)
-	return skillcard
+
+	local use = {to = sgs.SPlayerList() , isDummy = true}
+	self:useTrickCard(skillcard, use)
+
+	local targetstrings = {}
+	local targetstring = "."
+
+	if use.card then
+		for _, p in sgs.qlist(use.to) do
+			table.insert(targetstrings, p:objectName())
+		end
+
+		if #targetstrings > 0 then
+			targetstring = table.concat(targetstrings, "+")
+		end
+
+		return (card_str .. "->" .. targetstring)
+	end
+	return "."
 end
 sgs.ai_cardneed.modao = function(to, card, self)
 	return card:getSuit() == sgs.Card_Club
