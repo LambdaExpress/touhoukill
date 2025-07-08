@@ -1635,8 +1635,6 @@ public:
         : TriggerSkill("yaoli")
     {
         events << GameStart << EventAcquireSkill << EventLoseSkill << Death << Debut << Revive << GeneralShown << EventPhaseChanging;
-        // show_type = "static";
-        view_as_skill = new YaoliVS("yaoli", false);
     }
 
     void record(TriggerEvent e, Room *room, QVariant &data) const override
@@ -1697,11 +1695,12 @@ public:
     }
 };
 
-QStringList Yaoli::el {"", "BasicCard", "ndtrick", "yaoliothercard"};
+QStringList Yaoli::el {"", "BasicCard", "ndtrick", "EquipCard"};
 
 YaoliCard::YaoliCard()
 {
-    will_throw = true;
+    will_throw = false;
+    handling_method = Card::MethodNone;
     m_skillName = "yaoli_attach";
 }
 
@@ -1752,7 +1751,10 @@ void YaoliCard::onEffect(const CardEffectStruct &effect) const
 
     int yaoliTagTypeId = 0;
 
-    if (effect.to->askForSkillInvoke("yaoli-draw", data, "hahahahahaha:" + effect.from->objectName())) {
+    const Card *thiscard = Sanguosha->getCard(subcards.first());
+    room->showCard(effect.from, subcards.first());
+
+    if (effect.to->askForSkillInvoke("yaoli-draw", data, "hahahahahaha:" + effect.from->objectName() + "::" + thiscard->getSuitString())) {
         effect.to->drawCards(1, "yaoli");
         if (effect.to->canDiscard(effect.to, "hes")) {
             const Card *discard = room->askForCard(effect.to, "..!", "@yaoli-discard", data);
@@ -1768,15 +1770,16 @@ void YaoliCard::onEffect(const CardEffectStruct &effect) const
                 room->throwCard(discard, effect.to);
             }
 
-            const Card *thiscard = Sanguosha->getCard(subcards.first());
             discard = Sanguosha->getCard(discard->getEffectiveId());
+
+            if (thiscard->getTypeId() == discard->getTypeId())
+                room->obtainCard(effect.to, thiscard);
 
             if (thiscard->getTypeId() == Card::TypeBasic && discard->getTypeId() == Card::TypeBasic)
                 yaoliTagTypeId = 1;
             else if (thiscard->isNDTrick() && discard->isNDTrick())
                 yaoliTagTypeId = 2;
-            else if (((thiscard->getTypeId() == Card::TypeEquip) || (thiscard->getTypeId() == Card::TypeTrick && !thiscard->isNDTrick()))
-                     && ((discard->getTypeId() == Card::TypeEquip) || (discard->getTypeId() == Card::TypeTrick && !discard->isNDTrick())))
+            else if ((thiscard->getTypeId() == Card::TypeEquip) && (discard->getTypeId() == Card::TypeEquip))
                 yaoliTagTypeId = 3;
 
             if (yaoliTagTypeId != 0) {
@@ -1805,47 +1808,6 @@ void YaoliCard::onEffect(const CardEffectStruct &effect) const
     effect.from->setFlags("-" + tagName);
 }
 
-class YaoliBasic : public TriggerSkill
-{
-public:
-    YaoliBasic()
-        : TriggerSkill("#yaolibasic")
-    {
-        events << TargetSpecifying;
-        global = true;
-    }
-
-    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *, const QVariant &data) const override
-    {
-        CardUseStruct use = data.value<CardUseStruct>();
-        if (use.card->getTypeId() == Card::TypeBasic && use.from != nullptr && use.from->isAlive() && use.from->tag.contains("yaolieffect1") && !use.from->hasFlag("yaolieffect1"))
-            return {SkillInvokeDetail(this, use.from, use.from, nullptr, true, nullptr, false)};
-
-        return {};
-    }
-
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail>, QVariant &data) const override
-    {
-        CardUseStruct use = data.value<CardUseStruct>();
-        use.from->setFlags("yaolieffect1");
-
-        LogMessage l;
-        l.type = "#yaolibasic";
-        l.from = use.from;
-        l.arg = use.card->objectName();
-
-        room->sendLog(l);
-
-        if (!use.card->isKindOf("Slash") || use.card->isKindOf("LightSlash") || use.card->isKindOf("PowerSlash"))
-            use.m_effectValue.first()++;
-        else
-            use.m_effectValue.last()++;
-        data = QVariant::fromValue(use);
-
-        return false;
-    }
-};
-
 class YaoliTrick : public TriggerSkill
 {
 public:
@@ -1870,73 +1832,112 @@ public:
         CardUseStruct use = data.value<CardUseStruct>();
         use.from->setFlags("yaolieffect2");
 
-        if (use.card->isKindOf("Nullification")) {
-            LogMessage l;
-            l.type = "#yaolitrick_nullification";
-            l.from = use.from;
-            room->sendLog(l);
+        LogMessage l;
+        l.type = "#yaolitrick";
+        l.from = use.from;
+        l.arg = use.card->objectName();
 
-            return false;
-        }
+        room->sendLog(l);
 
-        QList<ServerPlayer *> canAdd;
-        QList<const Player *> ps;
-        foreach (ServerPlayer *p, use.to)
-            ps << p;
-        use.card->setFlags("yaoli");
-        use.card->setFlags("IgnoreFailed");
-        foreach (ServerPlayer *sp, room->getAlivePlayers()) {
-            if (!use.to.contains(sp) && !use.from->isProhibited(sp, use.card, ps) && use.card->targetFilter(ps, sp, use.from))
-                canAdd << sp;
-        }
-        use.card->setFlags("-IgnoreFailed");
-        use.card->setFlags("-yaoli");
+        use.m_effectValue.first()++;
 
-        if (canAdd.isEmpty() && use.to.isEmpty()) {
-            LogMessage l;
-            l.type = "#yaolitrick_noAvailable";
-            l.from = use.from;
-            room->sendLog(l);
-
-            return false;
-        }
-
-        // do not confuse it with "yaolieffect2"
-        use.from->tag["yaolitrick"] = data;
-        ServerPlayer *target = room->askForPlayerChosen(use.from, canAdd + use.to, "yaolitrick", "@yaolitrick:::" + use.card->objectName(), false, true);
-        if (target == nullptr)
-            target = (canAdd + use.to).constFirst();
-
-        if (canAdd.contains(target)) {
-            LogMessage l;
-            l.type = "#Kuangwu";
-            l.from = use.from;
-            l.to << target;
-            l.arg = "yaolitrick";
-            l.arg2 = use.card->objectName();
-            room->sendLog(l);
-            use.to.append(target);
-        } else if (use.to.contains(target)) {
-            LogMessage l;
-            l.type = "#XushiHegemonySkillAvoid";
-            l.arg = "yaolitrick";
-            l.arg2 = use.card->objectName();
-            l.from = target;
-            room->sendLog(l);
-            use.to.removeOne(target);
-        }
-
-        room->sortByActionOrder(use.to);
         data = QVariant::fromValue(use);
 
         return false;
     }
 };
 
-class YaoliTrickDistance : public TargetModSkill
+class YaoliBasic : public TriggerSkill
 {
 public:
-    YaoliTrickDistance()
+    YaoliBasic()
+        : TriggerSkill("#yaolitrick")
+    {
+        events = {CardResponded, TargetSpecifying};
+        global = true;
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent e, const Room *, const QVariant &data) const override
+    {
+        if (e == TargetSpecifying) {
+            CardUseStruct use = data.value<CardUseStruct>();
+            if (use.card->getTypeId() == Card::TypeBasic && use.from != nullptr && use.from->isAlive() && use.from->tag.contains("yaolieffect1")
+                && !use.from->hasFlag("yaolieffect1"))
+                return {SkillInvokeDetail(this, use.from, use.from, nullptr, true, nullptr, false)};
+        } else if (e == CardResponded) {
+            CardResponseStruct resp = data.value<CardResponseStruct>();
+            if (resp.m_isUse && resp.m_card->getTypeId() == Card::TypeBasic && resp.m_from != nullptr && resp.m_from->isAlive() && resp.m_from->tag.contains("yaolieffect1")
+                && !resp.m_from->hasFlag("yaolieffect1"))
+                return {SkillInvokeDetail(this, resp.m_from, resp.m_from, nullptr, true, nullptr, false)};
+        }
+
+        return {};
+    }
+
+    bool effect(TriggerEvent e, Room *room, QSharedPointer<SkillInvokeDetail>, QVariant &data) const override
+    {
+        if (e == CardResponded) {
+            CardResponseStruct resp = data.value<CardResponseStruct>();
+            resp.m_from->setFlags("yaolieffect1");
+
+            LogMessage l;
+            l.type = "#yaolibasic_jink";
+            l.from = resp.m_from;
+            l.arg = resp.m_card->objectName();
+            room->sendLog(l);
+        } else if (e == TargetSpecifying) {
+            CardUseStruct use = data.value<CardUseStruct>();
+            use.from->setFlags("yaolieffect1");
+
+            QList<ServerPlayer *> canAdd;
+            QList<const Player *> ps;
+            foreach (ServerPlayer *p, use.to)
+                ps << p;
+            use.card->setFlags("yaoli");
+            use.card->setFlags("IgnoreFailed");
+            foreach (ServerPlayer *sp, room->getAlivePlayers()) {
+                if (!use.to.contains(sp) && !use.from->isProhibited(sp, use.card, ps) && use.card->targetFilter(ps, sp, use.from) && use.from->inMyAttackRange(sp))
+                    canAdd << sp;
+            }
+            use.card->setFlags("-IgnoreFailed");
+            use.card->setFlags("-yaoli");
+
+            if (canAdd.isEmpty()) {
+                LogMessage l;
+                l.type = "#yaolibasic_noAvailable";
+                l.from = use.from;
+                room->sendLog(l);
+
+                return false;
+            }
+
+            // do not confuse it with "yaolieffect1"
+            use.from->tag["yaolibasic"] = data;
+            ServerPlayer *target = room->askForPlayerChosen(use.from, canAdd, "yaolibasic", "@yaolibasic:::" + use.card->objectName(), false, true);
+            if (target == nullptr)
+                target = canAdd.constFirst();
+
+            LogMessage l;
+            l.type = "#Kuangwu";
+            l.from = use.from;
+            l.to << target;
+            l.arg = "yaolibasic";
+            l.arg2 = use.card->objectName();
+            room->sendLog(l);
+            use.to.append(target);
+
+            room->sortByActionOrder(use.to);
+            data = QVariant::fromValue(use);
+        }
+
+        return false;
+    }
+};
+
+class YaoriBasicDistance : public TargetModSkill
+{
+public:
+    YaoriBasicDistance()
         : TargetModSkill("#yaoli-dist")
     {
         pattern = ".";
@@ -1951,10 +1952,10 @@ public:
     }
 };
 
-class YaoliTrickAiHelper : public TargetModSkill
+class YaoliBasicAiHelper : public TargetModSkill
 {
 public:
-    YaoliTrickAiHelper()
+    YaoliBasicAiHelper()
         : TargetModSkill("#yaoli-aihelper")
     {
         pattern = ".";
@@ -1982,8 +1983,8 @@ public:
     QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *, const QVariant &data) const override
     {
         CardUseStruct use = data.value<CardUseStruct>();
-        if (((use.card->getTypeId() == Card::TypeEquip) || (use.card->getTypeId() == Card::TypeTrick && !use.card->isNDTrick())) && use.from != nullptr && use.from->isAlive()
-            && use.from->tag.contains("yaolieffect3") && !use.from->hasFlag("yaolieffect3"))
+        if ((use.card->getTypeId() == Card::TypeEquip) && use.from != nullptr && use.from->isAlive() && use.from->tag.contains("yaolieffect3")
+            && !use.from->hasFlag("yaolieffect3"))
             return {SkillInvokeDetail(this, use.from, use.from, nullptr, true, nullptr, false)};
 
         return {};
@@ -1995,32 +1996,12 @@ public:
         use.from->setFlags("yaolieffect3");
 
         LogMessage l;
+        l.type = "#TriggerSkill";
         l.from = use.from;
-
-        QList<ServerPlayer *> targets;
-        foreach (ServerPlayer *p, room->getAlivePlayers()) {
-            if (p->getCards("ej").length() > 0)
-                targets << p;
-        }
-
-        if (targets.isEmpty()) {
-            l.type = "#yaoliequip_noAvailable";
-            room->sendLog(l);
-            return false;
-        }
-
-        ServerPlayer *target = room->askForPlayerChosen(use.from, targets, "yaoliequip", "@yaoli-equip", false, true);
-
-        if (target == nullptr)
-            target = targets.first();
-
-        l.type = "#yaoliequip";
-        l.to << target;
+        l.arg = "yaoliequip";
         room->sendLog(l);
 
-        DummyCard d;
-        d.addSubcards(target->getCards("ej"));
-        room->throwCard(&d, target, ((target == use.from) ? nullptr : use.from));
+        use.from->drawCards(3, "yaoliequip");
 
         return false;
     }
@@ -2080,10 +2061,10 @@ THNDJPackage::THNDJPackage()
 
     General *eirin = new General(this, "eirin_ndj", "yyc");
     eirin->addSkill(new Yaoli);
-    eirin->addSkill(new YaoliTrickDistance);
-    eirin->addSkill(new YaoliTrickAiHelper);
-    eirin->addSkill(new YaoliBasic);
+    eirin->addSkill(new YaoriBasicDistance);
+    eirin->addSkill(new YaoliBasicAiHelper);
     eirin->addSkill(new YaoliTrick);
+    eirin->addSkill(new YaoliBasic);
     eirin->addSkill(new YaoliEquip);
     related_skills.insertMulti("yaoli", "#yaoli-dist");
     related_skills.insertMulti("yaoli", "#yaoli-aihelper");

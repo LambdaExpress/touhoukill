@@ -519,24 +519,21 @@ end
 local yaoliCardType = function(originalCard)
 	card = originalCard
 	if type(originalCard) == "number" then card = sgs.Sanguosha:getCard(originalCard) end
-	-- 1：基本 2：非延时锦囊 3：延时锦囊或装备
+	-- 1：基本 2：非延时锦囊 3：装备
 	if card:getTypeId() == sgs.Card_TypeBasic then return 1 end
 	if card:isNDTrick() then return 2 end
 	if card:getTypeId() == sgs.Card_TypeEquip then return 3 end
-	if card:getTypeId() == sgs.Card_TypeTrick and not card:isNDTrick() then return 3 end
-	-- nil: 未知（？？？？）
+	-- nil: 延时锦囊
 end
 sgs.ai_event_callback[sgs.EventPhaseStart].yaoli = function(self, player)
 	if player:getPhase() == sgs.Player_Play then
 		sgs.ai_use_priority.YaoliCard = 6
 	end
 end
-local yaoli_skill, yaoli_attach_skill = {}, {}
-yaoli_skill.name = "yaoli"
+local yaoli_attach_skill = {}
 yaoli_attach_skill.name = "yaoli_attach"
-table.insert(sgs.ai_skills, yaoli_skill)
 table.insert(sgs.ai_skills, yaoli_attach_skill)
-yaoli_skill.getTurnUseCard = function(self)
+yaoli_attach_skill.getTurnUseCard = function(self)
 	local discard
 	if self.player:isWounded() and self.player:getArmor() and self.player:getArmor():isKindOf("SliverLion") then
 		discard = self.player:getArmor()
@@ -553,7 +550,7 @@ yaoli_skill.getTurnUseCard = function(self)
 			end
 		end
 
-		-- 延时锦囊/装备太厉害了，拆装备/判定比较猛，但是延时锦囊普遍usevalue比较高，而装备的延时收益也要考虑，权衡一下的话可能不是好方案
+		-- 延时锦囊太厉害了，摸三张呢
 		-- 基本牌比较多，容易触发，但是也是效果最不靠谱的（桃除外）
 		-- 普通锦囊如果priority低的话，可能不如药理扔了好
 		-- 如果简单考虑的话，普通锦囊 / 基本 / 装备吧（懒）
@@ -561,7 +558,7 @@ yaoli_skill.getTurnUseCard = function(self)
 		local priority = {2, 1, 3}
 		for _, prio in ipairs(priority) do
 			local collection = cards_sort[prio]
-			if #collection > (self.player:hasSkill("yaoli") and 2 or 1) then
+			if #collection > 1 then
 				self:sortByUseValue(collection, true)
 				discard = collection[1]
 				break
@@ -578,7 +575,6 @@ yaoli_skill.getTurnUseCard = function(self)
 	end
 	return discard and sgs.Card_Parse("@YaoliCard=" .. tostring(discard:getEffectiveId()))
 end
-yaoli_attach_skill.getTurnUseCard = yaoli_skill.getTurnUseCard
 sgs.ai_skill_use_func.YaoliCard = function(card, use, self)
 	local eirin
 	for _, p in sgs.qlist(self.room:getAllPlayers()) do
@@ -588,6 +584,7 @@ sgs.ai_skill_use_func.YaoliCard = function(card, use, self)
 				return
 			end
 			eirin = p
+			break
 		end
 	end
 
@@ -601,11 +598,6 @@ sgs.ai_skill_use_func.YaoliCard = function(card, use, self)
 		return
 	end
 
-	-- if self.player:objectName() == eirin:objectName() then
-	-- 加个什么限制才能防止永林自己过劳导致没牌？
-	-- end
-
-	-- 用吧用吧，不太亏
 	use.card = card
 	if use.to then use.to:append(eirin) end
 end
@@ -699,10 +691,10 @@ sgs.ai_choicemade_filter.cardResponded["@yaoli-discard"] = function(self, player
 	end
 end
 
-sgs.ai_skill_playerchosen.yaolitrick = function(self, targets)
+sgs.ai_skill_playerchosen.yaolibasic = function(self, targets)
 	local canadd, cancancel = {}
 
-	local use = self.player:getTag("yaolitrick"):toCardUse()
+	local use = self.player:getTag("yaolibasic"):toCardUse()
 	cancancel = sgs.QList2Table(use.to)
 	for _, target in sgs.qlist(targets) do
 		local flag = false
@@ -716,193 +708,29 @@ sgs.ai_skill_playerchosen.yaolitrick = function(self, targets)
 	end
 
 	-- canadd 是可以添加的目标
-	-- cancancel 是可以取消的目标 （就是use.to啦）
 
-	-- 基本上是aoe / GlobalEffect才会要取消目标，其余都是添加
-	-- 添加目标原则？每个牌可能不一样
-
-	if use.card:isKindOf("AmazingGrace") then
-		-- 五谷：敌方秋穰子取消 / 座次最近的取消
-		local cancancelEnemy = sgs.SPlayerList()
-		for _, t in ipairs(cancancel) do
-			if self:isEnemy(t) then
-				if t:hasSkill("shouhuo", true) then return t end -- 敌方秋穰子，不能让她白嫖，最优先
-				if not self:needKongcheng(t) and t:isKongcheng() then -- 敌方河童，不能取消，让她摸
-					cancancelEnemy:append(t)
+	-- 添加目标原则？每个牌可能不一样，暂时先。。。
+	-- 源码耦合，让牌可以多选择一个目标，让默认AI尝试着用一用
+	use.card:setFlags("yaoli_Fsu0413AiHelperDoNotRemoveThisSkillIsToComplicatedOhMyGod")
+	local dummyuse = { to = sgs.SPlayerList(), isDummy = true }
+	self:useCardByClassName(use.card, dummyuse)
+	use.card:setFlags("-yaoli_Fsu0413AiHelperDoNotRemoveThisSkillIsToComplicatedOhMyGod")
+	-- 然后看看AI默认使用这张牌有没有增加的目标。如果有的话，就直接增加。如果没有的话，就随缘了
+	if dummyuse.card then
+		for _, target in sgs.qlist(dummyuse.to) do
+			local flag = false
+			for _, add in ipairs(canadd) do
+				if target:objectName() == add:objectName() then
+					flag = true
+					break
 				end
 			end
-			if self:isFriend(t) then
-				if self:needKongcheng(t) and t:isKongcheng() then
-					-- 我方没手牌河童。取消吗？
-				end
-			end
-		end
-		if cancancelEnemy.length() > 0 then
-			self.room:sortByActionOrder(cancancelEnemy)
-			return cancancelEnemy:first()
-		end
-		-- canadd? 五谷一般都是全局，canadd一般为空
-	elseif use.card:isKindOf("GlobalEffect") then
-		-- 桃园 / 联军盛宴：找到敌方hp最低的取消 / 找没效果的（优先敌方）取消
-		local cancancelEnemy = {}
-		local cancancelEnemyNoEffect = {}
-		for _, t in ipairs(cancancel) do
-			if self:isEnemy(t) then
-				if t:isWounded() or (use.card:isKindOf("AllianceFeast") and (not t:isDebuffStatus())) then
-					table.insert(cancancelEnemy, t)
-				else
-					table.insert(cancancelEnemyNoEffect, t)
-				end
-			end
-		end
-		if #cancancelEnemy > 0 then
-			self:sort(cancancelEnemy, "hp")
-			return cancancelEnemy[1]
-		end
-		if #cancancelEnemyNoEffect > 0 then
-			self:sort(cancancelEnemyNoEffect, "hp")
-			return cancancelEnemyNoEffect[1]
-		end
-		-- canadd? 桃园/联军一般都是全局，canadd一般为空
-	elseif use.card:isKindOf("AOE") then
-		-- 南蛮/万箭/水淹：找到我方defense最低的（如果是水淹，有装备且无狮子的 ，如果是南蛮万箭，无藤甲的）取消
-		local cancancelFriend = {}
-		local cancancelFriendNoEffect = {}
-		for _, t in ipairs(cancancel) do
-			if self:isFriend(t) then
-				if use.card:isKindOf("Drowning") then
-					if t:getEquips():isEmpty() then
-						table.insert(cancancelFriendNoEffect, t)
-					elseif t:getArmor() and t:getArmor():isKindOf("SilverLion") and t:isWounded() then
-						-- 有狮子！千万别取消！！取消了就扔不了狮子回血了！！！
-					else
-						table.insert(cancancelFriend, t)
-					end
-				else
-					if t:getArmor() and t:getArmor():isKindOf("Vine") then
-						table.insert(cancancelFriendNoEffect, t)
-					else
-						table.insert(cancancelFriend, t)
-					end
-				end
-			end
-		end
-		if #cancancelFriend > 0 then
-			self:sort(cancancelFriend, "defense")
-			return cancancelFriend[1]
-		end
-		if #cancancelFriendNoEffect > 0 then
-			self:sort(cancancelFriendNoEffect, "defense")
-			return cancancelFriendNoEffect[1]
-		end
-	else
-		-- 源码耦合，让牌可以多选择一个目标，让默认AI尝试着用一用
-		use.card:setFlags("yaoli_Fsu0413AiHelperDoNotRemoveThisSkillIsToComplicatedOhMyGod")
-		local dummyuse = { to = sgs.SPlayerList(), isDummy = true }
-		self:useCardByClassName(use.card, dummyuse)
-		use.card:setFlags("-yaoli_Fsu0413AiHelperDoNotRemoveThisSkillIsToComplicatedOhMyGod")
-		-- 然后看看AI默认使用这张牌有没有增加的目标。如果有的话，就直接增加。如果没有的话，就随缘了
-		if dummyuse.card then
-			for _, target in sgs.qlist(dummyuse.to) do
-				local flag = false
-				for _, add in ipairs(canadd) do
-					if target:objectName() == add:objectName() then
-						flag = true
-						break
-					end
-				end
-				if flag then
-					return target
-				end
+			if flag then
+				return target
 			end
 		end
 	end
 
 	-- 随缘啦
 	return targets:first()
-end
-sgs.ai_choicemade_filter.playerChosen.yaolitrick = function(self, player, args)
-	local use = self.player:getTag("yaolitrick"):toCardUse()
-	local target = self.room:findPlayerByObjectName(args[#args])
-	local intention
-	if target then
-		local iscancel
-		for _, to in sgs.qlist(use.to) do
-			if to:objectName() == target:objectName() then
-				iscancel = true
-				break
-			end
-		end
-		if iscancel then
-			if use.card:isKindOf("AmagingGrace") and target:hasSkill("shouhuo") then
-				intention = 200
-			elseif use.card:isKindOf("GlobalEffect") then
-				intention = 20
-			elseif use.card:isKindOf("AOE") then
-				intention = -20
-			end
-		end
-	end
-
-	if intention then
-		sgs.updateIntention(player, target, intention)
-	end
-end
-
-sgs.ai_skill_playerchosen.yaoliequip = function(self, targets)
-	-- 敌方有超魔理沙 - 无脑扔，一张也要扔
-	-- 友方有乐或兵且没有春息，没装备或只有一张狮子且受伤，
-	-- 敌方装备最多的，且装备>2，且没有乐或兵
-
-	for _, t in sgs.qlist(targets) do
-		if self:isEnemy(t) and t:hasSkill("baoyi") then return t end
-	end
-
-	for _, t in sgs.qlist(targets) do
-		if self:isFriend(t) then
-			if (t:containsTrick("Indulgence") or t:containsTrick("SupplyShortage")) and not t:containsTrick("SpringBreath") and (t:getEquips():length() == 0 or (t:getEquips():length() == 1 and t:getArmor() and t:getArmor():isKindOf("SilverLion") and t:isWounded())) then
-				return t
-			end
-		end
-	end
-
-	local enemyTarget, enemyTargetLength
-	for _, t in sgs.qlist(targets) do
-		if self:isEnemy(t) then
-			if t:getEquips():length() > 0 and not (t:containsTrick("Indulgence") or t:containsTrick("SupplyShortage")) then
-				local l = t:getEquips():length()
-				if (not enemyTarget) or (l > enemyTargetLength) then
-					enemyTarget = t enemyTargetLength = l
-				end
-			end
-		end
-	end
-
-	if enemyTarget then return enemyTarget end
-
-	-- 马丹 又要强制选择，我吐了
-	return targets:first()
-end
-sgs.ai_choicemade_filter.playerChosen.yaoliequip = function(self, player, args)
-	local target = self.room:findPlayerByObjectName(args[#args])
-	local intention = 0
-	if target then
-		if t:containsTrick("SpringBreath") then -- 拆春息无条件敌方吧
-			intention = 10
-		else
-			if t:containsTrick("Indulgence") then
-				intention = intention - 10
-			end
-			if t:containsTrick("SupplyShortage") then
-				intention = intention - 10
-			end
-			local equips = t:getEquips():length()
-			if t:isWounded() and t:getArmor() and t:getArmor():isKindOf("SilverLion") then
-				equips = equips - 3
-			end
-			intention = intention + equips * 10
-		end
-	end
-
-	sgs.updateIntention(player, target, intention)
 end
