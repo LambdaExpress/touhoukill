@@ -2357,7 +2357,7 @@ public:
             QString prompt = "@qinlue-discard1:" + source->objectName();
             const Card *card = room->askForCard(current, "Jink,Armor", prompt, QVariant::fromValue(source));
             if (card == nullptr) {
-                room->setPlayerFlag(current, "Global_TurnTerminated");
+                current->setFlags("Global_TurnTerminated");
                 if (!room->getThread()->hasExtraTurn()) {
                     ExtraTurnStruct extra;
                     extra.player = invoke->invoker;

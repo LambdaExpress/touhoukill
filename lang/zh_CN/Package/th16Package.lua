@@ -55,7 +55,7 @@ return {
 
 	["nemuno"] = "坂田合欢",
 	["#nemuno"] = "跨越浮世门关的山姥",
-	["designer:nemuno"] = "三国有单",
+	["designer:nemuno"] = "辰焰天明",
 
 	["illustrator:nemuno"] = "针鼠修罗",
 	["origin:nemuno"] = "p号：62793220，个人id：3442252",

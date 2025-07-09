@@ -334,9 +334,9 @@ void Room::revivePlayer(ServerPlayer *player, bool initialize)
         doBroadcastNotify(QSanProtocol::S_COMMAND_LOG_EVENT, args);
 
         if (player->getPhase() == Player::Play)
-            setPlayerFlag(player, "Global_PlayPhaseTerminated");
+            player->setFlags("Global_PlayPhaseTerminated");
         if (player->isCurrent())
-            setPlayerFlag(player, "Global_TurnTerminated");
+            player->setFlags("Global_TurnTerminated");
     }
 
     m_alivePlayers.clear();
@@ -5603,7 +5603,7 @@ void Room::activate(ServerPlayer *player, CardUseStruct &card_use)
     tryPause();
 
     if (player->hasFlag("Global_PlayPhaseTerminated") || player->hasFlag("Global_TurnTerminated")) {
-        setPlayerFlag(player, "-Global_PlayPhaseTerminated");
+        player->setFlags("-Global_PlayPhaseTerminated");
         //for "dangjia" intention ai
         //need record  PlayPhaseTerminated
         setPlayerFlag(player, "PlayPhaseTerminated");

@@ -4,16 +4,6 @@
 #include "card.h"
 #include "package.h"
 
-class LeitingCard : public SkillCard
-{
-    Q_OBJECT
-
-public:
-    Q_INVOKABLE LeitingCard();
-
-    void onEffect(const CardEffectStruct &effect) const override;
-};
-
 class YuanfeiCard : public SkillCard
 {
     Q_OBJECT

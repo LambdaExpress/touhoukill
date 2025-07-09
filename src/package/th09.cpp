@@ -117,7 +117,6 @@ public:
             }
             use.nullified_list << "_ALL_TARGETS";
             data = QVariant::fromValue(use);
-            //room->setPlayerFlag(invoke->targets.first(), "Global_PlayPhaseTerminated");
         }
         return false;
     }

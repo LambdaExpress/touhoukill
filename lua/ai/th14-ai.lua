@@ -60,6 +60,7 @@ end
 --堀川雷鼓
 --[雷霆]
 --todo：雷霆弃牌丢出了已经装入木牛且移给他人的牌
+--[[
 local leiting_skill = {}
 leiting_skill.name = "leiting"
 table.insert(sgs.ai_skills, leiting_skill)
@@ -145,6 +146,7 @@ sgs.ai_cardneed.leiting = function(to, card, self)
 		return card:getSuit()==sgs.Card_Heart or card:getSuit()==sgs.Card_Spade
 	end
 end
+]]
 
 --鬼人正邪
 --[逆转]

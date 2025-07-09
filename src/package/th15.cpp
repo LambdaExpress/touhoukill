@@ -1176,7 +1176,7 @@ public:
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail>, QVariant &) const override
     {
         ServerPlayer *current = room->getCurrent();
-        room->setPlayerFlag(current, "Global_PlayPhaseTerminated");
+        current->setFlags("Global_PlayPhaseTerminated");
         room->sendLog("#rumeng_skip", current, "rumeng_skip", QList<ServerPlayer *>(), objectName());
         return false;
     }

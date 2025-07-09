@@ -186,68 +186,139 @@ public:
     }
 };
 
-LeitingCard::LeitingCard()
-{
-}
-
-void LeitingCard::onEffect(const CardEffectStruct &effect) const
-{
-    Room *room = effect.to->getRoom();
-    effect.from->drawCards(1);
-    if (effect.from->isKongcheng())
-        return;
-    QList<const Card *> hc = effect.from->getHandcards();
-    foreach (const Card *c, hc) {
-        if (effect.from->isJilei(c))
-            hc.removeOne(c);
-    }
-    if (hc.length() == 0)
-        return;
-
-    const Card *cards = room->askForCard(effect.from, ".|.|.|hand,equipped", "@leiting:" + effect.to->objectName(), QVariant::fromValue(effect.to));
-    if (cards == nullptr)
-        return;
-
-    if (cards->getSuit() == Card::Heart) {
-        effect.to->drawCards(1);
-        room->damage(DamageStruct("leiting", nullptr, effect.to, 1, DamageStruct::Thunder));
-    } else if (cards->getSuit() == Card::Spade) {
-        ThunderSlash *slash = new ThunderSlash(Card::NoSuit, 0);
-        // if return without usecard,we need delete this new thunderslash?
-        if (effect.to->isCardLimited(slash, Card::MethodUse))
-            return;
-        QList<ServerPlayer *> listt;
-        foreach (ServerPlayer *p, room->getOtherPlayers(effect.to)) {
-            if (effect.to->inMyAttackRange(p) && effect.to->canSlash(p, slash, true))
-                listt << p;
-        }
-        if (listt.length() <= 0)
-            return;
-        ServerPlayer *target = room->askForPlayerChosen(effect.to, listt, "leiting", "@leiting_chosen:" + effect.from->objectName(), false);
-
-        if (target != nullptr) {
-            slash->setSkillName("_leiting");
-            room->useCard(CardUseStruct(slash, effect.to, target), false);
-        }
-    }
-}
-
-class Leiting : public ZeroCardViewAsSkill
+class LeitingVS : public ZeroCardViewAsSkill
 {
 public:
-    Leiting()
-        : ZeroCardViewAsSkill("leiting")
+    LeitingVS(const QString &base)
+        : ZeroCardViewAsSkill(base)
     {
-    }
-
-    bool isEnabledAtPlay(const Player *player) const override
-    {
-        return !player->hasUsed("LeitingCard");
+        response_pattern = "@@leiting!";
     }
 
     const Card *viewAs() const override
     {
-        return new LeitingCard;
+        ThunderSlash *slash = new ThunderSlash(Card::SuitToBeDecided, -1);
+        slash->setSkillName("_" + objectName());
+        return slash;
+    }
+};
+
+class Leiting : public TriggerSkill
+{
+public:
+    Leiting()
+        : TriggerSkill("leiting")
+    {
+        view_as_skill = new LeitingVS(objectName());
+        events = {EventPhaseChanging, CardUsed};
+    }
+
+    void record(TriggerEvent triggerEvent, Room *, QVariant &data) const override
+    {
+        if (triggerEvent == EventPhaseChanging) {
+            PhaseChangeStruct change = data.value<PhaseChangeStruct>();
+            if (change.from == Player::Play)
+                change.player->tag.remove(objectName() + "_lastChoice");
+        }
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent triggerEvent, const Room *room, const QVariant &data) const override
+    {
+        if (triggerEvent == CardUsed) {
+            CardUseStruct use = data.value<CardUseStruct>();
+            if (use.from != nullptr && use.from->hasSkill(this) && use.from->isAlive() && use.from->getPhase() == Player::Play) {
+                foreach (ServerPlayer *p, room->getOtherPlayers(use.from)) {
+                    if (p->getHandcardNum() <= use.from->getHandcardNum())
+                        return {SkillInvokeDetail(this, use.from, use.from)};
+                }
+            }
+        }
+
+        return {};
+    }
+
+    bool cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        QList<ServerPlayer *> targets;
+
+        foreach (ServerPlayer *p, room->getOtherPlayers(invoke->invoker)) {
+            if (p->getHandcardNum() <= invoke->invoker->getHandcardNum())
+                targets << p;
+        }
+
+        if (!targets.isEmpty()) {
+            ServerPlayer *target = room->askForPlayerChosen(invoke->invoker, targets, objectName(), "leiting-choose", true, true);
+            if (target != nullptr) {
+                invoke->targets << target;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        ServerPlayer *target = invoke->targets.first();
+        QString leitingLastChoice = "unknown";
+        if (invoke->invoker->tag.contains(objectName() + "_lastChoice"))
+            leitingLastChoice = invoke->invoker->tag[objectName() + "_lastChoice"].toString();
+        QString leitingThisChoice;
+
+        if (room->askForDiscard(target, objectName(), 1, 1, true, false, "leiting-discard:" + invoke->invoker->objectName())) {
+            leitingThisChoice = "discard";
+        } else {
+            leitingThisChoice = "draw";
+            room->drawCards(invoke->invoker, 1, objectName());
+        }
+
+        invoke->invoker->tag[objectName() + "_lastChoice"] = leitingThisChoice;
+
+        if (leitingThisChoice == leitingLastChoice) {
+            QString choice = "choice1";
+            ThunderSlash *ts = new ThunderSlash(Card::SuitToBeDecided, -1);
+            ts->setSkillName("_" + objectName());
+            if (ts->isAvailable(target) && !target->isCardLimited(ts, Card::MethodUse)) {
+                bool available = false;
+                foreach (ServerPlayer *p, room->getOtherPlayers(target)) {
+                    if (target->inMyAttackRange(p) && target->canSlash(p, ts, true)) {
+                        available = true;
+                        break;
+                    }
+                }
+
+                if (available)
+                    choice = room->askForChoice(invoke->invoker, objectName(), "choice1+choice2", QVariant::fromValue(target));
+            }
+            delete ts;
+
+            if (choice == "choice1") {
+                target->drawCards(1);
+                room->damage(DamageStruct("leiting", nullptr, target, 1, DamageStruct::Thunder));
+            } else if (choice == "choice2") {
+                if (!room->askForUseCard(target, "@@leiting!", "leiting-usethunderslash", 0)) {
+                    CardUseStruct use;
+                    ThunderSlash *ts = new ThunderSlash(Card::SuitToBeDecided, -1);
+                    ts->setSkillName("_" + objectName());
+                    use.card = ts;
+                    use.from = target;
+
+                    foreach (ServerPlayer *p, room->getOtherPlayers(target)) {
+                        if (target->inMyAttackRange(p) && target->canSlash(p, use.card, true)) {
+                            use.to << p;
+                            break;
+                        }
+                    }
+
+                    Q_ASSERT(!use.to.isEmpty());
+                    room->useCard(use);
+                }
+            }
+
+            invoke->invoker->setFlags("Global_PlayPhaseTerminated");
+        }
+
+        return false;
     }
 };
 
@@ -1250,7 +1321,6 @@ TH14Package::TH14Package()
     seija_sp->addSkill(new Duobao);
     related_skills.insertMulti("tianxie", "#tianxie-record");
 
-    addMetaObject<LeitingCard>();
     addMetaObject<YuanfeiCard>();
     addMetaObject<LiangeCard>();
 }
