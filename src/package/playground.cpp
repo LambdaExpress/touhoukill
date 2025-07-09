@@ -12,6 +12,7 @@
 #include <QPointer>
 #include <QVBoxLayout>
 
+#if 0
 class Fsu0413Gepi : public TriggerSkill
 {
 public:
@@ -138,6 +139,8 @@ public:
         return false;
     }
 };
+
+#endif
 
 Fsu0413GainianDialog *Fsu0413GainianDialog::getInstance(const QString &object)
 {
@@ -598,95 +601,6 @@ public:
     }
 };
 
-class JmshtryMdlKudi : public TriggerSkill
-{
-public:
-    JmshtryMdlKudi()
-        : TriggerSkill("jmshtrymdlkudi")
-    {
-        events << EventPhaseStart << DamageInflicted;
-        frequency = Frequent;
-    }
-
-    QList<SkillInvokeDetail> triggerable(TriggerEvent triggerEvent, const Room *, const QVariant &data) const override
-    {
-        QList<SkillInvokeDetail> r;
-        if (triggerEvent == EventPhaseStart) {
-            ServerPlayer *p = data.value<ServerPlayer *>();
-            if (p->isAlive() && p->getPhase() == Player::Start && p->hasSkill(this))
-                r << SkillInvokeDetail(this, p, p);
-
-        } else {
-            DamageStruct damage = data.value<DamageStruct>();
-            if (damage.to->isAlive() && damage.to->hasSkill(this))
-                r << SkillInvokeDetail(this, damage.to, damage.to);
-        }
-
-        return r;
-    }
-
-    bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
-    {
-        if (TriggerSkill::cost(triggerEvent, room, invoke, data)) {
-            QList<int> cards = room->getNCards(3);
-            room->fillAG(cards, invoke->invoker);
-            invoke->tag["cards"] = IntList2VariantList(cards);
-            return true;
-        }
-
-        return false;
-    }
-
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
-    {
-        QList<int> cards = VariantList2IntList(invoke->tag.value("cards", QVariantList()).toList());
-        if (cards.isEmpty())
-            return false;
-        QList<int> getcards;
-        QList<int> guanxingcards;
-        Card::Suit s = Card::NoSuit;
-
-        do {
-            int id = room->askForAG(invoke->invoker, cards, s != Card::NoSuit, objectName());
-            if (id == -1)
-                break;
-
-            room->takeAG(invoke->invoker, id, false, QList<ServerPlayer *>() << invoke->invoker);
-            room->showCard(invoke->invoker, id);
-
-            getcards << id;
-
-            cards.removeOne(id);
-
-            if (s == Card::NoSuit) {
-                const Card *c = Sanguosha->getCard(id);
-                if (c != nullptr) {
-                    s = c->getSuit();
-                    foreach (int remainid, cards) {
-                        const Card *rc = Sanguosha->getCard(remainid);
-                        if (rc != nullptr && rc->getSuit() != s) {
-                            guanxingcards << remainid;
-                            cards.removeOne(remainid);
-                            room->takeAG(nullptr, remainid, false, QList<ServerPlayer *>() << invoke->invoker);
-                        }
-                    }
-                }
-            }
-        } while (!cards.isEmpty());
-
-        room->clearAG();
-
-        DummyCard dc;
-        dc.addSubcards(getcards);
-        room->obtainCard(invoke->invoker, &dc);
-
-        guanxingcards.append(cards);
-        room->askForGuanxing(invoke->invoker, guanxingcards, Room::GuanxingDownOnly, objectName());
-
-        return false;
-    }
-};
-
 Fsu0413JbdNashaCard::Fsu0413JbdNashaCard()
 {
 }
@@ -1074,18 +988,11 @@ public:
 PlaygroundPackage::PlaygroundPackage()
     : Package("playground")
 {
-    General *dyingfs = new General(this, "dyingfsu0413", "touhougod", 4, true);
-    dyingfs->addSkill(new Fsu0413Gepi);
-    dyingfs->addSkill(new Skill("fsu0413sile", Skill::NotCompulsory));
-
-    General *dovefs = new General(this, "dovefsu0413", "touhougod", 4, true);
+    General *dovefs = new General(this, "fsu0413", "touhougod", 4, true);
     dovefs->addSkill(new Fsu0413Gainian);
     dovefs->addSkill(new Fsu0413GainianDis);
     dovefs->addSkill(new Fsu0413Lese);
     related_skills.insertMulti("fsu0413gainian", "#fsu0413gainian-dis");
-
-    //    General *jmshtry = new General(this, "jmshtry", "touhougod", 5, true);
-    //    jmshtry->addSkill(new JmshtryMdlKudi);
 
     General *otaku = new General(this, "otaku", "touhougod", 5, true);
     otaku->addSkill(new Fsu0413Fei2Zhai);

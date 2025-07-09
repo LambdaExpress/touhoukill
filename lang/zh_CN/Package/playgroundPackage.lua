@@ -1,12 +1,6 @@
 return {
 	["playground"] = "游乐场包",
 
-	["#dyingfsu0413"] = "摆烂开发者",
-	["dyingfsu0413"] = "嗝屁Fs",
-	["designer:dyingfsu0413"] = "Fs",
-	["illustrator:dyingfsu0413"] = "Fs",
-	["origin:dyingfsu0413"] = "帅气自拍",
-
 	["fsu0413gepi"] = "嗝屁",
 	[":fsu0413gepi"] = "一名角色的准备阶段开始时，你可以令其弃置你的一张牌，若如此做，你令其一个技能（主公技、觉醒技和永久技除外）于此回合内无效，若以此法无效描述中不带“出牌阶段”的技能或不能无效技能时，其摸三张牌。" ,
 	["$Fsu0413GepiNullify"] = "%from 发动 <font color=\"yellow\"><b>嗝屁</b></font> 令 %to 的技能 %arg 于本回合无效",
@@ -17,11 +11,11 @@ return {
 	["fsu0413sile"] = "死了",
 	[":fsu0413sile"] = "。",
 
-	["#dovefsu0413"] = "咕咕咕开发者",
-	["dovefsu0413"] = "咕咕Fs",
-	["designer:dovefsu0413"] = "Fs",
-	["illustrator:dovefsu0413"] = "Fs",
-	["origin:dovefsu0413"] = "帅气自拍",
+	["#fsu0413"] = "咕咕咕开发者",
+	["fsu0413"] = "咕咕Fs",
+	["designer:fsu0413"] = "Fs",
+	["illustrator:fsu0413"] = "Fs",
+	["origin:fsu0413"] = "帅气自拍",
 
 	["fsu0413gainian"] = "概念",
 	[":fsu0413gainian"] = "你可以将一张延时类锦囊牌当任意延时类锦囊牌使用（无距离限制）。",
@@ -81,6 +75,7 @@ return {
 	["fsu0413fei2zhai"] = "肥宅",
 	[":fsu0413fei2zhai"] = "<font color=\"#808080\"><b>永久技，</b></font>当一张【桃】或仙【桃】不因使用而置入弃牌堆后，你获得之；你跳过弃牌阶段。",
 	["fsu0413fei4zhai"] = "废宅",
+	-- [":fsu0413fei4zhai"] = "<font color=\"#808080\"><b>永久技，</b></font>当你造成伤害时，若伤害点数大于1或你于此回合造成过伤害，你防止此伤害。",
 	[":fsu0413fei4zhai"] = "<font color=\"#808080\"><b>永久技，</b></font>当你因【桃】或仙【桃】的效果回复体力时，若你不处于濒死状态，你防止此回复体力。",
 
 	["god9"] = "⑨",
