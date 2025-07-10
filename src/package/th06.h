@@ -8,6 +8,7 @@
 
 class QAbstractButton;
 class QGroupBox;
+class QVBoxLayout;
 class QButtonGroup;
 
 class SkltKexueCard : public SkillCard
@@ -58,22 +59,6 @@ signals:
     void onButtonClick();
 };
 
-class HezhouCard : public SkillCard
-{
-    Q_OBJECT
-
-public:
-    Q_INVOKABLE HezhouCard();
-
-    bool do_hezhou(ServerPlayer *player) const;
-    bool targetFixed(const Player *Self) const override;
-    bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
-    bool targetsFeasible(const QList<const Player *> &targets, const Player *Self) const override;
-
-    const Card *validate(CardUseStruct &card_use) const override;
-    const Card *validateInResponse(ServerPlayer *user) const override;
-};
-
 class ZhenyeCard : public SkillCard
 {
     Q_OBJECT
@@ -107,6 +92,31 @@ public:
 
     bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
     void use(Room *room, const CardUseStruct &card_use) const override;
+};
+
+class HezhouDialog : public QDialog
+{
+    Q_OBJECT
+
+public:
+    static HezhouDialog *getInstance();
+
+public slots:
+    void popup();
+    void selectCard(QAbstractButton *button);
+
+private:
+    HezhouDialog();
+
+    QVBoxLayout *create();
+    QAbstractButton *createButton(const Card *card);
+    QButtonGroup *group;
+    QHash<QString, const Card *> map;
+
+    static QString object_name;
+
+signals:
+    void onButtonClick();
 };
 
 class TH06Package : public Package

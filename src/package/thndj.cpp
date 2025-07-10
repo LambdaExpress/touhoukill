@@ -1851,7 +1851,7 @@ class YaoliBasic : public TriggerSkill
 {
 public:
     YaoliBasic()
-        : TriggerSkill("#yaolitrick")
+        : TriggerSkill("#yaolibasic")
     {
         events = {CardResponded, TargetSpecifying};
         global = true;

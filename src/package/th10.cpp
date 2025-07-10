@@ -581,9 +581,6 @@ void QijiDialog::popup()
                         continue;
                     validPatterns << name;
                 }
-            } else if (object_name == "hezhou") {
-                if ((!Self->isCurrent() && card->isKindOf("Peach")) || (Self->isCurrent() && card->isNDTrick() && !card->isKindOf("AOE") && !card->isKindOf("GlobalEffect")))
-                    validPatterns << card->objectName();
             } else if (object_name == "shende") {
                 if (card->isKindOf("BasicCard"))
                     validPatterns << card->objectName();
@@ -708,7 +705,7 @@ QGroupBox *QijiDialog::createRight()
     QList<const Card *> cards = Sanguosha->findChildren<const Card *>();
     foreach (const Card *card, cards) {
         if (card->isNDTrick() && !map.contains(card->objectName()) && !ban_list.contains(card->getPackage())) {
-            if (object_name == "chuangshi" || object_name == "hezhou") {
+            if (object_name == "chuangshi") {
                 if (!card->isNDTrick() || card->isKindOf("AOE") || card->isKindOf("GlobalEffect"))
                     continue;
             }
@@ -833,7 +830,7 @@ public:
         }
 
         QString name = Self->tag.value("qiji", QString()).toString();
-        if (name != nullptr) {
+        if (!name.isEmpty()) {
             Card *card = Sanguosha->cloneCard(name);
             card->setSkillName(objectName());
             card->addSubcard(originalCard);
