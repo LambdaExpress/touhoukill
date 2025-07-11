@@ -2236,9 +2236,9 @@ public:
         response_pattern = "@@xingyun_hegemony";
     }
 
-    bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const override
+    bool viewFilter(const Card *to_select) const override
     {
-        return selected.isEmpty() && to_select->hasFlag("xingyun");
+        return to_select->hasFlag("xingyun");
     }
 
     const Card *viewAs(const Card *originalCard) const override

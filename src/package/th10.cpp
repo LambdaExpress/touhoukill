@@ -820,6 +820,7 @@ public:
 
     const Card *viewAs(const Card *originalCard) const override
     {
+        // TODO: check if following really has some use... since QijiDialog always return some meaningful choice in tag
         QStringList checkedPatterns = responsePatterns();
         if (checkedPatterns.length() == 1) {
             Card *card = Sanguosha->cloneCard(checkedPatterns.first());
@@ -836,8 +837,9 @@ public:
             card->addSubcard(originalCard);
             card->setCanRecast(false);
             return card;
-        } else
-            return nullptr;
+        }
+
+        return nullptr;
     }
 
     bool isEnabledAtNullification(const ServerPlayer *player) const override

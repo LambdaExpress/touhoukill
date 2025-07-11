@@ -104,8 +104,8 @@ class ZeroCardViewAsSkill : public ViewAsSkill
 public:
     explicit ZeroCardViewAsSkill(const QString &name);
 
-    bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const override;
-    const Card *viewAs(const QList<const Card *> &cards) const override;
+    bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const final;
+    const Card *viewAs(const QList<const Card *> &cards) const final;
     virtual const Card *viewAs() const = 0;
 };
 
@@ -116,8 +116,8 @@ class OneCardViewAsSkill : public ViewAsSkill
 public:
     explicit OneCardViewAsSkill(const QString &name);
 
-    bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const override;
-    const Card *viewAs(const QList<const Card *> &cards) const override;
+    bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const final;
+    const Card *viewAs(const QList<const Card *> &cards) const final;
 
     virtual bool viewFilter(const Card *to_select) const;
     virtual const Card *viewAs(const Card *originalCard) const = 0;

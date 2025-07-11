@@ -165,6 +165,74 @@ public:
     void use(Room *room, const CardUseStruct &card_use) const override;
 };
 
+class YucanSelectCard : public SkillCard
+{
+    Q_OBJECT
+
+public:
+    Q_INVOKABLE YucanSelectCard();
+
+public:
+    bool targetsFeasible(const QList<const Player *> &targets, const Player *Self) const override;
+    bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self, int &maxVotes) const override;
+    void onUse(Room *room, const CardUseStruct &card_use) const override;
+
+    bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
+};
+
+class YucanCard : public SkillCard
+{
+    Q_OBJECT
+
+public:
+    Q_INVOKABLE YucanCard();
+
+    // Card interface
+
+    QList<int> do_yucan(Room *room, ServerPlayer *eat) const;
+
+    bool targetsFeasible(const QList<const Player *> &targets, const Player *Self) const override;
+    bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
+    const Card *validate(CardUseStruct &cardUse) const override;
+    const Card *validateInResponse(ServerPlayer *user) const override;
+};
+
+class YucanDialog : public QDialog
+{
+    Q_OBJECT
+
+public:
+    static YucanDialog *getInstance();
+
+public slots:
+    void popup();
+    void selectCard(QAbstractButton *button);
+
+private:
+    explicit YucanDialog();
+
+    QVBoxLayout *create();
+    QAbstractButton *createButton(const Card *card);
+    QButtonGroup *group;
+    QHash<QString, const Card *> map;
+
+    static QString object_name;
+
+signals:
+    void onButtonClick();
+};
+
+class HuiranCard : public SkillCard
+{
+    Q_OBJECT
+
+public:
+    Q_INVOKABLE HuiranCard();
+
+    bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
+    void onUse(Room *room, const CardUseStruct &card_use) const override;
+};
+
 class TH09Package : public Package
 {
     Q_OBJECT

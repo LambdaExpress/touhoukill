@@ -1229,7 +1229,7 @@ public:
         return !player->getPile("jinengPile").isEmpty();
     }
 
-    bool viewFilter(const QList<const Card *> &, const Card *to_select) const override
+    bool viewFilter(const Card *to_select) const override
     {
         if (!Self->getPile("jinengPile").contains(to_select->getEffectiveId()))
             return false;

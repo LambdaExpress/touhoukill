@@ -2236,7 +2236,7 @@ public:
         response_or_use = true;
     }
 
-    bool viewFilter(const QList<const Card *> &, const Card *to_select) const override
+    bool viewFilter(const Card *to_select) const override
     {
         return !to_select->isKindOf("TrickCard");
     }

@@ -226,7 +226,7 @@ public:
         return (Self != nullptr) && Self->getKingdom() == "zhan";
     }
 
-    bool viewFilter(const QList<const Card *> &, const Card *to_select) const override
+    bool viewFilter(const Card *to_select) const override
     {
         return to_select->isKindOf("Peach") || to_select->isKindOf("Analeptic");
     }
@@ -2960,6 +2960,541 @@ public:
     }
 };
 
+QString YucanDialog::object_name = "yucan";
+
+YucanDialog *YucanDialog::getInstance()
+{
+    static QPointer<YucanDialog> instance;
+
+    if (instance == nullptr) {
+        instance = new YucanDialog;
+        connect(qApp, &QCoreApplication::aboutToQuit, instance.data(), &YucanDialog::deleteLater);
+    }
+
+    return instance;
+}
+
+YucanDialog::YucanDialog()
+{
+    setObjectName(object_name);
+    setWindowTitle(Sanguosha->translate(object_name));
+    group = new QButtonGroup(this);
+
+    setLayout(create());
+
+    connect(group, SIGNAL(buttonClicked(QAbstractButton *)), this, SLOT(selectCard(QAbstractButton *)));
+}
+
+void YucanDialog::popup()
+{
+    Self->tag.remove(object_name);
+
+    QString pattern = Sanguosha->currentRoomState()->getCurrentCardUsePattern();
+
+    if (pattern == "@@yucan-card1!") {
+        emit onButtonClick();
+        return;
+    }
+
+    QSet<QString> validPatterns;
+    QStringList ban_list = Sanguosha->getBanPackages();
+    QList<const Card *> cards = Sanguosha->findChildren<const Card *>();
+
+    foreach (const Card *card, cards) {
+        if (!ban_list.contains(card->getPackage()) && card->getTypeId() == Card::TypeBasic)
+            validPatterns << card->objectName();
+    }
+
+    Card::HandlingMethod method = Card::MethodUse;
+
+    const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
+    bool play = (Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_PLAY);
+
+    const Player *user = Self;
+
+    QSet<QString> checkedPatterns;
+    foreach (const QString &str, validPatterns) {
+        Card *card = Sanguosha->cloneCard(str);
+        DELETE_OVER_SCOPE(Card, card)
+        if (((play && card->isAvailable(user)) || (!play && cardPattern != nullptr && cardPattern->match(user, card))) && !user->isCardLimited(card, method))
+            checkedPatterns << str;
+    }
+
+    if (checkedPatterns.isEmpty()) { // not available
+        emit onButtonClick();
+        return;
+    }
+
+    QStringList availablePatterns;
+    foreach (QAbstractButton *button, group->buttons()) {
+        Card *card = Sanguosha->cloneCard(button->objectName());
+        DELETE_OVER_SCOPE(Card, card)
+        bool available = true;
+        if (card->isKindOf("Peach"))
+            available = card->isAvailable(user);
+
+        bool checked = checkedPatterns.contains(card->objectName());
+        bool enabled = available && checked;
+        button->setEnabled(enabled);
+        if (enabled)
+            availablePatterns << card->objectName();
+    }
+
+    if (availablePatterns.length() == 1) {
+        Self->tag[object_name] = availablePatterns.first();
+        emit onButtonClick();
+        return;
+    }
+
+    exec();
+}
+
+void YucanDialog::selectCard(QAbstractButton *button)
+{
+    const Card *card = map.value(button->objectName());
+    Self->tag[object_name] = QVariant::fromValue(card->objectName());
+
+    emit onButtonClick();
+    accept();
+}
+
+QVBoxLayout *YucanDialog::create()
+{
+    QVBoxLayout *l = new QVBoxLayout;
+
+    QStringList ban_list = Sanguosha->getBanPackages();
+    QList<const Card *> cards = Sanguosha->findChildren<const Card *>();
+
+    foreach (const Card *card, cards) {
+        if (card->getTypeId() == Card::TypeBasic && !map.contains(card->objectName()) && !ban_list.contains(card->getPackage())) {
+            Card *c = Sanguosha->cloneCard(card->objectName());
+            c->setSkillName(object_name);
+            c->setParent(this);
+
+            l->addWidget(createButton(c));
+        }
+    }
+
+    return l;
+}
+
+QAbstractButton *YucanDialog::createButton(const Card *card)
+{
+    QCommandLinkButton *button = new QCommandLinkButton(Sanguosha->translate(card->objectName()));
+    button->setObjectName(card->objectName());
+    button->setToolTip(card->getDescription());
+
+    map.insert(card->objectName(), card);
+    group->addButton(button);
+
+    return button;
+}
+
+YucanCard::YucanCard()
+{
+    will_throw = false;
+    handling_method = Card::MethodUse;
+    target_fixed = false;
+    m_skillName = "yucan";
+}
+
+QList<int> YucanCard::do_yucan(Room *room, ServerPlayer *eat) const
+{
+    room->setPlayerFlag(eat, getSkillName());
+
+    foreach (ServerPlayer *p, room->getAllPlayers())
+        p->tag[getSkillName()] = 0;
+
+    QList<ServerPlayer *> ps;
+
+    if (room->askForUseCard(eat, "@@" + getSkillName() + "-card1!", getSkillName() + "-choosePlayer", 1, Card::MethodNone, false)) {
+        foreach (ServerPlayer *p, room->getAllPlayers()) {
+            int i = p->tag[getSkillName()].toInt();
+            for (int n = 0; n < i; ++n)
+                ps << p;
+        }
+    } else {
+        foreach (ServerPlayer *p, room->getAllPlayers()) {
+            int i = qMin(p->getHandcardNum(), 3 - ps.length());
+            for (int n = 0; n < i; ++n)
+                ps << p;
+
+            if (ps.length() >= 3)
+                break;
+        }
+    }
+
+    Q_ASSERT(ps.length() == 3);
+
+    room->sortByActionOrder(ps);
+
+    QList<int> ids;
+
+    QMultiMap<ServerPlayer *, int> idm;
+
+    foreach (ServerPlayer *p, ps) {
+        if (p != eat)
+            room->doAnimate(QSanProtocol::S_ANIMATE_INDICATE, eat->objectName(), p->objectName());
+
+        QList<int> idP = idm.values(p);
+        int id = room->askForCardChosen(eat, p, "hs", getSkillName(), false, Card::MethodNone, idP);
+        idm.insertMulti(p, id);
+        ids << id;
+    }
+
+    bool isBasicCard = true;
+    bool isNotBasicCard = true;
+
+    foreach (int id, ids) {
+        const Card *c = Sanguosha->getCard(id);
+        if (c->getTypeId() == Card::TypeBasic)
+            isNotBasicCard = false;
+        else
+            isBasicCard = false;
+    }
+
+    if (isBasicCard || isNotBasicCard)
+        return ids;
+
+    return {};
+}
+
+bool YucanCard::targetsFeasible(const QList<const Player *> &targets, const Player *Self) const
+{
+    if (user_string == nullptr)
+        return false;
+    Card *card = Sanguosha->cloneCard(user_string.split("+").first(), Card::NoSuit, 0);
+    if (card == nullptr)
+        return false;
+    DELETE_OVER_SCOPE(Card, card)
+    card->setSkillName(getSkillName());
+    if (card->canRecast() && targets.length() == 0)
+        return false;
+    if (card->targetFixed(Self))
+        return true;
+    return card->targetsFeasible(targets, Self);
+}
+
+bool YucanCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
+{
+    if (user_string == nullptr)
+        return false;
+    Card *card = Sanguosha->cloneCard(user_string.split("+").first(), Card::NoSuit, 0);
+    if (card == nullptr)
+        return false;
+    DELETE_OVER_SCOPE(Card, card)
+    card->setSkillName(getSkillName());
+    if (card->targetFixed(Self))
+        return false;
+    return card->targetFilter(targets, to_select, Self) && !Self->isProhibited(to_select, card, targets);
+}
+
+const Card *YucanCard::validate(CardUseStruct &card_use) const
+{
+    ServerPlayer *xihua_general = card_use.from;
+    Room *room = xihua_general->getRoom();
+    QString to_use = user_string;
+
+    LogMessage log;
+    log.type = card_use.to.isEmpty() ? "#XihuaNoTarget" : "#Xihua";
+    log.from = xihua_general;
+    log.to = card_use.to;
+    log.arg = to_use;
+    log.arg2 = getSkillName();
+    room->sendLog(log);
+
+    QList<int> cards = do_yucan(room, xihua_general);
+    if (cards.length() == 3) {
+        Card *use_card = Sanguosha->cloneCard(to_use);
+        use_card->setSkillName(getSkillName());
+        use_card->setShowSkill(getSkillName());
+        use_card->addSubcards(cards);
+        return use_card;
+    }
+
+    return nullptr;
+}
+
+const Card *YucanCard::validateInResponse(ServerPlayer *user) const
+{
+    Room *room = user->getRoom();
+
+    LogMessage log;
+    log.type = "#XihuaNoTarget";
+    log.from = user;
+    log.arg = user_string;
+    log.arg2 = getSkillName();
+    room->sendLog(log);
+
+    QList<int> cards = do_yucan(room, user);
+    if (cards.length() == 3) {
+        Card *use_card = Sanguosha->cloneCard(user_string);
+        use_card->setSkillName(getSkillName());
+        use_card->setShowSkill(getSkillName());
+        use_card->addSubcards(cards);
+        return use_card;
+    }
+
+    return nullptr;
+}
+
+YucanSelectCard::YucanSelectCard()
+{
+    m_skillName = "_yucan";
+}
+
+bool YucanSelectCard::targetsFeasible(const QList<const Player *> &targets, const Player *) const
+{
+    if (targets.toSet().size() > 3 || targets.toSet().size() == 0)
+        return false;
+    QHash<const Player *, int> map;
+
+    foreach (const Player *sp, targets)
+        map[sp]++;
+    foreach (const Player *sp, map.keys()) {
+        if (map[sp] > sp->getHandcardNum())
+            return false;
+    }
+
+    return true;
+}
+
+bool YucanSelectCard::targetFilter(const QList<const Player *> &, const Player *, const Player *) const
+{
+    Q_ASSERT(false);
+    return false;
+}
+
+bool YucanSelectCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *, int &maxVotes) const
+{
+    if (to_select->isKongcheng())
+        return false;
+    int i = 0;
+
+    foreach (const Player *player, targets) {
+        if (player == to_select)
+            i++;
+    }
+
+    maxVotes = qMax(3 - targets.size(), 0) + i;
+    return maxVotes > 0;
+}
+
+void YucanSelectCard::onUse(Room *, const CardUseStruct &card_use) const
+{
+    foreach (ServerPlayer *p, card_use.to)
+        p->tag[getSkillName()] = p->tag[getSkillName()].toInt() + 1;
+}
+
+class YucanVS : public ZeroCardViewAsSkill
+{
+public:
+    YucanVS(const QString &base)
+        : ZeroCardViewAsSkill(base)
+    {
+    }
+
+    static QStringList responsePatterns()
+    {
+        const CardPattern *pattern = Sanguosha->getPattern(Sanguosha->currentRoomState()->getCurrentCardUsePattern());
+
+        Card::HandlingMethod method = Card::MethodUse;
+        if (Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_RESPONSE)
+            method = Card::MethodResponse;
+
+        QStringList checkedPatterns;
+        QList<const Card *> cards = Sanguosha->findChildren<const Card *>();
+        QStringList ban_list = Sanguosha->getBanPackages();
+        foreach (const Card *card, cards) {
+            if ((card->isNDTrick() || card->isKindOf("BasicCard")) && !ban_list.contains(card->getPackage())) {
+                QString p = card->objectName();
+                if (!checkedPatterns.contains(p) && (pattern != nullptr && pattern->match(Self, card)) && !Self->isCardLimited(card, method))
+                    checkedPatterns << p;
+            }
+        }
+        return checkedPatterns;
+    }
+
+    bool isEnabledAtPlay(const Player *player) const override
+    {
+        return !player->hasFlag(objectName());
+    }
+
+    bool isEnabledAtResponse(const Player *player, const QString &pattern) const override
+    {
+        if (pattern == "@@" + objectName() + "-card1!")
+            return true;
+
+        if (player->hasFlag(objectName()))
+            return false;
+
+        return !responsePatterns().isEmpty();
+    }
+
+    const Card *viewAs() const override
+    {
+        QString pattern = Sanguosha->getCurrentCardUsePattern();
+        if (pattern == "@@" + objectName() + "-card1!")
+            return new YucanSelectCard;
+
+        QString name = Self->tag.value(objectName()).toString();
+        if (!name.isEmpty()) {
+            Card *card = Sanguosha->cloneCard(name);
+            card->setSkillName(objectName());
+            card->setShowSkill(objectName());
+            card->setCanRecast(false);
+            return card;
+        }
+
+        return nullptr;
+    }
+};
+
+class Yucan : public TriggerSkill
+{
+public:
+    Yucan()
+        : TriggerSkill("yucan")
+    {
+        view_as_skill = new YucanVS(objectName());
+        events = {EventPhaseStart};
+    }
+
+    QDialog *getDialog() const override
+    {
+        return YucanDialog::getInstance();
+    }
+
+    void record(TriggerEvent, Room *room, QVariant &data) const override
+    {
+        ServerPlayer *p = data.value<ServerPlayer *>();
+        if (p->getPhase() == Player::NotActive) {
+            foreach (ServerPlayer *a, room->getAllPlayers()) {
+                if (a->hasFlag(objectName()))
+                    room->setPlayerFlag(a, "-" + objectName());
+            }
+        }
+    }
+};
+
+HuiranCard::HuiranCard()
+{
+    handling_method = Card::MethodNone;
+}
+
+bool HuiranCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *) const
+{
+    return targets.length() < 2 && !to_select->isKongcheng();
+}
+
+void HuiranCard::onUse(Room *, const CardUseStruct &card_use) const
+{
+    foreach (ServerPlayer *p, card_use.to)
+        p->setFlags(getSkillName() + "selected");
+}
+
+class HuiranVS : public ZeroCardViewAsSkill
+{
+public:
+    HuiranVS(const QString &base)
+        : ZeroCardViewAsSkill(base)
+    {
+        response_pattern = "@@huiran";
+    }
+
+    const Card *viewAs() const override
+    {
+        return new HuiranCard;
+    }
+};
+
+class Huiran : public TriggerSkill
+{
+public:
+    Huiran()
+        : TriggerSkill("huiran")
+    {
+        view_as_skill = new HuiranVS(objectName());
+        events = {EventPhaseEnd};
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *, const QVariant &data) const override
+    {
+        ServerPlayer *p = data.value<ServerPlayer *>();
+        if (p->getPhase() == Player::Play && !p->hasFlag(objectName()) && p->isAlive() && p->hasSkill(this))
+            return {SkillInvokeDetail(this, p, p)};
+
+        return {};
+    }
+
+    bool cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        foreach (ServerPlayer *p, room->getAllPlayers())
+            p->setFlags("-" + objectName() + "selected");
+
+        bool select = room->askForUseCard(invoke->invoker, "@@huiran", "huiran-select", -1, Card::MethodNone, true, objectName());
+        if (!select)
+            return false;
+
+        foreach (ServerPlayer *p, room->getAllPlayers()) {
+            if (p->hasFlag(objectName() + "selected"))
+                invoke->targets << p;
+        }
+
+        room->sortByActionOrder(invoke->targets);
+
+        return !invoke->targets.isEmpty();
+    }
+
+    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        foreach (ServerPlayer *p, invoke->targets) {
+            int id = -1;
+            if (p == invoke->invoker) {
+                const Card *c = room->askForExchange(p, objectName(), 1, 1, false, "huiran-select");
+                id = c->getEffectiveId();
+                delete c;
+            } else {
+                id = room->askForCardChosen(invoke->invoker, p, "hs", objectName());
+            }
+
+            p->addToShownHandCards({id});
+        }
+
+        return false;
+    }
+};
+
+class HuiranRecord : public TriggerSkill
+{
+public:
+    HuiranRecord(const QString &b = "huiran")
+        : TriggerSkill("#" + b + "-record")
+        , b(b)
+    {
+        events = {DamageDone, EventPhaseStart};
+        global = true;
+    }
+
+    void record(TriggerEvent triggerEvent, Room *room, QVariant &data) const override
+    {
+        if (triggerEvent == DamageDone) {
+            DamageStruct damage = data.value<DamageStruct>();
+            if (damage.from != nullptr)
+                damage.from->setFlags(b);
+        } else if (triggerEvent == EventPhaseStart) {
+            ServerPlayer *p = data.value<ServerPlayer *>();
+            if (p->getPhase() == Player::NotActive) {
+                foreach (ServerPlayer *a, room->getAllPlayers())
+                    a->setFlags("-" + b);
+            }
+        }
+    }
+
+private:
+    QString b;
+};
+
 TH09Package::TH09Package()
     : Package("th09")
 {
@@ -3028,8 +3563,11 @@ TH09Package::TH09Package()
     kokorosp->addSkill(new Mianling);
     kokorosp->addSkill(new Ximshang);
 
-    General *yuma = new General(this, "yuma", "zhan", 4, false, true, true);
-    Q_UNUSED(yuma);
+    General *yuma = new General(this, "yuma", "zhan", 4);
+    yuma->addSkill(new Yucan);
+    yuma->addSkill(new Huiran);
+    yuma->addSkill(new HuiranRecord);
+    related_skills.insertMulti("huiran", "#huiran-record");
 
     addMetaObject<YanhuiCard>();
     addMetaObject<ToupaiCard>();
@@ -3042,6 +3580,9 @@ TH09Package::TH09Package()
     addMetaObject<KuaizhaoCard>();
     addMetaObject<ShizaiCard>();
     addMetaObject<YsJieCard>();
+    addMetaObject<YucanSelectCard>();
+    addMetaObject<YucanCard>();
+    addMetaObject<HuiranCard>();
 
     skills << new YanhuiVS;
 }

@@ -705,7 +705,7 @@ public:
         if (!disabled.isEmpty()) {
             CardMoveReason reason(CardMoveReason::S_REASON_NATURAL_ENTER, invoke->invoker->objectName(), objectName(), {});
             DummyCard dummy(disabled);
-            room->throwCard(&dummy, reason, NULL);
+            room->throwCard(&dummy, reason, nullptr);
         }
 
         return false;
@@ -720,7 +720,7 @@ HezhouDialog *HezhouDialog::getInstance()
 
     if (instance == nullptr) {
         instance = new HezhouDialog;
-        connect(qApp, &QCoreApplication::aboutToQuit, instance.data(), &QijiDialog::deleteLater);
+        connect(qApp, &QCoreApplication::aboutToQuit, instance.data(), &HezhouDialog::deleteLater);
     }
 
     return instance;
@@ -823,13 +823,13 @@ QVBoxLayout *HezhouDialog::create()
         if ((card->isNDTrick() || card->objectName() == "peach") && !map.contains(card->objectName()) && !ban_list.contains(card->getPackage())) {
             if (card->isKindOf("AOE") || card->isKindOf("GlobalEffect"))
                 continue;
+
+            Card *c = Sanguosha->cloneCard(card->objectName());
+            c->setSkillName(object_name);
+            c->setParent(this);
+
+            l->addWidget(createButton(c));
         }
-
-        Card *c = Sanguosha->cloneCard(card->objectName());
-        c->setSkillName(object_name);
-        c->setParent(this);
-
-        l->addWidget(createButton(c));
     }
 
     return l;
@@ -953,7 +953,7 @@ public:
             }
         }
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override

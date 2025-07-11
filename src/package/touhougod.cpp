@@ -348,7 +348,7 @@ public:
         return player->getMark("@ye") > 0;
     }
 
-    bool viewFilter(const QList<const Card *> &, const Card *to_select) const override
+    bool viewFilter(const Card *to_select) const override
     {
         return (to_select->isKindOf("Weapon") || to_select->getSuit() == Card::Heart) && !Self->isJilei(to_select);
     }
@@ -4476,11 +4476,8 @@ public:
         return !checkedPatterns.isEmpty();
     }
 
-    bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const override
+    bool viewFilter(const Card *to_select) const override
     {
-        if (selected.length() >= 1)
-            return false;
-
         if (Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_RESPONSE_USE
             || Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_RESPONSE) {
             QStringList patterns = responsePatterns();

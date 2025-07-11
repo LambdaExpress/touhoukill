@@ -1173,7 +1173,7 @@ public:
         return checkedPatterns;
     }
 
-    bool viewFilter(const QList<const Card *> &, const Card *card) const override
+    bool viewFilter(const Card *card) const override
     {
         if (Self->isShownHandcard(card->getId()) || !card->isKindOf("BasicCard"))
             return false;
