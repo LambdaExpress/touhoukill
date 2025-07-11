@@ -3107,7 +3107,7 @@ QList<int> YucanCard::do_yucan(Room *room, ServerPlayer *eat) const
 
     QList<ServerPlayer *> ps;
 
-    if (room->askForUseCard(eat, "@@" + getSkillName() + "-card1!", getSkillName() + "-choosePlayer", 1, Card::MethodNone, false)) {
+    if (room->askForUseCard(eat, "@@" + getSkillName() + "-card1!", getSkillName() + "-chooseplayer:::" + user_string, 1, Card::MethodNone, false)) {
         foreach (ServerPlayer *p, room->getAllPlayers()) {
             int i = p->tag[getSkillName()].toInt();
             for (int n = 0; n < i; ++n)
@@ -3132,14 +3132,28 @@ QList<int> YucanCard::do_yucan(Room *room, ServerPlayer *eat) const
 
     QMultiMap<ServerPlayer *, int> idm;
 
+    bool selfasked = false;
+
     foreach (ServerPlayer *p, ps) {
-        if (p != eat)
+        if (p != eat) {
             room->doAnimate(QSanProtocol::S_ANIMATE_INDICATE, eat->objectName(), p->objectName());
 
-        QList<int> idP = idm.values(p);
-        int id = room->askForCardChosen(eat, p, "hs", getSkillName(), false, Card::MethodNone, idP);
-        idm.insertMulti(p, id);
-        ids << id;
+            QList<int> idP = idm.values(p);
+            int id = room->askForCardChosen(eat, p, "hs", getSkillName(), false, Card::MethodNone, idP);
+            room->showCard(p, id);
+            idm.insertMulti(p, id);
+            ids << id;
+        } else if (!selfasked) {
+            int n = ps.count(eat);
+            const Card *c = room->askForExchange(eat, objectName(), n, n, false, getSkillName() + "-showself:::" + QString::number(n));
+            foreach (int id, c->getSubcards()) {
+                room->showCard(eat, id);
+                idm.insertMulti(eat, id);
+                ids << id;
+            }
+            delete c;
+            selfasked = true;
+        }
     }
 
     bool isBasicCard = true;
@@ -3451,7 +3465,7 @@ public:
         foreach (ServerPlayer *p, invoke->targets) {
             int id = -1;
             if (p == invoke->invoker) {
-                const Card *c = room->askForExchange(p, objectName(), 1, 1, false, "huiran-select");
+                const Card *c = room->askForExchange(p, objectName(), 1, 1, false, "huiran-discard");
                 id = c->getEffectiveId();
                 delete c;
             } else {
