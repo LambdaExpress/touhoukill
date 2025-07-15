@@ -98,4 +98,24 @@ return {
 	[":ftmfeitian"] = "<font color=blue><b>锁定技，</b></font>当你使用黑色牌时，你获得X+1枚“飞”标记；当你使用红色牌时，你获得X枚“飞”标记。结束阶段开始时，若X为：0，你摸两张牌；一名角色的座次，你选择令其回复或失去1点体力；牌堆牌数，你获得牌堆。回合结束时，你弃所有“飞”标记。（X为“飞”标记数）",
 	["ftmfeitian_x:recover-or-losehp"] = "飞天：点击“确定”令 %src 失去 1 点体力，或者点击“取消”令 %src 回复 1 点体力。",
 	["@flying"] = "飞",
+
+	["tailormokou"] = "神 藤原妹红",
+	["&tailormokou"] = "神藤原妹红",
+	["designer:tailormokou"] = "裁月镌云",
+
+	["illustrator:tailormokou"] = "谁",
+	["origin:tailormokou"] = "多少",
+
+	["tailorfuzhong"] = "覆踵",
+	[":tailorfuzhong"] = "<font color=\"#808080\"><b>永久技，</b></font>你不进入濒死状态；你死亡时，你可以选择一个非永久技的技能，令你的人物牌失去之，若如此做，你于死亡后以游戏开始时的状态重新加入游戏。",
+	["tailorchenglu"] = "澄路"
+	[":tailorchenglu"] = "<font color=\"#808080\"><b>永久技，</b></font><font color=\"purple\"><b>觉醒技</b></font>，你首次重新加入游戏时，若你没有【泯心】，你令你的人物牌获得【护卫】并令你的人物牌失去【覆踵】；否则你令你的人物牌获得【凯风】。",
+	["$tailorchengluAnimate"] = "skill=tailormokou:tailorchenglu",
+	["tailorminxin"] = "泯心",
+	[":tailorminxin"] = "<font color=\"blue\"><b>锁定技，</b></font>你的体力值扣减至0以下后，体力下限+1，对一名角色造成1点火焰伤害。",
+	["tailorminxin-select"] = "泯心你选择一名角色对齐造成 1 点火焰伤害",
+	["tailormiezui"] = "灭罪",
+	[":tailormiezui"] = "<font color=\"green\"><b>对每名角色限一次，</b></font>当你对一名角色造成伤害后，若此伤害令其进入濒死状态，且其曾造成过令一名角色进入濒死状态的伤害，你可以选择不大于2的非负整数，令你的体力下限 -X（X为你此次选择的数），若你因此法体力下限变为1，你可以死亡。",
+	["tailormiezui:dismiss"] = "取消",
+	["tailormiezui:death"] = "灭罪你可以死亡",
 }

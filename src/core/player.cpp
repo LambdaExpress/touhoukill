@@ -1551,7 +1551,6 @@ QList<const Skill *> Player::getSkillList(bool include_equip, bool visible_only)
     QList<const Skill *> skillList;
 
     foreach (const QString &skill_name, skills.keys() + skills2.keys() + acquired_skills.toList() + acquired_skills2.toList()) {
-        //foreach (QString skill_name, skills_originalOrder + skills2_originalOrder + acquired_skills.toList() + acquired_skills2.toList()) {
         const Skill *skill = Sanguosha->getSkill(skill_name);
         if ((skill != nullptr) && (include_equip || !hasEquipSkill(skill->objectName())) && (!visible_only || skill->isVisible()))
             skillList << skill;

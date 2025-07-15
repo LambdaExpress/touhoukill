@@ -740,7 +740,7 @@ public:
             if ((damage.from != nullptr) && damage.from->getPhase() == Player::Play) {
                 if (!damage.from->hasFlag("shihui_first")) {
                     room->setPlayerFlag(damage.from, "shihui_first");
-                    damage.trigger_info.append("shihui_first");
+                    damage.trigger_info << QStringLiteral("shihui_first");
                     data = QVariant::fromValue(damage);
                 }
             }
@@ -756,7 +756,7 @@ public:
     {
         if (e == Damage) {
             DamageStruct damage = data.value<DamageStruct>();
-            if ((damage.from == nullptr) || damage.from->isDead() || damage.from->getPhase() != Player::Play || !damage.trigger_info.contains("shihui_first"))
+            if ((damage.from == nullptr) || damage.from->isDead() || damage.from->getPhase() != Player::Play || !damage.trigger_info.contains(QStringLiteral("shihui_first")))
                 return QList<SkillInvokeDetail>();
 
             //int maxnum = qMax(damage.from->getEquips().length(), 1);

@@ -985,6 +985,386 @@ public:
     }
 };
 
+class TailorFuzhongEffect : public TriggerSkill
+{
+public:
+    TailorFuzhongEffect(const QString &base = "tailorfuzhong")
+        : TriggerSkill("#" + base + "-effect")
+        , b(base)
+    {
+        events = {BuryVictim};
+    }
+
+    int getPriority() const override
+    {
+        return -6;
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *room, const QVariant &data) const override
+    {
+        if (room->getTagNames().contains(b)) {
+            DeathStruct death = data.value<DeathStruct>();
+            QStringList l = room->getTag(b).toStringList();
+            if (l.contains(death.who->objectName()))
+                return {SkillInvokeDetail(this, death.who, death.who, nullptr, true, nullptr, false)};
+        }
+
+        return {};
+    }
+
+    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        QStringList roomTag = room->getTag(b).toStringList();
+
+        roomTag.removeAll(invoke->invoker->objectName());
+        if (roomTag.isEmpty())
+            room->removeTag(b);
+        else
+            room->setTag(b, roomTag);
+
+        room->revivePlayer(invoke->invoker, true);
+
+        return false;
+    }
+
+private:
+    QString b;
+};
+
+class TailorFuzhong : public TriggerSkill
+{
+public:
+    TailorFuzhong()
+        : TriggerSkill("tailorfuzhong")
+    {
+        frequency = Eternal;
+        events = {EnterDying, Death};
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent triggerEvent, const Room *, const QVariant &data) const override
+    {
+        if (triggerEvent == EnterDying) {
+            DyingStruct dying = data.value<DyingStruct>();
+            if (dying.who->hasSkill(this))
+                return {SkillInvokeDetail(this, dying.who, dying.who, nullptr, true)};
+        } else if (triggerEvent == Death) {
+            DeathStruct death = data.value<DeathStruct>();
+            if (death.who->hasSkill(this))
+                return {SkillInvokeDetail(this, death.who, death.who)};
+        }
+
+        return {};
+    }
+
+    bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    {
+        if (triggerEvent == Death) {
+            QList<const Skill *> l = invoke->invoker->getVisibleSkillList();
+
+            QStringList choices;
+
+            foreach (const Skill *skill, l) {
+                if (invoke->invoker->ownSkill(skill))
+                    choices << skill->objectName();
+            }
+
+            if (choices.isEmpty())
+                return false;
+
+            choices << "dismiss";
+
+            QString choice = room->askForChoice(invoke->invoker, objectName(), choices.join("+"));
+
+            if (choice == "dismiss")
+                return false;
+
+            invoke->tag[objectName()] = choice;
+            return true;
+        }
+
+        return TriggerSkill::cost(triggerEvent, room, invoke, data);
+    }
+
+    bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        if (triggerEvent == EnterDying) {
+            return true;
+        } else if (triggerEvent == Death) {
+            QString choice = invoke->tag[objectName()].toString();
+            invoke->invoker->loseSkill(choice);
+
+            QStringList roomTag;
+            if (room->getTagNames().contains(objectName()))
+                roomTag = room->getTag(objectName()).toStringList();
+
+            roomTag << invoke->invoker->objectName();
+            room->setTag(objectName(), roomTag);
+        }
+        return false;
+    }
+};
+
+class TailorChenglu : public TriggerSkill
+{
+public:
+    TailorChenglu()
+        : TriggerSkill("tailorchenglu")
+    {
+        frequency = Eternal;
+        events = {Revive};
+    }
+
+    void record(TriggerEvent, Room *room, QVariant &data) const override
+    {
+        QStringList roomTag;
+        if (room->getTagNames().contains(objectName()))
+            roomTag = room->getTag(objectName()).toStringList();
+
+        ServerPlayer *p = data.value<ServerPlayer *>();
+        if (roomTag.contains(p->objectName()))
+            room->setPlayerMark(p, objectName(), 1);
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *, const QVariant &data) const override
+    {
+        ServerPlayer *p = data.value<ServerPlayer *>();
+        if (p->hasSkill(this))
+            return {SkillInvokeDetail(this, p, p)};
+
+        return {};
+    }
+
+    // This is Eternal + Wake skill
+    // It should be considered that Eternal should not be a frequency, as well as Compulsory
+    bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    {
+        if (invoke->invoker->getMark(objectName()) == 0)
+            return TriggerSkill::cost(triggerEvent, room, invoke, data);
+
+        room->setPlayerMark(invoke->invoker, "@waked", invoke->invoker->getMark("@waked") + 1);
+        return false;
+    }
+
+    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        room->doLightbox("$tailorchengluAnimate");
+
+        QStringList roomTag;
+        if (room->getTagNames().contains(objectName()))
+            roomTag = room->getTag(objectName()).toStringList();
+
+        roomTag << invoke->invoker->objectName();
+        room->setTag(objectName(), roomTag);
+
+        room->setPlayerMark(invoke->invoker, objectName(), 1);
+
+        QStringList triggerList;
+
+        // Currently no GameStart is considered. Both "huwei / kaifeng" invokes no GameStart
+
+        if (room->changeMaxHpForAwakenSkill(invoke->invoker, 0)) {
+            if (!invoke->invoker->ownSkill("tailorminxin")) {
+                invoke->invoker->loseSkill("tailorfuzhong");
+                invoke->invoker->loseSkill("#tailorfuzhong-effect");
+                invoke->invoker->addSkill("huwei");
+
+                triggerList = QStringList {"-tailorfuzhong", "huwei"};
+            } else {
+                invoke->invoker->addSkill("kaifeng");
+                triggerList = QStringList {"kaifeng"};
+            }
+        }
+
+        foreach (const QString &trigger, triggerList) {
+            if (!trigger.startsWith("-")) {
+                const Skill *skill = Sanguosha->getSkill(trigger);
+                QList<const Skill *> related = Sanguosha->getRelatedSkills(trigger);
+                related.prepend(skill);
+                foreach (const Skill *skillx, related) {
+                    const TriggerSkill *ts = dynamic_cast<const TriggerSkill *>(skillx);
+                    if (ts != nullptr)
+                        room->getThread()->addTriggerSkill(ts);
+                    if (skillx != skill)
+                        invoke->invoker->addSkill(skillx->objectName());
+                }
+            }
+        }
+
+        // do not trigger EventAcquireSkill / EventLoseSkill since it is not acquire / detach
+
+        // foreach (const QString trigger, triggerList) {
+        //     SkillAcquireDetachStruct s;
+        //     s.isAcquire = trigger.startsWith("-");
+        //     s.player = invoke->invoker;
+        //     QString skillName = trigger;
+        //     if (s.isAcquire)
+        //         skillName = skillName.mid(1);
+        //     s.skill = Sanguosha->getSkill(skillName);
+        //     QVariant data = QVariant::fromValue(s);
+        //     room->getThread()->trigger(s.isAcquire ? EventAcquireSkill : EventLoseSkill, room, data);
+        // }
+
+        return false;
+    }
+};
+
+class TailorMinxin : public TriggerSkill
+{
+public:
+    TailorMinxin()
+        : TriggerSkill("tailorminxin")
+    {
+        events = {PostHpReduced};
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *, const QVariant &data) const override
+    {
+        int point = -1;
+        ServerPlayer *p = nullptr;
+        if (data.canConvert<DamageStruct>()) {
+            DamageStruct damage = data.value<DamageStruct>();
+            point = damage.damage;
+            p = damage.to;
+        } else if (data.canConvert<HpLostStruct>()) {
+            HpLostStruct hplost = data.value<HpLostStruct>();
+            point = hplost.num;
+            p = hplost.player;
+        }
+
+        if (p != nullptr && point > 0 && p->getHp() + point > 0 && p->getHp() <= 0 && p->hasSkill(this))
+            return {SkillInvokeDetail(this, p, p, nullptr, true)};
+
+        return {};
+    }
+
+    bool cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        ServerPlayer *t = room->askForPlayerChosen(invoke->invoker, room->getAlivePlayers(), objectName(), "tailorminxin-select", false, true);
+        if (t == nullptr && invoke->invoker->hasShownSkill(this))
+            t = room->getAllPlayers().first();
+
+        if (t == nullptr)
+            return false;
+
+        room->setPlayerProperty(invoke->invoker, "dyingFactor", invoke->invoker->getDyingFactor() + 1);
+        invoke->targets << t;
+        return true;
+    }
+
+    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        room->damage({objectName(), invoke->invoker, invoke->targets.first(), 1, DamageStruct::Fire});
+
+        return false;
+    }
+};
+
+class TailorMiezui : public TriggerSkill
+{
+public:
+    TailorMiezui()
+        : TriggerSkill("tailormiezui")
+    {
+        events = {Dying, Damage, EventLoseSkill, Death};
+    }
+
+    void record(TriggerEvent triggerEvent, Room *room, QVariant &data) const override
+    {
+        if (triggerEvent == EventLoseSkill || triggerEvent == Death) {
+            QVariantMap l;
+            if (room->getTagNames().contains(objectName()))
+                l = room->getTag(objectName()).toMap();
+
+            ServerPlayer *p = nullptr;
+            if (triggerEvent == EventLoseSkill)
+                p = data.value<SkillAcquireDetachStruct>().player;
+            else if (triggerEvent == Death)
+                p = data.value<DeathStruct>().who;
+
+            if (p != nullptr) {
+                if (l.contains(p->objectName())) {
+                    QStringList s = l.value(p->objectName()).toStringList();
+                    foreach (const QString &sp, s) {
+                        ServerPlayer *t = room->findPlayerByObjectName(sp, true);
+                        if (t != nullptr)
+                            room->removePlayerMark(t, "@" + objectName(), 1);
+                    }
+
+                    l.remove(p->objectName());
+                    room->setTag(objectName(), l);
+                }
+            }
+        } else if (triggerEvent == Dying) {
+            DyingStruct dying = data.value<DyingStruct>();
+            if (dying.damage != nullptr) {
+                dying.damage->trigger_info << objectName();
+                if (dying.damage->from != nullptr)
+                    dying.damage->from->tag[objectName()] = true;
+            }
+        }
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent triggerEvent, const Room *room, const QVariant &data) const override
+    {
+        if (triggerEvent == Damage) {
+            DamageStruct damage = data.value<DamageStruct>();
+            if (damage.trigger_info.contains(objectName()) && damage.from != nullptr && damage.from->hasSkill(this) && damage.from->isAlive()
+                && damage.to->tag.contains(objectName()) && damage.to->tag.value(objectName()).toBool()) {
+                QVariantMap l;
+                if (room->getTagNames().contains(objectName()))
+                    l = room->getTag(objectName()).toMap();
+
+                QStringList s;
+                if (l.contains(damage.from->objectName()))
+                    s = l.value(damage.from->objectName()).toStringList();
+
+                if (!s.contains(damage.to->objectName()))
+                    return {SkillInvokeDetail(this, damage.from, damage.from, damage.to)};
+            }
+        }
+
+        return {};
+    }
+
+    bool cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
+    {
+        QString choice = room->askForChoice(invoke->invoker, objectName(), "dismiss+0+1+2", data);
+        if (choice == "dismiss")
+            return false;
+
+        int n = choice.toInt();
+        invoke->tag[objectName()] = n;
+
+        QVariantMap l;
+        if (room->getTagNames().contains(objectName()))
+            l = room->getTag(objectName()).toMap();
+
+        QStringList s;
+        if (l.contains(invoke->invoker->objectName()))
+            s = l.value(invoke->invoker->objectName()).toStringList();
+
+        s << invoke->targets.first()->objectName();
+
+        l[invoke->invoker->objectName()] = s;
+        room->setTag(objectName(), l);
+
+        return true;
+    }
+
+    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        int n = invoke->tag[objectName()].toInt();
+
+        if (n != 0)
+            room->setPlayerProperty(invoke->invoker, "dyingFactor", invoke->invoker->getDyingFactor() - n);
+
+        if (invoke->invoker->dyingThreshold() == 1 && room->askForSkillInvoke(invoke->invoker, objectName(), "death"))
+            room->killPlayer(invoke->invoker);
+
+        return false;
+    }
+};
+
 PlaygroundPackage::PlaygroundPackage()
     : Package("playground")
 {
@@ -1015,6 +1395,14 @@ PlaygroundPackage::PlaygroundPackage()
 
     General *fsb = new General(this, "flyingskybright", "touhougod", 4, true);
     fsb->addSkill(new FtmFeitian);
+
+    General *tailormokou = new General(this, "tailormokou", "touhougod", 2);
+    tailormokou->addSkill(new TailorFuzhong);
+    tailormokou->addSkill(new TailorFuzhongEffect);
+    tailormokou->addSkill(new TailorChenglu);
+    tailormokou->addSkill(new TailorMinxin);
+    tailormokou->addSkill(new TailorMiezui);
+    related_skills.insertMulti("tailorfuzhong", "#tailorfuzhong-effect");
 }
 
 ADD_PACKAGE(Playground)

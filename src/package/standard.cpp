@@ -323,7 +323,6 @@ void DelayedTrick::onUse(Room *room, const CardUseStruct &card_use) const
     CardMoveReason reason(CardMoveReason::S_REASON_USE, use.from->objectName(), QString(), card_use.card->getSkillName(false), QString());
     CardsMoveStruct move(card_use.card->getEffectiveId(), nullptr, Player::PlaceTable, reason);
     room->moveCardsAtomic(move, true);
-    //show hidden after move Event to avoid filter card
     use.from->showHiddenSkill(getSkillName(false));
 
     thread->trigger(CardUsed, room, data);

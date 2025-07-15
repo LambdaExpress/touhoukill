@@ -234,7 +234,7 @@ void Room::enterDying(ServerPlayer *player, DamageStruct *reason)
 
     bool enterdying = thread->trigger(EnterDying, this, dying_data);
 
-    if (!(player->isDead() || player->getHp() >= player->dyingThreshold() || enterdying)) {
+    if (!player->isDead() && player->getHp() < player->dyingThreshold() && !enterdying) {
         thread->trigger(Dying, this, dying_data);
         if (player->isAlive()) {
             if (player->getHp() >= player->dyingThreshold()) {
@@ -248,7 +248,7 @@ void Room::enterDying(ServerPlayer *player, DamageStruct *reason)
                 sendLog(log);
 
                 foreach (ServerPlayer *saver, getAllPlayers()) {
-                    DyingStruct dying = dying_data.value<DyingStruct>();
+                    dying = dying_data.value<DyingStruct>();
                     dying.nowAskingForPeaches = saver;
                     dying_data = QVariant::fromValue(dying);
                     if (player->getHp() >= player->dyingThreshold() || player->isDead())
@@ -260,7 +260,7 @@ void Room::enterDying(ServerPlayer *player, DamageStruct *reason)
                     thread->trigger(AskForPeaches, this, dying_data);
                     setPlayerProperty(saver, "currentdying", cd);
                 }
-                DyingStruct dying = dying_data.value<DyingStruct>();
+                dying = dying_data.value<DyingStruct>();
                 dying.nowAskingForPeaches = nullptr;
                 dying_data = QVariant::fromValue(dying);
                 thread->trigger(AskForPeachesDone, this, dying_data);
@@ -290,7 +290,7 @@ ServerPlayer *Room::getCurrentDyingPlayer() const
     QStringList currentdying = getTag("CurrentDying").toStringList();
     if (currentdying.isEmpty())
         return nullptr;
-    QString dyingobj = currentdying.last();
+    const QString &dyingobj = currentdying.last();
     ServerPlayer *who = nullptr;
     foreach (ServerPlayer *p, m_alivePlayers) {
         if (p->objectName() == dyingobj) {
@@ -327,7 +327,7 @@ void Room::revivePlayer(ServerPlayer *player, bool initialize)
             player->setFaceUp(true);
             broadcastProperty(player, "faceup");
         }
-        setPlayerProperty(player, "role_shown", player->isLord() ? true : false);
+        setPlayerProperty(player, "role_shown", player->isLord());
 
         JsonArray args;
         args << QSanProtocol::S_GAME_EVENT_UPDATE_SKILL;
@@ -4158,7 +4158,7 @@ bool Room::changeMaxHpForAwakenSkill(ServerPlayer *player, int magnitude)
         } else {
             loseMaxHp(player, -magnitude);
         }
-    } else {
+    } else if (magnitude > 0) {
         setPlayerProperty(player, "maxhp", player->getMaxHp() + magnitude);
 
         LogMessage log;
@@ -5367,7 +5367,6 @@ void Room::preparePlayers()
             player->notifyPreshow();
             notifyProperty(player, player, "flags", "-AutoPreshowAvailable");
         }
-
     } else {
         foreach (ServerPlayer *player, m_players) {
             QList<const Skill *> skills = player->getGeneral()->getSkillList();

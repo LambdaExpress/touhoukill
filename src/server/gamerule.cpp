@@ -473,6 +473,7 @@ bool GameRule::effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<Skil
         if (data.canConvert<DamageStruct>()) {
             DamageStruct damage = data.value<DamageStruct>();
             room->enterDying(player, &damage);
+            data = QVariant::fromValue(damage);
         } else
             room->enterDying(player, nullptr);
 
@@ -564,7 +565,7 @@ bool GameRule::effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<Skil
                         DamageStruct chain_damage = damage;
                         chain_damage.to = chained_player;
                         chain_damage.chain = true;
-                        chain_damage.trigger_info = QString(); //clear trigger_info.  eg. shihui
+                        chain_damage.trigger_info.clear();
 
                         room->damage(chain_damage);
                     }
