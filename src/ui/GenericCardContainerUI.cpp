@@ -1377,7 +1377,7 @@ void PlayerCardContainer::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 
 void PlayerCardContainer::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *)
 {
-    if (Config.EnableDoubleClick)
+    if (Config.EnableDoubleClick && _m_maxVotes <= 1)
         RoomSceneInstance->doOkButton();
 }
 
@@ -1580,11 +1580,6 @@ void PlayerCardContainer::onSkinChangingFinished()
     if (isItemUnderMouse(avatarItem)) {
         heroSKinBtn->show();
     }
-
-    /*if (generalName == "zuoci" && m_player->isAlive() && !_m_huashenGeneralName.isEmpty() && !_m_huashenSkillName.isEmpty()) {
-        QString huashen_place = Self->tag.value("Huashen_place", QString()).toString();
-        startHuaShen(_m_huashenGeneralName, _m_huashenSkillName, (huashen_place != "deputy"));
-    }*/
 }
 
 void PlayerCardContainer::stopHeroSkinChangingAnimation()
@@ -1613,16 +1608,8 @@ QPixmap PlayerCardContainer::getSmallAvatarIcon(const QString &generalName)
 
 void PlayerCardContainer::showSkillName(const QString &skill_name, bool isSelf)
 {
-    // ClientPlayer *player = ClientInstance->getPlayer(player_name);
-
-    //getSkillNameFont().paintText(_m_skillNameItem,
-    //     getSkillNameArea(),
-    //    Qt::AlignLeft,
-    //    Sanguosha->translate(skill_name));
     if (!isSelf) {
-        G_PHOTO_LAYOUT.m_skillNameFont.paintText(_m_skillNameItem,
-                                                 G_PHOTO_LAYOUT.m_skillNameArea, //getSkillNameArea()
-                                                 Qt::AlignLeft, Sanguosha->translate(skill_name));
+        G_PHOTO_LAYOUT.m_skillNameFont.paintText(_m_skillNameItem, G_PHOTO_LAYOUT.m_skillNameArea, Qt::AlignLeft, Sanguosha->translate(skill_name));
     } else {
         if (ServerInfo.Enable2ndGeneral && Self->inDeputySkills(skill_name))
             G_DASHBOARD_LAYOUT.m_skillNameFont.paintText(_m_skillNameItem, G_DASHBOARD_LAYOUT.m_secondarySkillNameArea, Qt::AlignLeft, Sanguosha->translate(skill_name));

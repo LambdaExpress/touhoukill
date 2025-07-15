@@ -486,15 +486,7 @@ void RoomScene::handleGameEvent(const QVariant &args)
         if (player == Self)
             detachSkill(skill_name, head);
 
-        // stop huashen animation
         PlayerCardContainer *container = (PlayerCardContainer *)_getGenericCardContainer(Player::PlaceHand, player);
-        //QString huashenSkillName = container->getHuashenSkillName();
-
-        //huashenSkillName is Empty...
-        //if (huashenSkillName != NULL && !huashenSkillName.isEmpty() && huashenSkillName == skill_name)
-        //if (!player->hasSkill("pingyi"))
-        //container->stopHuaShen();
-
         container->updateAvatarTooltip();
         break;
     }
@@ -547,7 +539,6 @@ void RoomScene::handleGameEvent(const QVariant &args)
         foreach (Photo *photo, photos)
             photo->updateAvatarTooltip();
         dashboard->updateAvatarTooltip();
-        //if (eventType == S_GAME_EVENT_PREPARE_SKILL)
         updateSkillButtons();
         dashboard->expandSpecialCard(); //for chaoren
         break;
@@ -558,34 +549,9 @@ void RoomScene::handleGameEvent(const QVariant &args)
         QList<QString> skill_names = preshow_map.keys();
         foreach (const QString &skill, skill_names) {
             bool showed = preshow_map[skill].toBool();
-
-            //if (Config.EnableAutoPreshow && auto_preshow_available) {
-            /*if (!auto_preshow_available) {
-                
-                const Skill *s = Sanguosha->getSkill(skill);
-                if (s != NULL && s->canPreshow()) {
-                    ClientInstance->preshow(skill, true);
-                    
-                }
-            }
-            else {*/
-
             Self->setSkillPreshowed(skill, showed);
-            /*if (!showed) {
-                    foreach(QSanSkillButton *btn, m_skillButtons) {
-                        if (btn->getSkill()->objectName() == skill) {
-                            btn->QGraphicsObject::setEnabled(true);
-                            btn->setState(QSanButton::S_STATE_CANPRESHOW);
-                            break;
-                        }
-                    }
-                }*/
-            //dashboard->updateHiddenMark();
-            //if (Self->inHeadSkills(skill))
-            dashboard->updateHiddenMark(); //updateLeftHiddenMark
-            //else
+            dashboard->updateHiddenMark();
             dashboard->updateRightHiddenMark();
-            //}
         }
         break;
     }
@@ -637,10 +603,8 @@ void RoomScene::handleGameEvent(const QVariant &args)
         if (oldHero != nullptr) {
             foreach (const Skill *skill, oldHero->getVisibleSkills(true, !isSecondaryHero))
                 detachSkill(skill->objectName(), !isSecondaryHero);
-            if (oldHero->hasSkill("pingyi") && (container != nullptr)) {
-                //PlayerCardContainer *container = (PlayerCardContainer *)_getGenericCardContainer(Player::PlaceHand, player);
+            if (oldHero->hasSkill("pingyi") && (container != nullptr))
                 container->stopHuaShen();
-            }
         }
 
         if (newHero != nullptr) {
@@ -670,7 +634,7 @@ void RoomScene::handleGameEvent(const QVariant &args)
         if (player == nullptr)
             return;
 
-        bool display = player->hasSkill(skill_name);
+        bool display = player->hasSkill(skill_name, true);
         if (!display) {
             // for wuyu
             static QStringList bllmwuyu;
@@ -680,13 +644,13 @@ void RoomScene::handleGameEvent(const QVariant &args)
                          << "bllmseyu"
                          << "bllmshuiyu"
                          << "bllmshiyu";
-            if (bllmwuyu.contains(skill_name))
+            if (bllmwuyu.contains(skill_name) && player->hasSkill("bllmwuyu", true))
                 display = true;
         }
 
         if (!display) {
             // for shenbao
-            if (player->hasSkill("shenbao") && (player->hasWeapon(skill_name) || player->hasArmorEffect(skill_name) || player->hasTreasure(skill_name)))
+            if (player->hasSkill("shenbao", true) && (player->hasWeapon(skill_name) || player->hasArmorEffect(skill_name) || player->hasTreasure(skill_name)))
                 display = true;
         }
 
