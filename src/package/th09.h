@@ -11,18 +11,6 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
-class YanhuiCard : public SkillCard
-{
-    Q_OBJECT
-
-public:
-    Q_INVOKABLE YanhuiCard();
-
-    bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
-    const Card *validate(CardUseStruct &card_use) const override;
-    const Card *validateInResponse(ServerPlayer *user) const override;
-};
-
 class ToupaiCard : public SkillCard
 {
     Q_OBJECT
@@ -231,6 +219,16 @@ public:
 
     bool targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const override;
     void onUse(Room *room, const CardUseStruct &card_use) const override;
+};
+
+class YuyanCard : public SkillCard
+{
+    Q_OBJECT
+
+public:
+    YuyanCard();
+
+    void onEffect(const CardEffectStruct &effect) const override;
 };
 
 class TH09Package : public Package

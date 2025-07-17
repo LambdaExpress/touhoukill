@@ -2444,9 +2444,18 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        invoke->invoker->gainAnExtraTurn();
         room->setPlayerMark(invoke->invoker, "wanshen", 1);
         room->handleAcquireDetachSkills(invoke->invoker, "xieli");
+
+        if (!room->getThread()->hasExtraTurn())
+            invoke->invoker->gainAnExtraTurn();
+        else {
+            LogMessage log;
+            log.type = "#ForbidExtraTurn";
+            log.from = invoke->invoker;
+
+            room->sendLog(log);
+        }
 
         return false;
     }

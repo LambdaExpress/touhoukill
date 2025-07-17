@@ -10,291 +10,6 @@
 #include <QCoreApplication>
 #include <QPointer>
 
-class ZuiyueVS : public ZeroCardViewAsSkill
-{
-public:
-    ZuiyueVS()
-        : ZeroCardViewAsSkill("zuiyue")
-    {
-    }
-
-    bool isEnabledAtPlay(const Player *player) const override
-    {
-        if (isHegemonyGameMode(ServerInfo.GameMode) && player->hasFlag("zuiyue_used"))
-            return false;
-        return player->hasFlag("zuiyue") && Analeptic::IsAvailable(player);
-    }
-
-    const Card *viewAs() const override
-    {
-        Analeptic *ana = new Analeptic(Card::NoSuit, 0);
-        ana->setSkillName(objectName());
-        return ana;
-    }
-};
-
-class Zuiyue : public TriggerSkill
-{
-public:
-    Zuiyue()
-        : TriggerSkill("zuiyue")
-    {
-        events << PreCardUsed << EventPhaseChanging;
-        view_as_skill = new ZuiyueVS;
-    }
-
-    void record(TriggerEvent triggerEvent, Room *room, QVariant &data) const override
-    {
-        if (triggerEvent == PreCardUsed) {
-            CardUseStruct use = data.value<CardUseStruct>();
-            if (!use.card->isKindOf("BasicCard") && (use.from != nullptr) && use.from->hasSkill(this) && use.from->getPhase() == Player::Play)
-                room->setPlayerFlag(use.from, "zuiyue");
-            else if (isHegemonyGameMode(ServerInfo.GameMode) && use.card->getSkillName() == "zuiyue")
-                room->setPlayerFlag(use.from, "zuiyue_used");
-        } else if (triggerEvent == EventPhaseChanging) {
-            PhaseChangeStruct change = data.value<PhaseChangeStruct>();
-            if (change.from == Player::Play) {
-                room->setPlayerFlag(change.player, "-zuiyue");
-                room->setPlayerFlag(change.player, "-zuiyue_used");
-            }
-        }
-    }
-};
-
-class Doujiu : public TriggerSkill
-{
-public:
-    Doujiu()
-        : TriggerSkill("doujiu")
-    {
-        events << CardUsed << EventPhaseChanging;
-        relate_to_place = "head";
-    }
-
-    void record(TriggerEvent triggerEvent, Room *room, QVariant &) const override
-    {
-        if (triggerEvent == EventPhaseChanging) {
-            foreach (ServerPlayer *p, room->getAllPlayers())
-                p->setFlags("-doujiu_used");
-        }
-    }
-
-    QList<SkillInvokeDetail> triggerable(TriggerEvent triggerEvent, const Room *room, const QVariant &data) const override
-    {
-        if (triggerEvent == EventPhaseChanging)
-            return QList<SkillInvokeDetail>();
-
-        CardUseStruct use = data.value<CardUseStruct>();
-        if (!use.card->isKindOf("Peach") && !use.card->isKindOf("Analeptic"))
-            return QList<SkillInvokeDetail>();
-        if (use.from->isKongcheng() || !use.from->isAlive())
-            return QList<SkillInvokeDetail>();
-        QList<SkillInvokeDetail> d;
-        foreach (ServerPlayer *suika, room->findPlayersBySkillName(objectName())) {
-            if (use.from != suika && !suika->hasFlag("doujiu_used"))
-                d << SkillInvokeDetail(this, suika, suika, nullptr, false, use.from);
-        }
-        return d;
-    }
-
-    bool cost(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
-    {
-        QVariant _data = QVariant::fromValue(invoke->preferredTarget);
-        return room->askForSkillInvoke(invoke->invoker, objectName(), _data);
-    }
-
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
-    {
-        invoke->invoker->setFlags("doujiu_used");
-        invoke->invoker->drawCards(1);
-        CardUseStruct use = data.value<CardUseStruct>();
-        room->doAnimate(QSanProtocol::S_ANIMATE_INDICATE, invoke->invoker->objectName(), invoke->targets.first()->objectName());
-        if (!invoke->invoker->isKongcheng() && invoke->invoker->pindian(invoke->targets.first(), objectName())) {
-            if (invoke->invoker->isWounded()) {
-                RecoverStruct recover;
-                recover.recover = 1;
-                room->recover(invoke->invoker, recover);
-            }
-            use.nullified_list << "_ALL_TARGETS";
-            data = QVariant::fromValue(use);
-        }
-        return false;
-    }
-};
-
-YanhuiCard::YanhuiCard()
-{
-    will_throw = false;
-    m_skillName = "yanhui_attach";
-}
-
-bool YanhuiCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
-{
-    if (!targets.isEmpty() || !to_select->hasLordSkill("yanhui") || to_select == Self)
-        return false;
-
-    bool globalDying = false;
-    if (Self != nullptr) {
-        QList<const Player *> players = Self->getSiblings();
-        players << Self;
-        foreach (const Player *p, players) {
-            if (p->hasFlag("Global_Dying") && p->isAlive()) {
-                globalDying = true;
-                break;
-            }
-        }
-    }
-    if (globalDying) {
-        return to_select->hasFlag("Global_Dying");
-    }
-
-    return to_select->isWounded() || to_select->isDebuffStatus();
-}
-
-const Card *YanhuiCard::validate(CardUseStruct &) const
-{
-    SuperPeach *use_card = new SuperPeach(Card::SuitToBeDecided, -1);
-    use_card->setSkillName("_yanhui");
-    use_card->addSubcard(subcards.first());
-    use_card->deleteLater();
-    return use_card;
-}
-
-const Card *YanhuiCard::validateInResponse(ServerPlayer *) const
-{
-    SuperPeach *use_card = new SuperPeach(Card::SuitToBeDecided, -1);
-    use_card->setSkillName("_yanhui");
-    use_card->addSubcard(subcards.first());
-    use_card->deleteLater();
-    return use_card;
-}
-
-class YanhuiVS : public OneCardViewAsSkill
-{
-public:
-    YanhuiVS()
-        : OneCardViewAsSkill("yanhui_attach")
-    {
-        attached_lord_skill = true;
-        response_or_use = true;
-    }
-
-    bool isEnabledAtPlay(const Player *player) const override
-    {
-        foreach (const Player *p, player->getAliveSiblings()) {
-            if (p->hasLordSkill("yanhui") && (p->isWounded() || p->isDebuffStatus()))
-                return true;
-        }
-        return false;
-    }
-
-    bool isEnabledAtResponse(const Player *player, const QString &pattern) const override
-    {
-        Peach *card = new Peach(Card::SuitToBeDecided, -1);
-        DELETE_OVER_SCOPE(Peach, card)
-        const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
-
-        if (cardPattern != nullptr && cardPattern->match(player, card)) {
-            bool globalDying = false;
-            if (Self != nullptr) {
-                QList<const Player *> players = Self->getSiblings();
-                players << Self;
-                foreach (const Player *p, players) {
-                    if (p->hasFlag("Global_Dying") && p->isAlive()) {
-                        globalDying = true;
-                        break;
-                    }
-                }
-            }
-            if (globalDying) {
-                foreach (const Player *p, player->getAliveSiblings()) {
-                    if (p->hasLordSkill("yanhui") && p->hasFlag("Global_Dying"))
-                        return true;
-                }
-            } else {
-                foreach (const Player *p, player->getAliveSiblings()) {
-                    if (p->hasLordSkill("yanhui") && (p->isWounded() || p->isDebuffStatus()))
-                        return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    bool shouldBeVisible(const Player *Self) const override
-    {
-        return (Self != nullptr) && Self->getKingdom() == "zhan";
-    }
-
-    bool viewFilter(const Card *to_select) const override
-    {
-        return to_select->isKindOf("Peach") || to_select->isKindOf("Analeptic");
-    }
-
-    const Card *viewAs(const Card *originalCard) const override
-    {
-        if (originalCard != nullptr) {
-            YanhuiCard *card = new YanhuiCard;
-            card->addSubcard(originalCard);
-            return card;
-        } else
-            return nullptr;
-    }
-};
-
-class Yanhui : public TriggerSkill
-{
-public:
-    Yanhui()
-        : TriggerSkill("yanhui$")
-    {
-        events << PreCardUsed << GameStart << EventAcquireSkill << EventLoseSkill << Revive;
-    }
-
-    void record(TriggerEvent triggerEvent, Room *room, QVariant &data) const override
-    {
-        if (triggerEvent == PreCardUsed) {
-            CardUseStruct use = data.value<CardUseStruct>();
-            foreach (ServerPlayer *p, use.to) {
-                if (p->hasLordSkill("yanhui") && p != use.from) {
-                    if ((use.card->getSkillName() == objectName())) {
-                        QList<ServerPlayer *> logto;
-                        logto << p;
-                        room->sendLog("#InvokeOthersSkill", use.from, objectName(), logto);
-                        room->notifySkillInvoked(p, objectName());
-                    }
-                }
-            }
-        } else {
-            static QString attachName = "yanhui_attach";
-            QList<ServerPlayer *> lords;
-            foreach (ServerPlayer *p, room->getAllPlayers()) {
-                if (p->hasLordSkill(this, true))
-                    lords << p;
-            }
-
-            if (lords.length() > 1) {
-                foreach (ServerPlayer *p, room->getAllPlayers()) {
-                    if (!p->hasLordSkill(attachName, true))
-                        room->attachSkillToPlayer(p, attachName);
-                }
-            } else if (lords.length() == 1) {
-                foreach (ServerPlayer *p, room->getAllPlayers()) {
-                    if (p->hasLordSkill(this, true) && p->hasLordSkill(attachName, true))
-                        room->detachSkillFromPlayer(p, attachName, true);
-                    else if (!p->hasLordSkill(this, true) && !p->hasLordSkill(attachName, true))
-                        room->attachSkillToPlayer(p, attachName);
-                }
-            } else { // the case that lords is empty
-                foreach (ServerPlayer *p, room->getAllPlayers()) {
-                    if (p->hasLordSkill(attachName, true))
-                        room->detachSkillFromPlayer(p, attachName, true);
-                }
-            }
-        }
-    }
-};
-
 class Shenpan : public TriggerSkill
 {
 public:
@@ -3509,13 +3224,137 @@ private:
     QString b;
 };
 
+YuyanCard::YuyanCard()
+{
+}
+
+void YuyanCard::onEffect(const CardEffectStruct &effect) const
+{
+    Room *room = effect.to->getRoom();
+    room->askForDiscard(effect.to, getSkillName(), 1, 1, false, true);
+
+    Analeptic *ana = new Analeptic(Card::NoSuit, 0);
+    ana->setSkillName("_" + getSkillName());
+
+    bool selfa = ana->isAvailable(effect.from);
+    bool othera = ana->isAvailable(effect.to);
+
+    if (!selfa && !othera) {
+        delete ana;
+        return;
+    }
+
+    bool selfchoice = selfa;
+
+    if (selfa && othera)
+        selfchoice = room->askForSkillInvoke(effect.from, getSkillName(), "drink::" + effect.to->objectName());
+
+    CardUseStruct use;
+    use.card = ana;
+    use.from = (selfchoice ? effect.from : effect.to);
+    room->useCard(use);
+}
+
+class Yuyan : public OneCardViewAsSkill
+{
+public:
+    Yuyan()
+        : OneCardViewAsSkill("yuyan")
+    {
+        filter_pattern = ".!";
+    }
+
+    bool isEnabledAtPlay(const Player *player) const override
+    {
+        return !player->hasUsed("YuyanCard");
+    }
+
+    const Card *viewAs(const Card *originalCard) const override
+    {
+        YuyanCard *c = new YuyanCard;
+        c->addSubcard(originalCard);
+        return c;
+    }
+};
+
+class Zuimeng : public TriggerSkill
+{
+public:
+    Zuimeng()
+        : TriggerSkill("zuimeng")
+    {
+        events = {EventPhaseChanging};
+        frequency = Frequent;
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *room, const QVariant &data) const override
+    {
+        QList<SkillInvokeDetail> d;
+        PhaseChangeStruct change = data.value<PhaseChangeStruct>();
+        if (change.to == Player::NotActive && !change.player->tag.value("touhou-extra", false).toBool() && !room->getThread()->hasExtraTurn()) {
+            bool drank = false;
+            foreach (ServerPlayer *p, room->getAllPlayers()) {
+                if (p->getMark("drank") > 0 || p->getMark("magic_drank") > 0) {
+                    drank = true;
+                    break;
+                }
+            }
+
+            if (drank) {
+                foreach (ServerPlayer *p, room->getAllPlayers()) {
+                    if (p->hasSkill(this))
+                        d << SkillInvokeDetail(this, p, p);
+                }
+            }
+        }
+
+        return d;
+    }
+
+    bool effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        invoke->invoker->gainAnExtraTurn();
+        return false;
+    }
+};
+
+class Cuihua : public TriggerSkill
+{
+public:
+    Cuihua()
+        : TriggerSkill("cuihua$")
+    {
+        events = {MarkChanged};
+    }
+
+    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *room, const QVariant &data) const override
+    {
+        QList<SkillInvokeDetail> d;
+        MarkChangeStruct m = data.value<MarkChangeStruct>();
+        if ((m.name == "drank" || m.name == "magic_drank") && m.num < 0 && m.player->getMark(m.name) == 0 && m.player->getKingdom() == "zhan" && m.player->isAlive()) {
+            foreach (ServerPlayer *p, room->getOtherPlayers(m.player)) {
+                if (p->hasLordSkill(this) && p->isAlive() && p != m.player)
+                    d << SkillInvokeDetail(this, p, m.player);
+            }
+        }
+
+        return d;
+    }
+
+    bool effect(TriggerEvent, Room *, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    {
+        invoke->owner->drawCards(1, objectName());
+        return false;
+    }
+};
+
 TH09Package::TH09Package()
     : Package("th09")
 {
     General *suika = new General(this, "suika$", "zhan", 3);
-    suika->addSkill(new Zuiyue);
-    suika->addSkill(new Doujiu);
-    suika->addSkill(new Yanhui);
+    suika->addSkill(new Yuyan);
+    suika->addSkill(new Zuimeng);
+    suika->addSkill(new Cuihua);
 
     General *shikieiki = new General(this, "shikieiki$", "zhan", 3);
     shikieiki->addSkill(new Shenpan);
@@ -3583,7 +3422,6 @@ TH09Package::TH09Package()
     yuma->addSkill(new HuiranRecord);
     related_skills.insertMulti("huiran", "#huiran-record");
 
-    addMetaObject<YanhuiCard>();
     addMetaObject<ToupaiCard>();
     addMetaObject<TianrenCard>();
     addMetaObject<NianliCard>();
@@ -3597,8 +3435,7 @@ TH09Package::TH09Package()
     addMetaObject<YucanSelectCard>();
     addMetaObject<YucanCard>();
     addMetaObject<HuiranCard>();
-
-    skills << new YanhuiVS;
+    addMetaObject<YuyanCard>();
 }
 
 ADD_PACKAGE(TH09)

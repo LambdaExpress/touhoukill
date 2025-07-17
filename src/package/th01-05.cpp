@@ -3731,8 +3731,6 @@ public:
             logto << invoke->targets.first();
             room->sendLog("#touhouExtraTurn", invoke->targets.first(), nullptr, logto);
             invoke->targets.first()->gainAnExtraTurn();
-            if (invoke->targets.first() != invoke->invoker)
-                room->loseHp(invoke->invoker, 1);
         } else {
             LogMessage log;
             log.type = "#ForbidExtraTurn";
@@ -3740,6 +3738,9 @@ public:
 
             room->sendLog(log);
         }
+
+        if (invoke->targets.first() != invoke->invoker)
+            room->loseHp(invoke->invoker, 1);
         return false;
     }
 };
