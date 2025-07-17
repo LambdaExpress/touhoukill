@@ -219,12 +219,12 @@ void Slash::onEffect(const CardEffectStruct &card_effect) const
     if (card_effect.from->getMark("drank") > 0) {
         room->setCardFlag(this, "drank");
         drank = card_effect.from->getMark("drank");
-        room->setPlayerMark(card_effect.from, "drank", 0);
+        card_effect.from->loseAllMarks("drank");
     }
     if (card_effect.from->getMark("magic_drank") > 0) {
         room->setCardFlag(this, "magic_drank");
         magic_drank = card_effect.from->getMark("magic_drank");
-        room->setPlayerMark(card_effect.from, "magic_drank", 0);
+        card_effect.from->loseAllMarks("magic_drank");
     }
 
     SlashEffectStruct effect;
@@ -2350,7 +2350,7 @@ void KnownBoth::use(Room *room, const CardUseStruct &card_use) const
         room->cardEffect(effect);
     }
     if (magic_drank > 0)
-        room->setPlayerMark(source, "magic_drank", 0);
+        source->loseAllMarks("magic_drank");
     room->removeTag("targets" + this->toString());
 
     if (source != nullptr && source->isAlive() && source->isCurrent()) {

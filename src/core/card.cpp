@@ -735,7 +735,7 @@ void Card::use(Room *room, const CardUseStruct &card_use) const
     }
     room->removeTag("targets" + this->toString()); //for ai?
     if (magic_drank > 0)
-        room->setPlayerMark(source, "magic_drank", 0);
+        source->loseAllMarks("magic_drank");
 
     if (room->getCardPlace(getEffectiveId()) == Player::PlaceTable) {
         CardMoveReason reason(CardMoveReason::S_REASON_USE, ((source != nullptr) ? source->objectName() : QString()), QString(), getSkillName(), QString());

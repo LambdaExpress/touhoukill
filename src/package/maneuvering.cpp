@@ -113,7 +113,7 @@ void Analeptic::onEffect(const CardEffectStruct &effect) const
         recover.recover = 1 + effect.effectValue.first();
         room->recover(effect.to, recover);
     } else {
-        room->addPlayerMark(effect.to, "drank", 1 + effect.effectValue.first());
+        effect.to->gainMark("drank", 1 + effect.effectValue.first());
     }
 }
 

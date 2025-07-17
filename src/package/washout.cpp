@@ -172,7 +172,7 @@ void MagicAnaleptic::onEffect(const CardEffectStruct &effect) const
         recover.recover = 1 + effect.effectValue.first();
         room->recover(effect.to, recover);
     } else {
-        room->addPlayerMark(effect.to, "magic_drank", 1 + effect.effectValue.first());
+        effect.to->gainMark("magic_drank", 1 + effect.effectValue.first());
     }
 }
 

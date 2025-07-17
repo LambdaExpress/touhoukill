@@ -904,7 +904,7 @@ void ServerPlayer::gainMark(const QString &mark, int n)
     change.num = n;
     change.player = this;
     QVariant n_data = QVariant::fromValue(change);
-    if (mark.startsWith("@")) {
+    if (mark.startsWith("@") || mark == "drank" || mark == "magic_drank") {
         if (room->getThread()->trigger(PreMarkChange, room, n_data))
             return;
         n = n_data.value<MarkChangeStruct>().num;
@@ -918,16 +918,18 @@ void ServerPlayer::gainMark(const QString &mark, int n)
 
     int value = getMark(mark) + n;
 
-    LogMessage log;
-    log.type = "#GetMark";
-    log.from = this;
-    log.arg = mark;
-    log.arg2 = QString::number(n);
+    if (mark.startsWith("@")) {
+        LogMessage log;
+        log.type = "#GetMark";
+        log.from = this;
+        log.arg = mark;
+        log.arg2 = QString::number(n);
+        room->sendLog(log);
+    }
 
-    room->sendLog(log);
     room->setPlayerMark(this, mark, value);
 
-    if (mark.startsWith("@"))
+    if (mark.startsWith("@") || mark == "drank" || mark == "magic_drank")
         room->getThread()->trigger(MarkChanged, room, n_data);
 }
 
@@ -942,7 +944,7 @@ void ServerPlayer::loseMark(const QString &mark, int n)
 
     QVariant n_data = QVariant::fromValue(change);
 
-    if (mark.startsWith("@")) {
+    if (mark.startsWith("@") || mark == "drank" || mark == "magic_drank") {
         if (room->getThread()->trigger(PreMarkChange, room, n_data))
             return;
         n = -(n_data.value<MarkChangeStruct>().num);
@@ -961,16 +963,18 @@ void ServerPlayer::loseMark(const QString &mark, int n)
         n = getMark(mark);
     }
 
-    LogMessage log;
-    log.type = "#LoseMark";
-    log.from = this;
-    log.arg = mark;
-    log.arg2 = QString::number(n);
+    if (mark.startsWith("@")) {
+        LogMessage log;
+        log.type = "#LoseMark";
+        log.from = this;
+        log.arg = mark;
+        log.arg2 = QString::number(n);
+        room->sendLog(log);
+    }
 
-    room->sendLog(log);
     room->setPlayerMark(this, mark, value);
 
-    if (mark.startsWith("@"))
+    if (mark.startsWith("@") || mark == "drank" || mark == "magic_drank")
         room->getThread()->trigger(MarkChanged, room, n_data);
 }
 

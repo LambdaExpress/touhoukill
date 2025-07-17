@@ -2366,7 +2366,7 @@ public:
 
     bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
     {
-        room->setPlayerMark(invoke->invoker, "drank", 0);
+        invoke->invoker->loseAllMarks("drank");
         RecoverStruct r;
         r.reason = objectName();
         room->recover(invoke->invoker, r);

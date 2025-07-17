@@ -272,7 +272,7 @@ bool GameRule::effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<Skil
                     log.from = p;
                     room->sendLog(log);
 
-                    room->setPlayerMark(p, "drank", 0);
+                    p->loseAllMarks("drank");
                 }
                 if (p->getMark("magic_drank") > 0) {
                     LogMessage log;
@@ -280,7 +280,7 @@ bool GameRule::effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<Skil
                     log.from = p;
                     room->sendLog(log);
 
-                    room->setPlayerMark(p, "magic_drank", 0);
+                    p->loseAllMarks("magic_drank");
                 }
             }
 
@@ -352,12 +352,12 @@ bool GameRule::effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<Skil
             //since use.to is empty, break the whole process
             if ((card_use.card != nullptr) && card_use.to.isEmpty()) {
                 if (card_use.card->isKindOf("Slash") && card_use.from->isAlive()) {
-                    room->setPlayerMark(card_use.from, "drank", 0);
-                    room->setPlayerMark(card_use.from, "magic_drank", 0);
+                    card_use.from->loseAllMarks("drank");
+                    card_use.from->loseAllMarks("magic_drank");
                 }
 
                 if (card_use.card->isNDTrick() && card_use.from->isAlive()) //clear magic_drank while using Nullification
-                    room->setPlayerMark(card_use.from, "magic_drank", 0);
+                    card_use.from->loseAllMarks("magic_drank");
                 break;
             }
 
