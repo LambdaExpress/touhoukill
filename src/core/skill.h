@@ -55,6 +55,7 @@ public:
     {
         relate_to_place = rtp;
     }
+    bool isEquipSkill() const;
 
 protected:
     Frequency frequency;
@@ -64,6 +65,7 @@ protected:
     bool attached_lord_skill;
     QString show_type;
     QString relate_to_place;
+    bool equip_skill;
 
 private:
     bool lord_skill;
@@ -289,40 +291,10 @@ protected:
     QString name;
 };
 
-class EquipSkill : public TriggerSkill
-{
-    Q_OBJECT
-
-public:
-    explicit EquipSkill(const QString &name);
-
-    static bool equipAvailable(const Player *p, EquipCard::Location location, const QString &equip_name, const Player *to = nullptr);
-    static bool equipAvailable(const Player *p, const EquipCard *card, const Player *to = nullptr);
-};
-
-class WeaponSkill : public EquipSkill
-{
-    Q_OBJECT
-
-public:
-    explicit WeaponSkill(const QString &name);
-};
-
-class ArmorSkill : public EquipSkill
-{
-    Q_OBJECT
-
-public:
-    explicit ArmorSkill(const QString &name);
-};
-
-class TreasureSkill : public EquipSkill
-{
-    Q_OBJECT
-
-public:
-    explicit TreasureSkill(const QString &name);
-};
+namespace EquipSkill {
+bool equipAvailable(const Player *p, EquipCard::Location location, const QString &equip_name, const Player *to = nullptr);
+bool equipAvailable(const Player *p, const EquipCard *card, const Player *to = nullptr);
+} // namespace EquipSkill
 
 class ViewHasSkill : public Skill
 {
