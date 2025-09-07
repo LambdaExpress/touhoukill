@@ -1311,7 +1311,7 @@ void PlayerCardContainer::revivePlayer()
     refresh();
 }
 
-void PlayerCardContainer::mousePressEvent(QGraphicsSceneMouseEvent *)
+void PlayerCardContainer::mousePressEvent(QGraphicsSceneMouseEvent * /*event*/)
 {
 }
 
@@ -1375,7 +1375,7 @@ void PlayerCardContainer::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     }
 }
 
-void PlayerCardContainer::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *)
+void PlayerCardContainer::mouseDoubleClickEvent(QGraphicsSceneMouseEvent * /*event*/)
 {
     if (Config.EnableDoubleClick && _m_maxVotes <= 1)
         RoomSceneInstance->doOkButton();

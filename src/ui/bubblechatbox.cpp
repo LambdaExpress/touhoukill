@@ -84,7 +84,7 @@ QRectF BubbleChatBox::boundingRect() const
     return m_rect;
 }
 
-void BubbleChatBox::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void BubbleChatBox::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     painter->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
     painter->drawPixmap(m_rect.toRect(), m_backgroundPixmap);

@@ -1922,7 +1922,7 @@ void ServerPlayer::notifyPreshow()
     room->doNotify(this, QSanProtocol::S_COMMAND_LOG_EVENT, args2);
 }
 
-void ServerPlayer::showGeneral(bool head_general, bool trigger_event, bool sendLog, bool)
+void ServerPlayer::showGeneral(bool head_general, bool trigger_event, bool sendLog, bool /*unused*/)
 {
     QStringList names = room->getTag(objectName()).toStringList();
     if (names.isEmpty())
@@ -2355,7 +2355,7 @@ void ServerPlayer::disconnectSkillsFromOthers(bool head_skill /* = true */)
     }
 }
 
-int ServerPlayer::getPlayerNumWithSameKingdom(const QString &, const QString &_to_calculate) const
+int ServerPlayer::getPlayerNumWithSameKingdom(const QString & /*unused*/, const QString &_to_calculate) const
 {
     QString to_calculate = _to_calculate;
 

@@ -1071,7 +1071,7 @@ const EquipCard *Player::getEquip(int index) const
     return nullptr;
 }
 
-bool Player::hasWeapon(const QString &weapon_name, bool, bool ignore_preshow) const
+bool Player::hasWeapon(const QString &weapon_name, bool /*unused*/, bool ignore_preshow) const
 {
     if (getMark("Equips_Nullified_to_Yourself") > 0)
         return false;
@@ -1087,7 +1087,7 @@ bool Player::hasWeapon(const QString &weapon_name, bool, bool ignore_preshow) co
     return real_weapon->objectName() == weapon_name || real_weapon->isKindOf(weapon_name.toStdString().c_str());
 }
 
-bool Player::hasArmorEffect(const QString &armor_name, bool) const
+bool Player::hasArmorEffect(const QString &armor_name, bool /*unused*/) const
 {
     if (!tag["Qinggang"].toStringList().isEmpty() || getMark("Armor_Nullified") > 0 || getMark("Equips_Nullified_to_Yourself") > 0)
         return false;
@@ -1103,7 +1103,7 @@ bool Player::hasArmorEffect(const QString &armor_name, bool) const
     return real_armor->objectName() == armor_name || real_armor->isKindOf(armor_name.toStdString().c_str());
 }
 
-bool Player::hasTreasure(const QString &treasure_name, bool) const
+bool Player::hasTreasure(const QString &treasure_name, bool /*unused*/) const
 {
     if (getMark("Equips_Nullified_to_Yourself") > 0)
         return false;

@@ -30,7 +30,7 @@ AvatarModel::AvatarModel(const QList<const General *> &list)
 {
 }
 
-int AvatarModel::rowCount(const QModelIndex &) const
+int AvatarModel::rowCount(const QModelIndex & /*parent*/) const
 {
     return list.size();
 }

@@ -163,7 +163,7 @@ QFont TriggerOptionButton::defaultFont()
     return font;
 }
 
-void TriggerOptionButton::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void TriggerOptionButton::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     painter->setRenderHint(QPainter::HighQualityAntialiasing);
     painter->save();
@@ -201,12 +201,12 @@ void TriggerOptionButton::mousePressEvent(QGraphicsSceneMouseEvent *event)
     event->accept();
 }
 
-void TriggerOptionButton::mouseReleaseEvent(QGraphicsSceneMouseEvent *)
+void TriggerOptionButton::mouseReleaseEvent(QGraphicsSceneMouseEvent * /*event*/)
 {
     emit clicked();
 }
 
-void TriggerOptionButton::hoverEnterEvent(QGraphicsSceneHoverEvent *)
+void TriggerOptionButton::hoverEnterEvent(QGraphicsSceneHoverEvent * /*event*/)
 {
     QPropertyAnimation *animation = new QPropertyAnimation(this, "opacity");
     animation->setEndValue(1.0);
@@ -215,7 +215,7 @@ void TriggerOptionButton::hoverEnterEvent(QGraphicsSceneHoverEvent *)
     emit hovered(true);
 }
 
-void TriggerOptionButton::hoverLeaveEvent(QGraphicsSceneHoverEvent *)
+void TriggerOptionButton::hoverLeaveEvent(QGraphicsSceneHoverEvent * /*event*/)
 {
     QPropertyAnimation *animation = new QPropertyAnimation(this, "opacity");
     animation->setEndValue(initialOpacity);

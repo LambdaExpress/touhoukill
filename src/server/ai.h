@@ -73,7 +73,7 @@ public:
     ~TrustAI() override;
 
     void activate(CardUseStruct &card_use) override;
-    Card::Suit askForSuit(const QString &) override;
+    Card::Suit askForSuit(const QString & /*reason*/) override;
     QString askForKingdom() override;
     bool askForSkillInvoke(const QString &skill_name, const QVariant &data) override;
     QString askForChoice(const QString &skill_name, const QString &choices, const QVariant &data) override;

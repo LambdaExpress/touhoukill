@@ -760,7 +760,7 @@ QPixmap IQSanComponentSkin::getPixmapFromFileName(const QString &fileName, bool 
     }
 }
 
-bool QSanRoomSkin::_loadAnimationConfig(const QVariant &)
+bool QSanRoomSkin::_loadAnimationConfig(const QVariant & /*config*/)
 {
     return true;
 }

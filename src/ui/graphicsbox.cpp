@@ -72,7 +72,7 @@ void GraphicsBox::moveToCenter(QGraphicsObject *target)
     target->setPos(RoomSceneInstance->tableCenterPos() - QPointF(rect.width() / 2, rect.height() / 2));
 }
 
-void GraphicsBox::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void GraphicsBox::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     paintGraphicsBoxStyle(painter, title, boundingRect());
     paintLayout(painter);

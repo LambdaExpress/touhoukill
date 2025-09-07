@@ -26,12 +26,12 @@ GraphicsPixmapHoverItem::GraphicsPixmapHoverItem(PlayerCardContainer *playerCard
     }
 }
 
-void GraphicsPixmapHoverItem::hoverEnterEvent(QGraphicsSceneHoverEvent *)
+void GraphicsPixmapHoverItem::hoverEnterEvent(QGraphicsSceneHoverEvent * /*event*/)
 {
     emit hover_enter();
 }
 
-void GraphicsPixmapHoverItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *)
+void GraphicsPixmapHoverItem::hoverLeaveEvent(QGraphicsSceneHoverEvent * /*event*/)
 {
     emit hover_leave();
 }
@@ -94,7 +94,7 @@ static void qt_graphicsItem_highlightSelected(QGraphicsItem *item, QPainter *pai
     painter->drawRect(item->boundingRect().adjusted(pad, pad, -pad, -pad));
 }
 
-void GraphicsPixmapHoverItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
+void GraphicsPixmapHoverItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget * /*widget*/)
 {
     if (pixmap().isNull()) {
         return;
@@ -133,7 +133,7 @@ void GraphicsPixmapHoverItem::paint(QPainter *painter, const QStyleOptionGraphic
     painter->drawPixmap(0, 0, tempPix);
 }
 
-void GraphicsPixmapHoverItem::timerEvent(QTimerEvent *)
+void GraphicsPixmapHoverItem::timerEvent(QTimerEvent * /*event*/)
 {
     ++m_currentSkinChangingFrameIndex;
     if (m_currentSkinChangingFrameIndex >= m_skinChangingFrameCount) {

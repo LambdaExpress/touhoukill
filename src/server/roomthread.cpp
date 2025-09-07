@@ -175,7 +175,7 @@ void RoomThread::_handleTurnBroken3v3(QList<ServerPlayer *> &first, QList<Server
     }
 }
 
-ServerPlayer *RoomThread::findHulaoPassNext(ServerPlayer *, QList<ServerPlayer *>)
+ServerPlayer *RoomThread::findHulaoPassNext(ServerPlayer * /*unused*/, QList<ServerPlayer *> /*unused*/)
 {
     ServerPlayer *current = room->getCurrent();
     return qobject_cast<ServerPlayer *>(current->getNextAlive(1, false));

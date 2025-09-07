@@ -311,7 +311,7 @@ void Client::signup()
     }
 }
 
-void Client::networkDelayTest(const QVariant &)
+void Client::networkDelayTest(const QVariant & /*unused*/)
 {
     notifyServer(S_COMMAND_NETWORK_DELAY_TEST);
 }
@@ -1181,7 +1181,7 @@ void Client::askForSurrender(const QVariant &initiator)
     setStatus(AskForSkillInvoke);
 }
 
-void Client::askForLuckCard(const QVariant &)
+void Client::askForLuckCard(const QVariant & /*unused*/)
 {
     skill_to_invoke = "luck_card";
     prompt_doc->setHtml(tr("Do you want to use the luck card?"));
@@ -1389,7 +1389,7 @@ QTextDocument *Client::getPromptDoc() const
     return prompt_doc;
 }
 
-void Client::resetPiles(const QVariant &)
+void Client::resetPiles(const QVariant & /*unused*/)
 {
     discarded_list.clear();
     swap_pile++;
@@ -1684,7 +1684,7 @@ void Client::askForSuit(const QVariant &arg)
     setStatus(ExecDialog);
 }
 
-void Client::askForKingdom(const QVariant &)
+void Client::askForKingdom(const QVariant & /*unused*/)
 {
     QStringList kingdoms = Sanguosha->getKingdoms();
 
@@ -1755,7 +1755,7 @@ void Client::askForRole3v3(const QVariant &arg)
     setStatus(ExecDialog);
 }
 
-void Client::askForDirection(const QVariant &)
+void Client::askForDirection(const QVariant & /*unused*/)
 {
     emit directions_got();
     setStatus(ExecDialog);
@@ -1869,7 +1869,7 @@ void Client::takeAG(const QVariant &take_var)
     }
 }
 
-void Client::clearAG(const QVariant &)
+void Client::clearAG(const QVariant & /*unused*/)
 {
     emit ag_cleared();
 }
@@ -1991,7 +1991,7 @@ void Client::attachSkill(const QVariant &skill)
     emit skill_attached(skill_name, true);
 }
 
-void Client::askForAssign(const QVariant &)
+void Client::askForAssign(const QVariant & /*unused*/)
 {
     emit assign_asked();
 }
@@ -2238,7 +2238,7 @@ void Client::speak(const QVariant &speak)
     emit line_spoken(QString("<p style=\"margin:3px 2px;\">%1</p>").arg(line));
 }
 
-void Client::heartbeat(const QVariant &)
+void Client::heartbeat(const QVariant & /*unused*/)
 {
 }
 
@@ -2328,7 +2328,7 @@ void Client::fillGenerals(const QVariant &generals)
     emit generals_filled(filled);
 }
 
-void Client::askForGeneral3v3(const QVariant &)
+void Client::askForGeneral3v3(const QVariant & /*unused*/)
 {
     emit general_asked();
     setStatus(AskForGeneralTaken);

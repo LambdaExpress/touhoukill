@@ -35,7 +35,7 @@ public:
     {
         return m_numCardsVisible;
     }
-    inline void paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *) override
+    inline void paint(QPainter * /*painter*/, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/) override
     {
     }
     void adjustCards();
@@ -50,7 +50,7 @@ protected:
     void _fadeOutCardsLocked(const QList<CardItem *> &cards);
     static const int S_CLEARANCE_UPDATE_INTERVAL_MSEC = 1000;
     static const int S_CLEARANCE_DELAY_BUCKETS = 3;
-    void timerEvent(QTimerEvent *) override;
+    void timerEvent(QTimerEvent * /*event*/) override;
     bool _addCardItems(QList<CardItem *> &card_items, const CardsMoveStruct &moveInfo) override;
     void _markClearance(CardItem *item);
     QList<CardItem *> m_visibleCards;

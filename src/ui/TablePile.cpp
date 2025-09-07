@@ -5,7 +5,7 @@
 #include <QParallelAnimationGroup>
 #include <QTimer>
 
-QList<CardItem *> TablePile::removeCardItems(const QList<int> &card_ids, Player::Place)
+QList<CardItem *> TablePile::removeCardItems(const QList<int> &card_ids, Player::Place /*place*/)
 {
     QList<CardItem *> result;
     _m_mutex_pileCards.lock();
@@ -36,7 +36,7 @@ void TablePile::setSize(double width, double height)
     setTransform(QTransform::fromTranslate(-width / 2, -height / 2), true);
 }
 
-void TablePile::timerEvent(QTimerEvent *)
+void TablePile::timerEvent(QTimerEvent * /*event*/)
 {
     QList<CardItem *> oldCards;
     _m_mutex_pileCards.lock();

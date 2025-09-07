@@ -117,7 +117,7 @@ void Button::setFont(const QFont &font)
 
 #include "engine.h"
 
-void Button::hoverEnterEvent(QGraphicsSceneHoverEvent *)
+void Button::hoverEnterEvent(QGraphicsSceneHoverEvent * /*event*/)
 {
     setFocus(Qt::MouseFocusReason);
     if (!mute)
@@ -131,7 +131,7 @@ void Button::mousePressEvent(QGraphicsSceneMouseEvent *event)
     event->accept();
 }
 
-void Button::mouseReleaseEvent(QGraphicsSceneMouseEvent *)
+void Button::mouseReleaseEvent(QGraphicsSceneMouseEvent * /*event*/)
 {
     if (!mute)
         Sanguosha->playSystemAudioEffect("button-down");
@@ -143,7 +143,7 @@ QRectF Button::boundingRect() const
     return QRectF(QPointF(), size);
 }
 
-void Button::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void Button::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     QRectF rect = boundingRect();
 
@@ -151,7 +151,7 @@ void Button::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget 
     painter->fillRect(rect, QColor(255, 255, 255, glow * 10));
 }
 
-void Button::timerEvent(QTimerEvent *)
+void Button::timerEvent(QTimerEvent * /*event*/)
 {
     update();
     if (hasFocus()) {

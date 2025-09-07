@@ -760,7 +760,7 @@ void Dashboard::selectAll()
     adjustCards(true);
 }
 
-void Dashboard::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void Dashboard::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     painter->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
 }

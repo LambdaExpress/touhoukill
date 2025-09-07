@@ -222,7 +222,7 @@ public:
         frequency = Compulsory;
     }
 
-    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *, const QVariant &data) const override
+    QList<SkillInvokeDetail> triggerable(TriggerEvent /*triggerEvent*/, const Room * /*room*/, const QVariant &data) const override
     {
         DamageStruct damage = data.value<DamageStruct>();
         if (!EquipSkill::equipAvailable(damage.from, EquipCard::WeaponLocation, objectName(), damage.to))
@@ -237,7 +237,7 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
     {
         ServerPlayer *target = invoke->targets.first();
         QList<int> ids;
@@ -272,7 +272,7 @@ public:
         events << SlashMissed;
     }
 
-    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *, const QVariant &data) const override
+    QList<SkillInvokeDetail> triggerable(TriggerEvent /*triggerEvent*/, const Room * /*room*/, const QVariant &data) const override
     {
         SlashEffectStruct effect = data.value<SlashEffectStruct>();
         if (!EquipSkill::equipAvailable(effect.from, EquipCard::WeaponLocation, objectName()))
@@ -282,7 +282,7 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail>, QVariant &data) const override
+    bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> /*invoke*/, QVariant &data) const override
     {
         SlashEffectStruct effect = data.value<SlashEffectStruct>();
         int damage_value = 1 + effect.drank + effect.effectValue.last();
@@ -470,7 +470,7 @@ public:
         }
     }
 
-    QList<SkillInvokeDetail> triggerable(TriggerEvent e, const Room *, const QVariant &data) const override
+    QList<SkillInvokeDetail> triggerable(TriggerEvent e, const Room * /*room*/, const QVariant &data) const override
     {
         if (e != Cancel)
             return QList<SkillInvokeDetail>();
@@ -485,7 +485,7 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail>, QVariant &data) const override
+    bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> /*invoke*/, QVariant &data) const override
     {
         CardEffectStruct effect = data.value<CardEffectStruct>();
         effect.canceled = true;
@@ -521,7 +521,7 @@ public:
         frequency = Compulsory;
     }
 
-    QList<SkillInvokeDetail> triggerable(TriggerEvent triggerEvent, const Room *, const QVariant &data) const override
+    QList<SkillInvokeDetail> triggerable(TriggerEvent triggerEvent, const Room * /*room*/, const QVariant &data) const override
     {
         if (triggerEvent == DamageInflicted) {
             DamageStruct damage = data.value<DamageStruct>();
@@ -579,7 +579,7 @@ public:
         frequency = Compulsory;
     }
 
-    QList<SkillInvokeDetail> triggerable(TriggerEvent, const Room *room, const QVariant &data) const override
+    QList<SkillInvokeDetail> triggerable(TriggerEvent /*triggerEvent*/, const Room *room, const QVariant &data) const override
     {
         ServerPlayer *current = room->getCurrent();
         if ((current == nullptr) || current->isDead() || current->isChained())
@@ -601,7 +601,7 @@ public:
         return QList<SkillInvokeDetail>();
     }
 
-    bool effect(TriggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &) const override
+    bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
     {
         room->setEmotion(invoke->invoker, "armor/hagoromo");
         int id = invoke->invoker->getArmor()->getEffectiveId();
@@ -626,7 +626,7 @@ AwaitExhausted::AwaitExhausted(Card::Suit suit, int number)
     setObjectName("await_exhausted");
 }
 
-bool AwaitExhausted::targetFilter(const QList<const Player *> &targets, const Player *, const Player *Self) const
+bool AwaitExhausted::targetFilter(const QList<const Player *> &targets, const Player * /*to_select*/, const Player *Self) const
 {
     int total_num = 2 + Sanguosha->correctCardTarget(TargetModSkill::ExtraTarget, Self, this);
     return targets.length() < total_num && !Self->isCardLimited(this, Card::MethodUse);

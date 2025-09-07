@@ -648,7 +648,7 @@ bool Card::targetFilter(const QList<const Player *> &targets, const Player *to_s
     return canSelect;
 }
 
-void Card::doPreAction(Room *, const CardUseStruct &) const
+void Card::doPreAction(Room * /*unused*/, const CardUseStruct & /*unused*/) const
 {
 }
 
@@ -758,11 +758,11 @@ void Card::use(Room *room, const CardUseStruct &card_use) const
     }
 }
 
-void Card::onEffect(const CardEffectStruct &) const
+void Card::onEffect(const CardEffectStruct & /*unused*/) const
 {
 }
 
-bool Card::isCancelable(const CardEffectStruct &) const
+bool Card::isCancelable(const CardEffectStruct & /*unused*/) const
 {
     return false;
 }
@@ -805,17 +805,17 @@ bool Card::isAvailable(const Player *player) const
     return !player->isCardLimited(this, handling_method) || (can_recast && !player->isCardLimited(this, Card::MethodRecast));
 }
 
-bool Card::ignoreCardValidty(const Player *) const
+bool Card::ignoreCardValidty(const Player * /*unused*/) const
 {
     return false;
 }
 
-const Card *Card::validate(CardUseStruct &) const
+const Card *Card::validate(CardUseStruct & /*unused*/) const
 {
     return this;
 }
 
-const Card *Card::validateInResponse(ServerPlayer *) const
+const Card *Card::validateInResponse(ServerPlayer * /*unused*/) const
 {
     return this;
 }
@@ -998,7 +998,7 @@ void SkillCard::onUse(Room *room, const CardUseStruct &_use) const
     use(room, card_use);
 }
 
-void SkillCard::use(Room *, const CardUseStruct &card_use) const
+void SkillCard::use(Room * /*room*/, const CardUseStruct &card_use) const
 {
     ServerPlayer *source = card_use.from;
     const QList<ServerPlayer *> &targets = card_use.to;
@@ -1041,7 +1041,7 @@ QString DummyCard::getSubtype() const
     return "dummy_card";
 }
 
-QString DummyCard::toString(bool) const
+QString DummyCard::toString(bool /*hidden*/) const
 {
     return "$" + subcardString();
 }

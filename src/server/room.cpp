@@ -838,7 +838,7 @@ ServerPlayer *Room::doBroadcastRaceRequest(QList<ServerPlayer *> &players, QSanP
     return winner;
 }
 
-ServerPlayer *Room::getRaceResult(QList<ServerPlayer *> &players, QSanProtocol::CommandType, time_t timeOut, ResponseVerifyFunction validateFunc, void *funcArg)
+ServerPlayer *Room::getRaceResult(QList<ServerPlayer *> &players, QSanProtocol::CommandType /*unused*/, time_t timeOut, ResponseVerifyFunction validateFunc, void *funcArg)
 {
     QTime timer;
     timer.start();
@@ -1258,7 +1258,7 @@ bool Room::isCanceled(const CardEffectStruct &effect)
     return result;
 }
 
-bool Room::verifyNullificationResponse(ServerPlayer *player, const QVariant &response, void *)
+bool Room::verifyNullificationResponse(ServerPlayer *player, const QVariant &response, void * /*unused*/)
 {
     const Card *card = nullptr;
     if (player != nullptr && response.canConvert<JsonArray>()) {
@@ -2910,7 +2910,7 @@ void Room::reportDisconnection()
     }
 }
 
-void Room::trustCommand(ServerPlayer *player, const QVariant &)
+void Room::trustCommand(ServerPlayer *player, const QVariant & /*unused*/)
 {
     player->acquireLock(ServerPlayer::SEMA_MUTEX);
     if (player->isOnline()) {
@@ -3102,7 +3102,7 @@ void Room::processClientPacket(const QString &request)
     }
 }
 
-void Room::addRobotCommand(ServerPlayer *player, const QVariant &)
+void Room::addRobotCommand(ServerPlayer *player, const QVariant & /*unused*/)
 {
     if ((player != nullptr) && !player->isOwner())
         return;
@@ -3143,7 +3143,7 @@ void Room::addRobotCommand(ServerPlayer *player, const QVariant &)
     broadcastProperty(robot, "state");
 }
 
-void Room::fillRobotsCommand(ServerPlayer *player, const QVariant &)
+void Room::fillRobotsCommand(ServerPlayer *player, const QVariant & /*unused*/)
 {
     if (Config.LimitRobot && (m_players.length() <= player_count / 2 || player_count <= 4)) {
         speakCommand(nullptr,
@@ -3168,7 +3168,7 @@ ServerPlayer *Room::getOwner() const
     return nullptr;
 }
 
-void Room::toggleReadyCommand(ServerPlayer *, const QVariant &)
+void Room::toggleReadyCommand(ServerPlayer * /*unused*/, const QVariant & /*unused*/)
 {
     if (!game_started2 && isFull()) {
         game_started2 = true;
@@ -6074,7 +6074,7 @@ QList<int> Room::getCardIdsOnTable(const QList<int> &card_ids) const
     return r;
 }
 
-ServerPlayer *Room::getLord(const QString &, bool) const
+ServerPlayer *Room::getLord(const QString & /*unused*/, bool /*unused*/) const
 {
     if (isHegemonyGameMode(mode))
         return nullptr;
@@ -6876,8 +6876,8 @@ void Room::retrial(const Card *card, ServerPlayer *player, JudgeStruct *judge, c
     }
 }
 
-int Room::askForRende(ServerPlayer *liubei, QList<int> &cards, const QString &skill_name, bool, bool optional, int max_num, QList<ServerPlayer *> players, CardMoveReason reason,
-                      const QString &prompt, bool notify_skill)
+int Room::askForRende(ServerPlayer *liubei, QList<int> &cards, const QString &skill_name, bool /*unused*/, bool optional, int max_num, QList<ServerPlayer *> players,
+                      CardMoveReason reason, const QString &prompt, bool notify_skill)
 {
     if (max_num == -1)
         max_num = cards.length();
@@ -7156,7 +7156,7 @@ QString Room::askForRole(ServerPlayer *player, const QStringList &roles, const Q
     return result;
 }
 
-void Room::networkDelayTestCommand(ServerPlayer *player, const QVariant &)
+void Room::networkDelayTestCommand(ServerPlayer *player, const QVariant & /*unused*/)
 {
     qint64 delay = player->endNetworkDelayTest();
     QString reportStr = tr("<font color=#EEB422>The network delay of player <b>%1</b> is %2 milliseconds.</font>").arg(player->screenName(), QString::number(delay));
@@ -7210,7 +7210,7 @@ void Room::skinChangeCommand(ServerPlayer *player, const QVariant &packet)
     doBroadcastNotify(QSanProtocol::S_COMMAND_LOG_EVENT, val);
 }
 
-void Room::heartbeatCommand(ServerPlayer *player, const QVariant &)
+void Room::heartbeatCommand(ServerPlayer *player, const QVariant & /*unused*/)
 {
     doNotify(player, QSanProtocol::S_COMMAND_HEARTBEAT, QVariant());
 }

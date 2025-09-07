@@ -49,7 +49,7 @@ void HegemonyRoleComboBox::mousePressEvent(QGraphicsSceneMouseEvent *event)
     update();
 }
 
-void HegemonyRoleComboBox::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void HegemonyRoleComboBox::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     /*
       --------------------

@@ -51,7 +51,7 @@ QRectF QSanButton::boundingRect() const
     return QRectF(0, 0, _m_size.width(), _m_size.height());
 }
 
-void QSanButton::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void QSanButton::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     painter->drawPixmap(0, 0, _m_bgPixmap[(int)_m_state]);
 }
@@ -125,7 +125,7 @@ void QSanButton::hoverEnterEvent(QGraphicsSceneHoverEvent *event)
         setState(S_STATE_HOVER);
 }
 
-void QSanButton::hoverLeaveEvent(QGraphicsSceneHoverEvent *)
+void QSanButton::hoverLeaveEvent(QGraphicsSceneHoverEvent * /*event*/)
 {
     if (_m_state == S_STATE_DISABLED || _m_state == S_STATE_CANPRESHOW)
         return;
@@ -389,7 +389,7 @@ void QSanInvokeSkillButton::_repaint()
     setSize(_m_bgPixmap[0].size());
 }
 
-void QSanInvokeSkillButton::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void QSanInvokeSkillButton::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     painter->drawPixmap(0, 0, _m_bgPixmap[(int)_m_state]);
     if (_m_skillType == S_SKILL_ATTACHEDLORD) {

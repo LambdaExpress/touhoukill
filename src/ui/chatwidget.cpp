@@ -88,7 +88,7 @@ QRectF MyPixmapItem::boundingRect() const
     return QRectF(QPointF(0, 0), QSizeF(sizex, sizey));
 }
 
-void MyPixmapItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void MyPixmapItem::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     painter->drawPixmap(boundingRect().toRect(), pixmap());
 }
@@ -187,7 +187,7 @@ QRectF ChatWidget::boundingRect() const
     return QRectF(-1, 0, 24 * 3 + 2, 24);
 }
 
-void ChatWidget::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void ChatWidget::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     painter->drawPixmap(base->pos(), base_pixmap);
 }

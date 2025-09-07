@@ -61,7 +61,7 @@ void GeneralCardItem::changeGeneral(const QString &generalName)
     setOuterGlowColor(Sanguosha->getKingdomColor(general->getKingdom()));
 }
 
-void GeneralCardItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void GeneralCardItem::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     painter->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
 
@@ -285,7 +285,7 @@ static bool sortByKingdom(const QString &gen1, const QString &gen2)
         return false;
 }
 
-void ChooseGeneralBox::chooseGeneral(const QStringList &_generals, bool view_only, bool single_result, const QString &reason, const Player *, const bool)
+void ChooseGeneralBox::chooseGeneral(const QStringList &_generals, bool view_only, bool single_result, const QString &reason, const Player * /*unused*/, const bool /*unused*/)
 {
     //repaint background
     QStringList generals = _generals;

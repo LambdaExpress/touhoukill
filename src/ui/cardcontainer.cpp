@@ -24,7 +24,7 @@ CardContainer::CardContainer()
     connect(close_button, SIGNAL(clicked()), this, SLOT(clear()));
 }
 
-void CardContainer::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void CardContainer::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     painter->drawPixmap(0, 0, _m_background);
 }
@@ -171,7 +171,7 @@ void CardContainer::fillGeneralCards(const QList<CardItem *> &card_item, const Q
     //confirm_button->setPos(boundingRect().center().x() - confirm_button->boundingRect().width() / 2, boundingRect().height() - 40);
 }
 
-bool CardContainer::_addCardItems(QList<CardItem *> &, const CardsMoveStruct &)
+bool CardContainer::_addCardItems(QList<CardItem *> & /*card_items*/, const CardsMoveStruct & /*moveInfo*/)
 {
     return true;
 }
@@ -208,7 +208,7 @@ void CardContainer::freezeCards(bool is_frozen)
         item->setFrozen(is_frozen);
 }
 
-QList<CardItem *> CardContainer::removeCardItems(const QList<int> &card_ids, Player::Place)
+QList<CardItem *> CardContainer::removeCardItems(const QList<int> &card_ids, Player::Place /*place*/)
 {
     QList<CardItem *> result;
     foreach (int card_id, card_ids) {
@@ -313,7 +313,7 @@ void SanCloseButton::mousePressEvent(QGraphicsSceneMouseEvent *event)
     event->accept();
 }
 
-void SanCloseButton::mouseReleaseEvent(QGraphicsSceneMouseEvent *)
+void SanCloseButton::mouseReleaseEvent(QGraphicsSceneMouseEvent * /*event*/)
 {
     emit clicked();
 }

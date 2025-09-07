@@ -642,7 +642,7 @@ void GeneralOverview::askTransfiguration()
     }
 }
 
-void GeneralOverview::on_tableWidget_itemDoubleClicked(QTableWidgetItem *)
+void GeneralOverview::on_tableWidget_itemDoubleClicked(QTableWidgetItem * /*unused*/)
 {
     if (ServerInfo.EnableCheat && (Self != nullptr)) {
         askTransfiguration();

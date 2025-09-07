@@ -156,7 +156,7 @@ QList<ServerPlayer *> AI::getFriends() const
     return friends;
 }
 
-void AI::filterEvent(TriggerEvent, const QVariant &)
+void AI::filterEvent(TriggerEvent /*unused*/, const QVariant & /*unused*/)
 {
     // dummy
 }
@@ -215,7 +215,7 @@ bool TrustAI::useCard(const Card *card)
     return false;
 }
 
-Card::Suit TrustAI::askForSuit(const QString &)
+Card::Suit TrustAI::askForSuit(const QString & /*reason*/)
 {
     return Card::AllSuits[qrand() % 4];
 }
@@ -272,20 +272,20 @@ QString TrustAI::askForKingdom()
         return "wai";
 }
 
-bool TrustAI::askForSkillInvoke(const QString &skill_name, const QVariant &)
+bool TrustAI::askForSkillInvoke(const QString &skill_name, const QVariant & /*data*/)
 {
     const TriggerSkill *skill = Sanguosha->getTriggerSkill(skill_name);
     return skill != nullptr && skill->getFrequency() == Skill::Frequent;
     //    return false;
 }
 
-QString TrustAI::askForChoice(const QString &, const QString &choice, const QVariant &)
+QString TrustAI::askForChoice(const QString & /*skill_name*/, const QString &choice, const QVariant & /*data*/)
 {
     QStringList choices = choice.split("+");
     return choices.at(qrand() % choices.length());
 }
 
-QList<int> TrustAI::askForDiscard(const QString &, int discard_num, int, bool optional, bool include_equip)
+QList<int> TrustAI::askForDiscard(const QString & /*reason*/, int discard_num, int /*min_num*/, bool optional, bool include_equip)
 {
     QList<int> to_discard;
     if (optional)
@@ -294,12 +294,12 @@ QList<int> TrustAI::askForDiscard(const QString &, int discard_num, int, bool op
         return self->forceToDiscard(discard_num, include_equip, self->hasFlag("Global_AIDiscardExchanging"));
 }
 
-const Card *TrustAI::askForNullification(const Card *, ServerPlayer *, ServerPlayer *, bool)
+const Card *TrustAI::askForNullification(const Card * /*trick*/, ServerPlayer * /*from*/, ServerPlayer * /*to*/, bool /*positive*/)
 {
     return nullptr;
 }
 
-int TrustAI::askForCardChosen(ServerPlayer *, const QString &, const QString &, Card::HandlingMethod)
+int TrustAI::askForCardChosen(ServerPlayer * /*who*/, const QString & /*flags*/, const QString & /*reason*/, Card::HandlingMethod /*method*/)
 {
     return -1;
 }
@@ -318,12 +318,12 @@ const Card *TrustAI::askForCard(const QString &pattern, const QString &prompt, c
     return nullptr;
 }
 
-QString TrustAI::askForUseCard(const QString &, const QString &, const Card::HandlingMethod)
+QString TrustAI::askForUseCard(const QString & /*pattern*/, const QString & /*prompt*/, const Card::HandlingMethod /*method*/)
 {
     return ".";
 }
 
-int TrustAI::askForAG(const QList<int> &card_ids, bool refusable, const QString &)
+int TrustAI::askForAG(const QList<int> &card_ids, bool refusable, const QString & /*reason*/)
 {
     if (refusable)
         return -1;
@@ -332,12 +332,12 @@ int TrustAI::askForAG(const QList<int> &card_ids, bool refusable, const QString 
     return card_ids.at(r);
 }
 
-const Card *TrustAI::askForCardShow(ServerPlayer *, const QString &)
+const Card *TrustAI::askForCardShow(ServerPlayer * /*requester*/, const QString & /*reason*/)
 {
     return self->getRandomHandCard();
 }
 
-const Card *TrustAI::askForPindian(ServerPlayer *requester, const QString &)
+const Card *TrustAI::askForPindian(ServerPlayer *requester, const QString & /*reason*/)
 {
     QList<const Card *> cards = self->getHandcards();
     std::sort(cards.begin(), cards.end(), Card::CompareByNumber);
@@ -374,7 +374,7 @@ const Card *TrustAI::askForSinglePeach(ServerPlayer *dying)
     return nullptr;
 }
 
-ServerPlayer *TrustAI::askForYiji(const QList<int> &, const QString &, int &)
+ServerPlayer *TrustAI::askForYiji(const QList<int> & /*cards*/, const QString & /*reason*/, int & /*card_id*/)
 {
     return nullptr;
 }

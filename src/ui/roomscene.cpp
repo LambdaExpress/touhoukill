@@ -809,7 +809,7 @@ QRectF ReplayerControlBar::boundingRect() const
     return QRectF(0, 0, S_BUTTON_WIDTH * 4 + S_BUTTON_GAP * 3, S_BUTTON_HEIGHT);
 }
 
-void ReplayerControlBar::paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *)
+void ReplayerControlBar::paint(QPainter * /*painter*/, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
 }
 
@@ -894,7 +894,7 @@ QRectF TimeLabel::boundingRect() const
     return QRectF(0, 0, time_label->width(), time_label->height());
 }
 
-void TimeLabel::paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *)
+void TimeLabel::paint(QPainter * /*painter*/, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
 }
 
@@ -3243,7 +3243,7 @@ void RoomScene::changeHp(const QString &who, int delta, DamageStruct::Nature nat
     }
 }
 
-void RoomScene::changeMaxHp(const QString &, int delta)
+void RoomScene::changeMaxHp(const QString & /*unused*/, int delta)
 {
     if (delta < 0)
         Sanguosha->playSystemAudioEffect("maxhplost");
@@ -4342,7 +4342,7 @@ void RoomScene::doAppearingAnimation(const QString &name, const QStringList &arg
     connect(disappear, SIGNAL(finished()), item, SLOT(deleteLater()));
 }
 
-void RoomScene::doLightboxAnimation(const QString &, const QStringList &args)
+void RoomScene::doLightboxAnimation(const QString & /*unused*/, const QStringList &args)
 {
     QString word = args.first();
     bool reset_size = word.startsWith("_mini_");
@@ -4423,7 +4423,7 @@ void RoomScene::doLightboxAnimation(const QString &, const QStringList &args)
     }
 }
 
-void RoomScene::doHuashen(const QString &, const QStringList &args)
+void RoomScene::doHuashen(const QString & /*unused*/, const QStringList &args)
 {
     Q_ASSERT(args.length() >= 2);
 
@@ -4485,12 +4485,12 @@ void RoomScene::showIndicator(const QString &from, const QString &to)
     indicator->doAnimation();
 }
 
-void RoomScene::doIndicate(const QString &, const QStringList &args)
+void RoomScene::doIndicate(const QString & /*unused*/, const QStringList &args)
 {
     showIndicator(args.first(), args.last());
 }
 
-void RoomScene::doBattleArray(const QString &, const QStringList &args)
+void RoomScene::doBattleArray(const QString & /*unused*/, const QStringList &args)
 {
     QStringList names = args.last().split("+");
     if (names.contains(Self->objectName()))

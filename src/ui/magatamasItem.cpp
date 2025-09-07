@@ -171,7 +171,7 @@ void MagatamasBoxItem::_doHpChangeAnimation(int newHp)
     }
 }
 
-void MagatamasBoxItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void MagatamasBoxItem::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     if (m_maxHp <= 0)
         return;

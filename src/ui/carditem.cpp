@@ -234,7 +234,7 @@ bool CardItem::isEquipped() const
     return Self->hasEquip(card);
 }
 
-void CardItem::setFrozen(bool is_frozen, bool)
+void CardItem::setFrozen(bool is_frozen, bool /*unused*/)
 {
     frozen = is_frozen;
     /*if (frozen != is_frozen) {
@@ -311,19 +311,19 @@ void CardItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
         emit toggle_discards();
 }
 
-void CardItem::hoverEnterEvent(QGraphicsSceneHoverEvent *)
+void CardItem::hoverEnterEvent(QGraphicsSceneHoverEvent * /*event*/)
 {
     emit enter_hover();
     emit hoverChanged(true); //hegemony
 }
 
-void CardItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *)
+void CardItem::hoverLeaveEvent(QGraphicsSceneHoverEvent * /*event*/)
 {
     emit leave_hover();
     emit hoverChanged(false); //hegemony
 }
 
-void CardItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void CardItem::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     //check painter?
     if (nullptr == painter) {

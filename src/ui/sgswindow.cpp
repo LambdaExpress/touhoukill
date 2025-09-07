@@ -109,7 +109,7 @@ QRectF Window::boundingRect() const
     return QRectF(QPointF(), size);
 }
 
-void Window::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void Window::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     QRectF window_rect = boundingRect();
 
