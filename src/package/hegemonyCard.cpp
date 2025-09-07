@@ -363,10 +363,10 @@ public:
     {
         CardUseStruct use = data.value<CardUseStruct>();
         if (use.from == nullptr || !EquipSkill::equipAvailable(use.from, EquipCard::WeaponLocation, objectName()))
-            return QList<SkillInvokeDetail>();
+            return {};
 
         if (!isHegemonyGameMode(room->getMode()))
-            return QList<SkillInvokeDetail>();
+            return {};
 
         if (use.card != nullptr && use.card->isKindOf("Slash")) {
             QList<SkillInvokeDetail> d;
@@ -381,7 +381,7 @@ public:
             return d;
         }
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override

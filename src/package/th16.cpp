@@ -271,7 +271,7 @@ public:
             }
         }
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
@@ -304,7 +304,7 @@ public:
         CardUseStruct use = data.value<CardUseStruct>();
         if (use.card->getTypeId() == Card::TypeBasic || use.card->isNDTrick()) {
             if (use.card->isKindOf("Jink") || use.card->isKindOf("Nullification"))
-                return QList<SkillInvokeDetail>();
+                return {};
             ServerPlayer *player = use.from;
             if (use.from != nullptr && player->isAlive() && player->hasSkill(this)) {
                 ServerPlayer *target = nullptr;
@@ -335,7 +335,7 @@ public:
                 }
             }
         }
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
@@ -455,7 +455,7 @@ public:
     {
         CardUseStruct use = data.value<CardUseStruct>();
         if (!use.card->isKindOf("KnownBoth") || !use.from || !use.from->hasSkill(this) || use.from->isDead())
-            return QList<SkillInvokeDetail>();
+            return {};
 
         QList<SkillInvokeDetail> d;
         foreach (ServerPlayer *p, use.to) {
@@ -758,11 +758,11 @@ public:
         if (e == EventPhaseStart) {
             ServerPlayer *player = data.value<ServerPlayer *>();
             if (!player->hasSkill(this) || player->isDead() || player->getPhase() != Player::Play)
-                return QList<SkillInvokeDetail>();
+                return {};
             return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, player, player);
         }
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
@@ -816,7 +816,7 @@ public:
     {
         CardUseStruct use = data.value<CardUseStruct>();
         if (!use.card->isNDTrick() || use.card->isKindOf("Nullification"))
-            return QList<SkillInvokeDetail>();
+            return {};
 
         QList<const Player *> ps;
         foreach (ServerPlayer *p, use.to)
@@ -834,7 +834,7 @@ public:
         use.card->setFlags("-xunshi");
         use.card->setFlags("-IgnoreFailed");
         if (!invoke)
-            return QList<SkillInvokeDetail>();
+            return {};
 
         QList<SkillInvokeDetail> d;
         QList<ServerPlayer *> invokers = room->findPlayersBySkillName(objectName());
@@ -1162,7 +1162,7 @@ public:
                 return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, effect.from, effect.from, effect.to, true, nullptr, false);
         }
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override

@@ -39,7 +39,7 @@ QVariant AvatarModel::data(const QModelIndex &index, int role) const
 {
     int row = index.row();
     if (row < 0 || row >= list.length())
-        return QVariant();
+        return {};
 
     const General *general = list.at(row);
 
@@ -54,7 +54,7 @@ QVariant AvatarModel::data(const QModelIndex &index, int role) const
     }
     }
 
-    return QVariant();
+    return {};
 }
 
 void ConnectionDialog::hideAvatarList()

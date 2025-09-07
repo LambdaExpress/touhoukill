@@ -231,7 +231,7 @@ QString QSanRoomSkin::getButtonPixmapPath(const QString &groupName, const QStrin
     QByteArray arr = qkey.toLatin1();
     key = arr.constData();
     if (!isImageKeyDefined(key))
-        return QString();
+        return {};
     QString path = _m_imageConfig[key].toString();
     QString stateKey;
     if (state == QSanButton::S_STATE_DISABLED)
@@ -245,7 +245,7 @@ QString QSanRoomSkin::getButtonPixmapPath(const QString &groupName, const QStrin
     else if (state == QSanButton::S_STATE_CANPRESHOW)
         stateKey = "disabled"; //use codes to make button lighter than other states
     else
-        return QString();
+        return {};
     return path.arg(buttonName).arg(stateKey);
 }
 
@@ -253,7 +253,7 @@ QPixmap QSanRoomSkin::getSkillButtonPixmap(QSanButton::ButtonState state, QSanIn
 {
     QString path = getButtonPixmapPath(S_SKIN_KEY_BUTTON_SKILL, QSanInvokeSkillButton::getSkillTypeString(type), state);
     if (path.isNull())
-        return QPixmap(1, 1); // older Qt version cries for non-zero QPixmap...
+        return {1, 1}; // older Qt version cries for non-zero QPixmap...
     else {
         QString arg2;
         if (width == QSanInvokeSkillButton::S_WIDTH_NARROW)
@@ -270,7 +270,7 @@ QPixmap QSanRoomSkin::getButtonPixmap(const QString &groupName, const QString &b
 {
     QString path = getButtonPixmapPath(groupName, buttonName, state);
     if (path.isNull())
-        return QPixmap(1, 1); // older Qt version cries for non-zero QPixmap...
+        return {1, 1}; // older Qt version cries for non-zero QPixmap...
     else
         return getPixmapFromFileName(path);
 }
@@ -284,7 +284,7 @@ QPixmap QSanRoomSkin::getProgressBarPixmap(int percentile) const
 {
     QVariant allMaps_var = _m_imageConfig[S_SKIN_KEY_PROGRESS_BAR_IMAGE];
     if (!allMaps_var.canConvert<JsonArray>())
-        return QPixmap(1, 1);
+        return {1, 1};
 
     JsonArray allMaps = allMaps_var.value<JsonArray>();
 
@@ -298,7 +298,7 @@ QPixmap QSanRoomSkin::getProgressBarPixmap(int percentile) const
             return getPixmapFromFileName(allMaps[i].value<JsonArray>()[1].toString(), true);
         }
     }
-    return QPixmap(1, 1);
+    return {1, 1};
 }
 
 QPixmap QSanRoomSkin::getCardMainPixmap(const QString &cardName, bool cache, bool heroSkin) const
@@ -575,7 +575,7 @@ QStringList IQSanComponentSkin::getAudioFileNames(const QString &key) const
 {
     const QVariant &result = _m_audioConfig[key];
     if (result.isNull())
-        return QStringList();
+        return {};
     else if (JsonUtils::isString(result))
         return QStringList(result.toString());
     else if (result.canConvert<JsonArray>()) {
@@ -583,7 +583,7 @@ QStringList IQSanComponentSkin::getAudioFileNames(const QString &key) const
         tryParse(result, audios);
         return audios;
     }
-    return QStringList();
+    return {};
 }
 
 QStringList IQSanComponentSkin::getAnimationFileNames() const
@@ -599,7 +599,7 @@ QString IQSanComponentSkin::getRandomAudioFileName(const QString &key) const
 {
     QStringList audios = getAudioFileNames(key);
     if (audios.isEmpty())
-        return QString();
+        return {};
     int r = qrand() % audios.length();
     return audios[r];
 }
@@ -739,7 +739,7 @@ QPixmap IQSanComponentSkin::getPixmapFileName(const QString &key) const
 QPixmap IQSanComponentSkin::getPixmapFromFileName(const QString &fileName, bool cache) const
 {
     if (fileName == "deprecated" || fileName.isEmpty()) {
-        return QPixmap(1, 1);
+        return {1, 1};
     } else {
         QPixmap pixmap;
         bool success = true;
@@ -754,7 +754,7 @@ QPixmap IQSanComponentSkin::getPixmapFromFileName(const QString &fileName, bool 
             }
         }
         if (!success)
-            return QPixmap(1, 1); // make Qt happy
+            return {1, 1}; // make Qt happy
         else
             return pixmap;
     }

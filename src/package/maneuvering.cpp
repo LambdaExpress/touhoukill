@@ -131,12 +131,12 @@ public:
     {
         CardUseStruct use = data.value<CardUseStruct>();
         if (!EquipSkill::equipAvailable(use.from, EquipCard::WeaponLocation, objectName()))
-            return QList<SkillInvokeDetail>();
+            return {};
         if (use.card->isKindOf("Slash") && use.from->isAlive()) {
             if (use.card->isKindOf("FireSlash") || !use.card->isKindOf("NatureSlash"))
                 return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, use.from, use.from);
         }
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent /*triggerEvent*/, Room * /*room*/, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
@@ -203,12 +203,12 @@ public:
     {
         DamageStruct damage = data.value<DamageStruct>();
         if (!EquipSkill::equipAvailable(damage.from, EquipCard::WeaponLocation, objectName(), damage.to))
-            return QList<SkillInvokeDetail>();
+            return {};
 
         if ((damage.card != nullptr) && damage.card->isKindOf("Slash") && damage.to->isKongcheng() && damage.by_user && !damage.chain && !damage.transfer)
             return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, damage.from, damage.from, nullptr, true, damage.to);
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
@@ -251,7 +251,7 @@ public:
         if (triggerEvent == SlashEffected) {
             SlashEffectStruct effect = data.value<SlashEffectStruct>();
             if (!EquipSkill::equipAvailable(effect.to, EquipCard::ArmorLocation, objectName()))
-                return QList<SkillInvokeDetail>();
+                return {};
             if (effect.slash->isKindOf("NatureSlash"))
                 return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, effect.to, effect.to, nullptr, true);
         } else if (triggerEvent == CardEffected) {
@@ -261,7 +261,7 @@ public:
                 return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, effect.to, effect.to, nullptr, true);
         }
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
@@ -319,7 +319,7 @@ public:
                 return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, damage.to, damage.to, nullptr, true);
         }
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent /*triggerEvent*/, Room * /*room*/, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
@@ -404,7 +404,7 @@ public:
             CardsMoveOneTimeStruct move = data.value<CardsMoveOneTimeStruct>();
 
             if (!move.from_places.contains(Player::PlaceEquip))
-                return QList<SkillInvokeDetail>();
+                return {};
             for (int i = 0; i < move.card_ids.size(); i++) {
                 if (move.from_places[i] != Player::PlaceEquip)
                     continue;
@@ -416,16 +416,16 @@ public:
                     if (!move.from->isWounded() || !move.from->tag["Qinggang"].toStringList().isEmpty() || move.from->getMark("Armor_Nullified") > 0
                         || move.from->getMark("Equips_Nullified_to_Yourself") > 0) {
                         move.from->setFlags("-SilverLionRecover");
-                        return QList<SkillInvokeDetail>();
+                        return {};
                     }
                     ServerPlayer *invoker = qobject_cast<ServerPlayer *>(move.from);
                     if (invoker == nullptr || invoker->isDead())
-                        return QList<SkillInvokeDetail>();
+                        return {};
                     return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, nullptr, invoker, nullptr, true);
                 }
             }
         }
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent triggerEvent, Room * /*room*/, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override

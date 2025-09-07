@@ -116,7 +116,7 @@ void PlayerCardBox::chooseCard(const QString &reason, const ClientPlayer *player
             }
             int hidden = player->getHandcardNum() - handcards.length();
             for (int i = 0; i < hidden; ++i)
-                handcards << NULL;
+                handcards << nullptr;
         } else
             handcards = player->getHandcards();
 
@@ -151,10 +151,10 @@ void PlayerCardBox::chooseCard(const QString &reason, const ClientPlayer *player
 QRectF PlayerCardBox::boundingRect() const
 {
     if (player == nullptr)
-        return QRectF();
+        return {};
 
     if (rowCount == 0)
-        return QRectF();
+        return {};
 
     const int cardWidth = G_COMMON_LAYOUT.m_cardNormalWidth;
     const int cardHeight = G_COMMON_LAYOUT.m_cardNormalHeight;

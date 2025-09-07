@@ -543,7 +543,7 @@ QString Player::getGeneralName() const
     if (general != nullptr)
         return general->objectName();
     else
-        return QString();
+        return {};
 }
 
 void Player::setGeneral2Name(const QString &general_name)
@@ -561,7 +561,7 @@ QString Player::getGeneral2Name() const
     if (general2 != nullptr)
         return general2->objectName();
     else
-        return QString();
+        return {};
 }
 
 const General *Player::getGeneral2() const
@@ -1425,7 +1425,7 @@ QString Player::getPileName(int card_id) const
             return pile_name;
     }
 
-    return QString();
+    return {};
 }
 
 bool Player::pileOpen(const QString &pile_name, const QString &player) const

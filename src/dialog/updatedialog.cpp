@@ -246,7 +246,7 @@ QVersionNumber UpdateDialog::getVersionNumberForItem(UpdateDialog::UpdateItem it
 
         QString s = v.toString();
         if (s == "N/A")
-            return QVersionNumber();
+            return {};
         else if (s.length() != 0)
             return QVersionNumber::fromString(s);
 
@@ -257,7 +257,7 @@ QVersionNumber UpdateDialog::getVersionNumberForItem(UpdateDialog::UpdateItem it
 
         QString s = v.toString();
         if (s == "N/A")
-            return QVersionNumber();
+            return {};
         else if (s.length() != 0)
             return QVersionNumber::fromString(s);
 
@@ -267,7 +267,7 @@ QVersionNumber UpdateDialog::getVersionNumberForItem(UpdateDialog::UpdateItem it
         break;
     }
 
-    return QVersionNumber();
+    return {};
 }
 
 void UpdateDialog::updateClicked()

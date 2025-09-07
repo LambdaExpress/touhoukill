@@ -425,7 +425,7 @@ void PlayerCardContainer::updatePile(const QString &pile_name)
     if (pile.size() == 0) {
         if (_m_privatePiles.contains(pile_name)) {
             delete _m_privatePiles[pile_name];
-            _m_privatePiles[pile_name] = NULL;
+            _m_privatePiles[pile_name] = nullptr;
             _m_privatePiles.remove(pile_name);
         }
     } else {
@@ -1362,7 +1362,7 @@ void PlayerCardContainer::onRemovedChanged()
 void PlayerCardContainer::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
     QGraphicsItem *item = getMouseClickReceiver();
-    if (item != nullptr && item->isUnderMouse() && isEnabled() && ((flags() & QGraphicsItem::ItemIsSelectable) != 0u)) {
+    if (item != nullptr && item->isUnderMouse() && isEnabled() && ((flags() & QGraphicsItem::ItemIsSelectable) != 0U)) {
         if (event->button() == Qt::RightButton)
             setSelected(false);
         else if (event->button() == Qt::LeftButton) {

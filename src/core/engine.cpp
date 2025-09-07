@@ -309,7 +309,7 @@ int Engine::getRoleIndex() const
 
 const CardPattern *Engine::getPattern(const QString &name) const
 {
-    const CardPattern *ptn = patterns.value(name, NULL);
+    const CardPattern *ptn = patterns.value(name, nullptr);
     if (ptn != nullptr)
         return ptn;
 
@@ -366,7 +366,7 @@ const Skill *Engine::getMainSkill(const QString &skill_name) const
 
 const General *Engine::getGeneral(const QString &name) const
 {
-    return generals.value(name, NULL);
+    return generals.value(name, nullptr);
 }
 
 const QStringList Engine::getGenerals() const
@@ -500,7 +500,7 @@ const Card *Engine::getEngineCard(int cardId) const
         Q_ASSERT(!(cardId < 0 || cardId >= cards.length()));
         return nullptr;
     } else {
-        Q_ASSERT(cards[cardId] != NULL);
+        Q_ASSERT(cards[cardId] != nullptr);
         return cards[cardId];
     }
 }
@@ -522,64 +522,64 @@ Card *Engine::cloneCard(const QString &name, Card::Suit suit, int number, const 
 {
     Card *card = nullptr;
     if (luaBasicCard_className2objectName.contains(name)) {
-        const LuaBasicCard *lcard = luaBasicCards.value(name, NULL);
+        const LuaBasicCard *lcard = luaBasicCards.value(name, nullptr);
         if (lcard == nullptr)
             return nullptr;
         card = lcard->clone(suit, number);
     } else if (luaBasicCard_className2objectName.values().contains(name)) {
         QString class_name = luaBasicCard_className2objectName.key(name, name);
-        const LuaBasicCard *lcard = luaBasicCards.value(class_name, NULL);
+        const LuaBasicCard *lcard = luaBasicCards.value(class_name, nullptr);
         if (lcard == nullptr)
             return nullptr;
         card = lcard->clone(suit, number);
     } else if (luaTrickCard_className2objectName.contains(name)) {
-        const LuaTrickCard *lcard = luaTrickCards.value(name, NULL);
+        const LuaTrickCard *lcard = luaTrickCards.value(name, nullptr);
         if (lcard == nullptr)
             return nullptr;
         card = lcard->clone(suit, number);
     } else if (luaTrickCard_className2objectName.values().contains(name)) {
         QString class_name = luaTrickCard_className2objectName.key(name, name);
-        const LuaTrickCard *lcard = luaTrickCards.value(class_name, NULL);
+        const LuaTrickCard *lcard = luaTrickCards.value(class_name, nullptr);
         if (lcard == nullptr)
             return nullptr;
         card = lcard->clone(suit, number);
     } else if (luaWeapon_className2objectName.contains(name)) {
-        const LuaWeapon *lcard = luaWeapons.value(name, NULL);
+        const LuaWeapon *lcard = luaWeapons.value(name, nullptr);
         if (lcard == nullptr)
             return nullptr;
         card = lcard->clone(suit, number);
     } else if (luaWeapon_className2objectName.values().contains(name)) {
         QString class_name = luaWeapon_className2objectName.key(name, name);
-        const LuaWeapon *lcard = luaWeapons.value(class_name, NULL);
+        const LuaWeapon *lcard = luaWeapons.value(class_name, nullptr);
         if (lcard == nullptr)
             return nullptr;
         card = lcard->clone(suit, number);
     } else if (luaArmor_className2objectName.contains(name)) {
-        const LuaArmor *lcard = luaArmors.value(name, NULL);
+        const LuaArmor *lcard = luaArmors.value(name, nullptr);
         if (lcard == nullptr)
             return nullptr;
         card = lcard->clone(suit, number);
     } else if (luaArmor_className2objectName.values().contains(name)) {
         QString class_name = luaArmor_className2objectName.key(name, name);
-        const LuaArmor *lcard = luaArmors.value(class_name, NULL);
+        const LuaArmor *lcard = luaArmors.value(class_name, nullptr);
         if (lcard == nullptr)
             return nullptr;
         card = lcard->clone(suit, number);
     } else if (luaTreasure_className2objectName.contains(name)) {
-        const LuaTreasure *lcard = luaTreasures.value(name, NULL);
+        const LuaTreasure *lcard = luaTreasures.value(name, nullptr);
         if (lcard == nullptr)
             return nullptr;
         card = lcard->clone(suit, number);
     } else if (luaTreasure_className2objectName.values().contains(name)) {
         QString class_name = luaTreasure_className2objectName.key(name, name);
-        const LuaTreasure *lcard = luaTreasures.value(class_name, NULL);
+        const LuaTreasure *lcard = luaTreasures.value(class_name, nullptr);
         if (lcard == nullptr)
             return nullptr;
         card = lcard->clone(suit, number);
     } else {
-        const QMetaObject *meta = metaobjects.value(name, NULL);
+        const QMetaObject *meta = metaobjects.value(name, nullptr);
         if (meta == nullptr)
-            meta = metaobjects.value(className2objectName.key(name, QString()), NULL);
+            meta = metaobjects.value(className2objectName.key(name, QString()), nullptr);
         if (meta != nullptr) {
             QObject *card_obj = meta->newInstance(Q_ARG(Card::Suit, suit), Q_ARG(int, number));
             card_obj->setObjectName(className2objectName.value(name, name));
@@ -598,7 +598,7 @@ Card *Engine::cloneCard(const QString &name, Card::Suit suit, int number, const 
 
 SkillCard *Engine::cloneSkillCard(const QString &name) const
 {
-    const QMetaObject *meta = metaobjects.value(name, NULL);
+    const QMetaObject *meta = metaobjects.value(name, nullptr);
     if (meta != nullptr) {
         QObject *card_obj = meta->newInstance();
         SkillCard *card = qobject_cast<SkillCard *>(card_obj);
@@ -746,7 +746,7 @@ QString Engine::getModeName(const QString &mode) const
     if (modes.contains(mode))
         return modes.value(mode);
 
-    return QString();
+    return {};
 }
 
 int Engine::getPlayerCount(const QString &mode) const
@@ -838,7 +838,7 @@ QString Engine::getRoles(const QString &mode) const
         else if (n == 6)
             return "ZCCNFF";
     }
-    return QString();
+    return {};
 }
 
 QStringList Engine::getRoleList(const QString &mode) const
@@ -1219,14 +1219,14 @@ void Engine::playAudioEffect(const QString &filename) const
 
 void Engine::playSkillAudioEffect(const QString &skill_name, int index) const
 {
-    const Skill *skill = skills.value(skill_name, NULL);
+    const Skill *skill = skills.value(skill_name, nullptr);
     if (skill != nullptr)
         skill->playAudioEffect(index);
 }
 
 const Skill *Engine::getSkill(const QString &skill_name) const
 {
-    return skills.value(skill_name, NULL);
+    return skills.value(skill_name, nullptr);
 }
 
 const Skill *Engine::getSkill(const EquipCard *equip) const

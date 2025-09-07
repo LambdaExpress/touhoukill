@@ -26,7 +26,7 @@ public:
     {
         ServerPlayer *a = data.value<ServerPlayer *>();
         if (!a->hasSkill(this) || a->isDead() || a->getPhase() != Player::Start)
-            return QList<SkillInvokeDetail>();
+            return {};
 
         return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, a, a, nullptr, true);
     }
@@ -76,7 +76,7 @@ public:
     {
         ServerPlayer *a = data.value<ServerPlayer *>();
         if (!a->hasSkill(this) || a->isDead() || a->getPhase() != Player::Judge || a->getJudgingArea().isEmpty() || !a->canDiscard(a, "j"))
-            return QList<SkillInvokeDetail>();
+            return {};
 
         return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, a, a, nullptr, true);
     }
@@ -121,7 +121,7 @@ public:
         if (death.who->hasSkill(objectName()) && room->getAlivePlayers().length() > 1) {
             return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, death.who, death.who, nullptr, true);
         }
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override

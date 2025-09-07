@@ -1356,7 +1356,7 @@ QList<QByteArray> Client::getRecords() const
     if (recorder != nullptr)
         return recorder->getRecords();
     else
-        return QList<QByteArray>();
+        return {};
 }
 
 QString Client::getReplayPath() const
@@ -1364,7 +1364,7 @@ QString Client::getReplayPath() const
     if (replayer != nullptr)
         return replayer->getPath();
     else
-        return QString();
+        return {};
 }
 
 void Client::setLines(const QString &filename)

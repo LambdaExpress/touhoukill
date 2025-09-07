@@ -77,7 +77,7 @@ void EffectAnimation::effectOut(QGraphicsItem *map)
     effect = registered.value(map);
     if (effect != nullptr)
         effect->deleteLater();
-    registered.insert(map, NULL);
+    registered.insert(map, nullptr);
 }
 
 void EffectAnimation::deleteEffect()
@@ -98,7 +98,7 @@ void EffectAnimation::deleteEffect(QAnimatedEffect *effect)
             effect->reset();
         pix->setGraphicsEffect(registered.value(pix));
         effects.insert(pix, registered.value(pix));
-        registered.insert(pix, NULL);
+        registered.insert(pix, nullptr);
     }
 }
 

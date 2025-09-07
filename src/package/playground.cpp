@@ -491,7 +491,7 @@ public:
                 }
             }
         }
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool effect(TriggerEvent e, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
@@ -666,7 +666,7 @@ public:
         if (jbd != nullptr && p != nullptr && p->isAlive() && p->getMark("@Brid") > 0)
             return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, jbd, jbd, p, true);
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override

@@ -5494,7 +5494,7 @@ void Room::filterCards(ServerPlayer *player, QList<const Card *> cards, bool ref
                 Q_ASSERT(skill);
                 if (skill->viewFilter(cards[i])) {
                     cards[i] = skill->viewAs(card);
-                    Q_ASSERT(cards[i] != NULL);
+                    Q_ASSERT(cards[i] != nullptr);
                     converged = false;
                     cardChanged[i] = true;
                 }
@@ -6053,7 +6053,7 @@ Player::Place Room::getCardPlace(int card_id) const
 QList<int> Room::getCardIdsOnTable(const Card *virtual_card) const
 {
     if (virtual_card == nullptr)
-        return QList<int>();
+        return {};
     if (!virtual_card->isVirtualCard()) {
         QList<int> ids;
         ids << virtual_card->getEffectiveId();
@@ -6061,7 +6061,7 @@ QList<int> Room::getCardIdsOnTable(const Card *virtual_card) const
     } else {
         return getCardIdsOnTable(virtual_card->getSubcards());
     }
-    return QList<int>();
+    return {};
 }
 
 QList<int> Room::getCardIdsOnTable(const QList<int> &card_ids) const
@@ -6305,7 +6305,7 @@ const Card *Room::askForPindian(ServerPlayer *player, ServerPlayer *from, Server
 QList<const Card *> Room::askForPindianRace(ServerPlayer *from, ServerPlayer *to, const QString &reason)
 {
     if (!from->isAlive() || !to->isAlive())
-        return QList<const Card *>() << NULL << NULL;
+        return QList<const Card *>() << nullptr << nullptr;
     Q_ASSERT(!from->isKongcheng() && !to->isKongcheng());
     tryPause();
     Countdown countdown;

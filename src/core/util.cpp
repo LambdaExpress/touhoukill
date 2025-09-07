@@ -102,7 +102,7 @@ QList<int> StringList2IntList(const QStringList &stringlist)
         bool ok = false;
         intlist.append(n.toInt(&ok));
         if (!ok)
-            return QList<int>();
+            return {};
     }
     return intlist;
 }
@@ -123,7 +123,7 @@ QList<int> VariantList2IntList(const QVariantList &variantlist)
         bool ok = false;
         intlist.append(n.toInt(&ok));
         if (!ok)
-            return QList<int>();
+            return {};
     }
     return intlist;
 }

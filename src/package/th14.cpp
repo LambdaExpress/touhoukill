@@ -463,7 +463,7 @@ public:
             }
         }
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
@@ -520,7 +520,7 @@ public:
                     return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, damage.to, damage.to);
             }
         }
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
@@ -680,7 +680,7 @@ public:
                     return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, damage.from, damage.from);
             }
         }
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
@@ -721,14 +721,14 @@ public:
         ServerPlayer *current = room->getCurrent();
         CardAskedStruct s = data.value<CardAskedStruct>();
         if ((current == nullptr) || !current->isAlive() || current == s.player || !s.player->hasSkill(this))
-            return QList<SkillInvokeDetail>();
+            return {};
 
         Jink jink(Card::NoSuit, 0);
         const CardPattern *cardPattern = Sanguosha->getPattern(s.pattern);
         if (cardPattern != nullptr && cardPattern->match(s.player, &jink) && !s.player->isCardLimited(&jink, s.method))
             return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, s.player, s.player, nullptr, false, current);
 
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent /*triggerEvent*/, Room * /*room*/, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
@@ -762,11 +762,11 @@ public:
             Jink *jink = new Jink(Card::NoSuit, 0);
             jink->deleteLater();
             if (s.player->isCardLimited(jink, s.method))
-                return QList<SkillInvokeDetail>();
+                return {};
 
             return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, s.player, s.player);
         }
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent /*triggerEvent*/, Room * /*room*/, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
@@ -926,11 +926,11 @@ public:
     QList<SkillInvokeDetail> triggerable(TriggerEvent triggerEvent, const Room * /*room*/, const QVariant &data) const override
     {
         if (triggerEvent != EventPhaseStart)
-            return QList<SkillInvokeDetail>();
+            return {};
         ServerPlayer *player = data.value<ServerPlayer *>();
         if (player->getPhase() == Player::Finish && player->hasSkill(this))
             return QList<SkillInvokeDetail>() << SkillInvokeDetail(this, player, player);
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
@@ -1009,7 +1009,7 @@ public:
         if (triggerEvent == EventPhaseStart) {
             ServerPlayer *player = data.value<ServerPlayer *>();
             if (player->getPhase() != Player::Finish)
-                return QList<SkillInvokeDetail>();
+                return {};
 
             bool hasPeach = false;
             QVariantList shizhu_ids = room->getTag("shizhuPeach").toList();
@@ -1020,7 +1020,7 @@ public:
                 }
             }
             if (!hasPeach)
-                return QList<SkillInvokeDetail>();
+                return {};
 
             QList<SkillInvokeDetail> d;
             foreach (ServerPlayer *src, room->findPlayersBySkillName(objectName())) {
@@ -1029,7 +1029,7 @@ public:
             }
             return d;
         }
-        return QList<SkillInvokeDetail>();
+        return {};
     }
 
     bool cost(TriggerEvent /*triggerEvent*/, Room * /*room*/, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override

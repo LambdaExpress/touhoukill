@@ -118,7 +118,7 @@ QString Card::getNumberString() const
         return "10";
     else {
         static const char *number_string = "-A23456789-JQK";
-        return QString(number_string[number]);
+        return {number_string[number]};
     }
 }
 
@@ -293,7 +293,7 @@ QString Card::getPackage() const
     if (parent() != nullptr)
         return parent()->objectName();
     else
-        return QString();
+        return {};
 }
 
 QString Card::getFullName(bool include_suit) const
@@ -343,7 +343,7 @@ QString Card::getLogName() const
 
 QString Card::getCommonEffectName() const
 {
-    return QString();
+    return {};
 }
 
 QString Card::getName() const

@@ -330,7 +330,7 @@ QString ServerPlayer::findReasonable(const QStringList &generals, bool no_unreas
     }
 
     if (no_unreasonable)
-        return QString();
+        return {};
 
     return generals.first();
 }
@@ -1102,7 +1102,7 @@ QString ServerPlayer::getIp() const
     if (socket != nullptr)
         return socket->peerAddress();
     else
-        return QString();
+        return {};
 }
 
 quint32 ServerPlayer::ipv4Address() const
@@ -1110,7 +1110,7 @@ quint32 ServerPlayer::ipv4Address() const
     if (socket != nullptr)
         return socket->ipv4Address();
     else
-        return 0u;
+        return 0U;
 }
 
 void ServerPlayer::introduceTo(ServerPlayer *player)
@@ -1756,13 +1756,13 @@ void ServerPlayer::showHiddenSkill(const QString &skill_name)
 QStringList ServerPlayer::checkTargetModSkillShow(const CardUseStruct &use)
 {
     if (use.card == nullptr || use.card->getTypeId() == Card::TypeSkill)
-        return QStringList();
+        return {};
     if (!isHegemonyGameMode(room->getMode())) {
         if (!canShowHiddenSkill())
-            return QStringList();
+            return {};
         QString cardskill = use.card->getSkillName(); //check double hidden skill
         if (cardskill != nullptr && use.from->isHiddenSkill(cardskill))
-            return QStringList();
+            return {};
     }
 
     QList<const TargetModSkill *> tarmods;
@@ -1786,7 +1786,7 @@ QStringList ServerPlayer::checkTargetModSkillShow(const CardUseStruct &use)
     }
 
     if (tarmods.isEmpty())
-        return QStringList();
+        return {};
 
     QSet<QString> showExtraTarget;
     QSet<QString> disShowExtraTarget;

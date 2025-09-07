@@ -50,7 +50,7 @@ QString Skill::getDescription(bool yellow, bool addHegemony) const
     if (normal_game && des_src.startsWith(":"))
         des_src = Sanguosha->translate(":" + objectName());
     if (des_src.startsWith(":"))
-        return QString();
+        return {};
     QString desc = QString("<font color=%1>%2</font>").arg((yellow ? "#FFFF33" : "#FF0080"), des_src);
     //if (isHegemonyGameMode(ServerInfo.GameMode) && !canPreshow())
     if (addHegemony && !canPreshow())
@@ -351,7 +351,7 @@ void TriggerSkill::record(TriggerEvent /*unused*/, Room * /*unused*/, QVariant &
 
 QList<SkillInvokeDetail> TriggerSkill::triggerable(TriggerEvent /*unused*/, const Room * /*unused*/, const QVariant & /*unused*/) const
 {
-    return QList<SkillInvokeDetail>();
+    return {};
 }
 
 bool TriggerSkill::cost(TriggerEvent /*unused*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const
@@ -404,7 +404,7 @@ QList<SkillInvokeDetail> MasochismSkill::triggerable(TriggerEvent /*triggerEvent
 
 QList<SkillInvokeDetail> MasochismSkill::triggerable(const Room * /*unused*/, const DamageStruct & /*unused*/) const
 {
-    return QList<SkillInvokeDetail>();
+    return {};
 }
 
 bool MasochismSkill::effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const

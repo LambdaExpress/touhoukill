@@ -204,7 +204,7 @@ public:
 
     bool inSiegeRelation(const ServerPlayer *skill_owner, const ServerPlayer *victim) const;
     bool inFormationRalation(ServerPlayer *teammate) const;
-    void summonFriends(const QString type);
+    void summonFriends(QString type);
 
 protected:
     //Synchronization helpers

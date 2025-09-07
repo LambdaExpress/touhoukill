@@ -1919,8 +1919,8 @@ void Dashboard::_createBattleArrayAnimations()
         if (!_m_frameBorders[kingdom]->valid()) {
             delete _m_frameBorders[kingdom];
             delete _m_roleBorders[kingdom];
-            _m_frameBorders[kingdom] = NULL;
-            _m_roleBorders[kingdom] = NULL;
+            _m_frameBorders[kingdom] = nullptr;
+            _m_roleBorders[kingdom] = nullptr;
             continue;
         }
         _m_frameBorders[kingdom]->setPos(-_dlayout->m_avatarArea.width() * 0.1, -_dlayout->m_normalHeight * 0.1);
