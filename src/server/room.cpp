@@ -1023,7 +1023,7 @@ bool Room::askForSkillInvoke(ServerPlayer *player, const QString &skill_name, co
     if (ai != nullptr) {
         invoked = ai->askForSkillInvoke(skill_name, data);
         const Skill *skill = Sanguosha->getSkill(skill_name);
-        if (invoked && !((skill != nullptr) && skill->getFrequency() == Skill::Frequent))
+        if (invoked && ((skill == nullptr) || skill->getFrequency() != Skill::Frequent))
             thread->delay();
     } else {
         JsonArray skillCommand;
@@ -4655,11 +4655,11 @@ void Room::drawCards(ServerPlayer *player, int n, const QString &reason)
     drawCards(players, n, reason);
 }
 
-void Room::drawCards(QList<ServerPlayer *> players, int n, const QString &reason)
+void Room::drawCards(const QList<ServerPlayer *> &players, int n, const QString &reason)
 {
     QList<int> n_list;
     n_list.append(n);
-    drawCards(std::move(players), n_list, reason);
+    drawCards(players, n_list, reason);
 }
 
 void Room::drawCards(const QList<ServerPlayer *> &players, const QList<int> &n_list, const QString &reason)
@@ -6607,8 +6607,10 @@ void Room::makeKilling(const QString &killerName, const QString &victimName)
 
     if (victim == nullptr)
         return;
-    if (killer == nullptr)
-        return killPlayer(victim);
+    if (killer == nullptr) {
+        killPlayer(victim);
+        return;
+    }
 
     DamageStruct damage("cheat", killer, victim);
     killPlayer(victim, &damage);

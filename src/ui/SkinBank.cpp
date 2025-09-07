@@ -173,7 +173,7 @@ void IQSanComponentSkin::QSanSimpleTextFont::paintText(QPainter *painter, QRect 
     if (pos.width() <= 0 || pos.height() <= 0 || m_fontSize.width() <= 0 || m_fontSize.height() <= 0)
         return;
     QSize actualSize = m_fontSize;
-    if ((align & Qt::TextWrapAnywhere) && !m_vertical)
+    if (((align & Qt::TextWrapAnywhere) != 0u) && !m_vertical)
         QSanUiUtils::QSanFreeTypeFont::paintQStringMultiLine(painter, text, m_fontFace, m_color, actualSize, m_spacing, pos, align);
     else
         QSanUiUtils::QSanFreeTypeFont::paintQString(painter, text, m_fontFace, m_color, actualSize, m_spacing, m_weight, pos, m_vertical ? Qt::Vertical : Qt::Horizontal, align);
@@ -438,32 +438,32 @@ QRect IQSanComponentSkin::AnchoredRect::getTranslatedRect(QRect parentRect, QSiz
 {
     QPoint parentAnchor;
     Qt::Alignment hAlign = m_anchorParent & Qt::AlignHorizontal_Mask;
-    if (hAlign & Qt::AlignRight)
+    if ((hAlign & Qt::AlignRight) != 0u)
         parentAnchor.setX(parentRect.right());
-    else if (hAlign & Qt::AlignHCenter)
+    else if ((hAlign & Qt::AlignHCenter) != 0u)
         parentAnchor.setX(parentRect.center().x());
     else
         parentAnchor.setX(parentRect.left());
     Qt::Alignment vAlign = m_anchorParent & Qt::AlignVertical_Mask;
-    if (vAlign & Qt::AlignBottom)
+    if ((vAlign & Qt::AlignBottom) != 0u)
         parentAnchor.setY(parentRect.bottom());
-    else if (vAlign & Qt::AlignVCenter)
+    else if ((vAlign & Qt::AlignVCenter) != 0u)
         parentAnchor.setY(parentRect.center().y());
     else
         parentAnchor.setY(parentRect.top());
 
     QPoint childAnchor;
     hAlign = m_anchorChild & Qt::AlignHorizontal_Mask;
-    if (hAlign & Qt::AlignRight)
+    if ((hAlign & Qt::AlignRight) != 0u)
         childAnchor.setX(size.width());
-    else if (hAlign & Qt::AlignHCenter)
+    else if ((hAlign & Qt::AlignHCenter) != 0u)
         childAnchor.setX(size.width() / 2);
     else
         childAnchor.setX(0);
     vAlign = m_anchorChild & Qt::AlignVertical_Mask;
-    if (vAlign & Qt::AlignBottom)
+    if ((vAlign & Qt::AlignBottom) != 0u)
         childAnchor.setY(size.height());
-    else if (vAlign & Qt::AlignVCenter)
+    else if ((vAlign & Qt::AlignVCenter) != 0u)
         childAnchor.setY(size.height() / 2);
     else
         childAnchor.setY(0);

@@ -12,9 +12,7 @@
 #include <algorithm>
 #include <cmath>
 
-SimaoCard::SimaoCard()
-{
-}
+SimaoCard::SimaoCard() = default;
 
 bool SimaoCard::targetsFeasible(const QList<const Player *> &targets, const Player * /*Self*/) const
 {
@@ -228,7 +226,7 @@ const QString LiunengSetProperty = "liuneng" + QString::number(static_cast<int>(
 class LiunengVS : public ZeroCardViewAsSkill
 {
 public:
-    LiunengVS(const QString &base)
+    explicit LiunengVS(const QString &base)
         : ZeroCardViewAsSkill(base)
     {
         response_or_use = true;
@@ -521,7 +519,7 @@ public:
 class CizhaoDistance : public DistanceSkill
 {
 public:
-    CizhaoDistance(const QString &baseSkill = "cizhao")
+    explicit CizhaoDistance(const QString &baseSkill = "cizhao")
         : DistanceSkill("#" + baseSkill + "-distance")
         , b(baseSkill)
     {
@@ -544,7 +542,7 @@ private:
 class DanranVS : public ViewAsSkill
 {
 public:
-    DanranVS(const QString &objectName)
+    explicit DanranVS(const QString &objectName)
         : ViewAsSkill(objectName)
     {
         response_pattern = "jink";
@@ -646,7 +644,7 @@ public:
 class YingjiRecord : public TriggerSkill
 {
 public:
-    YingjiRecord(const QString &yingji = "yingji")
+    explicit YingjiRecord(const QString &yingji = "yingji")
         : TriggerSkill("#" + yingji + "-record")
         , b(yingji)
     {
@@ -710,7 +708,7 @@ private:
 class YingJiVS : public OneCardViewAsSkill
 {
 public:
-    YingJiVS(const QString &base)
+    explicit YingJiVS(const QString &base)
         : OneCardViewAsSkill(base)
     {
         expand_pile = "+goods";
@@ -1071,7 +1069,7 @@ void BoxiCard::use(Room *room, const CardUseStruct &card_use) const
             // use BoxiUseOrObtainCard only for obtaining
             room->setPlayerProperty(card_use.from, "boxi", IntList2StringList(to_discard2).join("+"));
             try {
-                if (!room->askForUseCard(card_use.from, "@@boxi!", "boxi-use-or-obtain")) {
+                if (room->askForUseCard(card_use.from, "@@boxi!", "boxi-use-or-obtain") == nullptr) {
                     // randomly get a card
                     int r = to_discard2.at(qrand() % to_discard2.length());
                     room->obtainCard(card_use.from, r);
@@ -1350,7 +1348,7 @@ void ZhuyuSlashCard::onEffect(const CardEffectStruct &effect) const
 class ZhuyuVS : public ViewAsSkill
 {
 public:
-    ZhuyuVS(const QString &base)
+    explicit ZhuyuVS(const QString &base)
         : ViewAsSkill(base)
     {
         expand_pile = "*" + objectName();
@@ -1518,7 +1516,7 @@ public:
 
                     // AI: Is it possible directly using the original card?
                     // need deduplicate items during setPlayerProperty
-                    if (!room->askForUseCard(invoke->invoker, pattern + "!", prompt + ":::" + c->getSuitString(), notifyIndex)) {
+                    if (room->askForUseCard(invoke->invoker, pattern + "!", prompt + ":::" + c->getSuitString(), notifyIndex) == nullptr) {
                         if (usedIds.isEmpty()) {
                             foreach (int id, ids) {
                                 const Card *idCard = Sanguosha->getCard(id);
@@ -1616,7 +1614,7 @@ public:
 
                     if (same) {
                         // AI: use original card for Slash
-                        if (!room->askForUseCard(invoke->invoker, "@@zhuyu-card3!", "zhuyu-slash1", 3)) {
+                        if (room->askForUseCard(invoke->invoker, "@@zhuyu-card3!", "zhuyu-slash1", 3) == nullptr) {
                             DummyCard d;
                             foreach (int id, ids) {
                                 if (!usedIds.contains(id))
@@ -1719,7 +1717,7 @@ void TiaosuoCard::use(Room *room, const CardUseStruct &card_use) const
 class TiaosuoVS : public OneCardViewAsSkill
 {
 public:
-    TiaosuoVS(const QString &base)
+    explicit TiaosuoVS(const QString &base)
         : OneCardViewAsSkill(base)
     {
         filter_pattern = ".|black";
@@ -1737,7 +1735,7 @@ public:
 class TiaosuoP : public ProhibitSkill
 {
 public:
-    TiaosuoP(const QString &base = "tiaosuo")
+    explicit TiaosuoP(const QString &base = "tiaosuo")
         : ProhibitSkill("#" + base + "-prohibit")
     {
     }
@@ -1754,7 +1752,7 @@ public:
 class TiaosuoT : public TargetModSkill
 {
 public:
-    TiaosuoT(const QString &base = "tiaosuo")
+    explicit TiaosuoT(const QString &base = "tiaosuo")
         : TargetModSkill("#" + base + "-targetmod")
     {
         pattern = "Slash";
@@ -1827,7 +1825,7 @@ public:
     bool cost(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
         ServerPlayer *p = data.value<ServerPlayer *>();
-        return room->askForUseCard(invoke->invoker, "@@tiaosuo", "tiaosuo-ts:" + p->objectName(), -1, Card::MethodNone);
+        return room->askForUseCard(invoke->invoker, "@@tiaosuo", "tiaosuo-ts:" + p->objectName(), -1, Card::MethodNone) != nullptr;
     }
 };
 
@@ -2038,7 +2036,7 @@ public:
 class MijiRecord : public TriggerSkill
 {
 public:
-    MijiRecord(const QString &base = "miji")
+    explicit MijiRecord(const QString &base = "miji")
         : TriggerSkill("#" + base)
         , b(base)
     {
@@ -2128,7 +2126,7 @@ public:
             const Card *c = Sanguosha->getCard(id);
             int type = static_cast<int>(c->getTypeId());
             int t = invoke->invoker->tag[objectName()].toInt();
-            if (t & (1 << type))
+            if ((t & (1 << type)) != 0)
                 disabled << id;
             else
                 enabled << id;

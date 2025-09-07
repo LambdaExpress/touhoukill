@@ -167,9 +167,7 @@ bool Ruizhi::effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<Sk
     return false;
 }
 
-MiyaoCard::MiyaoCard()
-{
-}
+MiyaoCard::MiyaoCard() = default;
 
 bool MiyaoCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
@@ -280,9 +278,7 @@ public:
     }
 };
 
-KuangzaoCard::KuangzaoCard()
-{
-}
+KuangzaoCard::KuangzaoCard() = default;
 
 void KuangzaoCard::onEffect(const CardEffectStruct &effect) const
 {
@@ -807,9 +803,7 @@ bool YegeCard::targetFilter(const QList<const Player *> &targets, const Player *
     indl->deleteLater();
 
     bool canUse = !Self->isLocked(indl);
-    if (canUse && to_select != Self && !to_select->containsTrick("indulgence") && !Self->isProhibited(to_select, indl))
-        return true;
-    return false;
+    return canUse && to_select != Self && !to_select->containsTrick("indulgence") && !Self->isProhibited(to_select, indl);
 }
 
 const Card *YegeCard::validate(CardUseStruct &cardUse) const
@@ -991,9 +985,7 @@ public:
 
         room->sendLog("#laolong_damage", damage.to, QString::number(damage.damage), QList<ServerPlayer *>(), QString::number(record));
         data = QVariant::fromValue(damage);
-        if (damage.damage == 0)
-            return true;
-        return false;
+        return damage.damage == 0;
     }
 };
 
@@ -1035,10 +1027,7 @@ public:
             pattern = "peach";
         QString markName = "yinghuo_record_" + pattern;
 
-        if (player->getMark(markName) > 0)
-            return true;
-        else
-            return false;
+        return player->getMark(markName) > 0;
     }
 
     void record(TriggerEvent e, Room *room, QVariant &data) const override
@@ -1591,7 +1580,7 @@ public:
                 }
             }
 
-            return room->askForCard(invoke->invoker, ".", prompt.join(":"), QVariant(), Card::MethodDiscard, nullptr, false, objectName());
+            return room->askForCard(invoke->invoker, ".", prompt.join(":"), QVariant(), Card::MethodDiscard, nullptr, false, objectName()) != nullptr;
         }
 
         return false;

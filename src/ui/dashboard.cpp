@@ -1222,7 +1222,7 @@ void Dashboard::startPending(const ViewAsSkill *skill)
     if (expand) {
         foreach (const QString &pile, Self->getHandPileList(false))
             expandPileCards(pile);
-        if (!((skill != nullptr) && skill->isResponseOrUse()))
+        if ((skill == nullptr) || !skill->isResponseOrUse())
             expandSpecialCard();
     } else {
         foreach (const QString &pile, Self->getPileNames()) {

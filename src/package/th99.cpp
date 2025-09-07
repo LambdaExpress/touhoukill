@@ -546,7 +546,7 @@ public:
     static bool isShitu(const Player *p, ShituRecordType recordType)
     {
         int n = p->tag.value("shituRecord").toInt();
-        return n & recordType;
+        return (n & recordType) != 0;
     }
 
     Shitu()
@@ -1741,7 +1741,7 @@ public:
 
             bool flag = false;
             foreach (ServerPlayer *q, room->getOtherPlayers(p)) {
-                if (!(use.from == q || use.to.contains(q)) && use.from != nullptr && use.from->canSlash(q, use.card, false)) {
+                if (use.from != q && !use.to.contains(q) && use.from != nullptr && use.from->canSlash(q, use.card, false)) {
                     flag = true;
                     break;
                 }
@@ -1760,7 +1760,7 @@ public:
         QList<ServerPlayer *> targets;
         use.card->setFlags("IgnoreFailed");
         foreach (ServerPlayer *q, room->getOtherPlayers(invoke->invoker)) {
-            if (!(use.from == q || use.to.contains(q)) && use.from->canSlash(q, use.card, false))
+            if (use.from != q && !use.to.contains(q) && use.from->canSlash(q, use.card, false))
                 targets << q;
         }
         use.card->setFlags("-IgnoreFailed");
@@ -1988,7 +1988,7 @@ public:
     {
         CardUseStruct use = data.value<CardUseStruct>();
         const Card *card = invoke->invoker->tag["jidong_card"].value<const Card *>();
-        bool can = (card->getNumber() >= 13 || !use.from->canDiscard(use.from, "hs")) ? true : false;
+        bool can = card->getNumber() >= 13 || !use.from->canDiscard(use.from, "hs");
         if (!can) {
             QString point = QString::number(card->getNumber() + 1);
             QString pattern = QString(".|.|%1~|hand").arg(point);

@@ -102,9 +102,7 @@ QStringList Liji::CardNameList = {
     "known_both", "iron_chain", "peach", "fire_slash", "lure_tiger",
 };
 
-LijiCard::LijiCard()
-{
-}
+LijiCard::LijiCard() = default;
 
 bool LijiCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
@@ -199,9 +197,7 @@ public:
     }
 };
 
-MenfeiCard::MenfeiCard()
-{
-}
+MenfeiCard::MenfeiCard() = default;
 
 bool MenfeiCard::targetFilter(const QList<const Player *> &targets, const Player * /*to_select*/, const Player * /*Self*/) const
 {
@@ -454,7 +450,7 @@ public:
     QList<SkillInvokeDetail> triggerable(TriggerEvent /*triggerEvent*/, const Room * /*room*/, const QVariant &data) const override
     {
         CardUseStruct use = data.value<CardUseStruct>();
-        if (!use.card->isKindOf("KnownBoth") || !use.from || !use.from->hasSkill(this) || use.from->isDead())
+        if (!use.card->isKindOf("KnownBoth") || (use.from == nullptr) || !use.from->hasSkill(this) || use.from->isDead())
             return {};
 
         QList<SkillInvokeDetail> d;
@@ -544,7 +540,7 @@ const QString Shengyu::ShengyuPattern
 class ModaoVS : public OneCardViewAsSkill
 {
 public:
-    ModaoVS(const QString &base)
+    explicit ModaoVS(const QString &base)
         : OneCardViewAsSkill(base)
     {
         response_pattern = "@@modao";
@@ -609,7 +605,7 @@ public:
             if (!ids.isEmpty())
                 invoke->invoker->tag[objectName() + "bh"] = IntList2VariantList(ids);
 
-            return room->askForUseCard(invoke->invoker, "@@modao", "modao-bh", -1, Card::MethodUse, true, objectName());
+            return room->askForUseCard(invoke->invoker, "@@modao", "modao-bh", -1, Card::MethodUse, true, objectName()) != nullptr;
         }
 
         return false;
@@ -1087,9 +1083,7 @@ public:
     }
 };
 
-MiZhiungHteiCard::MiZhiungHteiCard()
-{
-}
+MiZhiungHteiCard::MiZhiungHteiCard() = default;
 
 bool MiZhiungHteiCard::targetFilter(const QList<const Player *> &p, const Player *to_select, const Player *Self) const
 {

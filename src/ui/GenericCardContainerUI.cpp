@@ -20,7 +20,7 @@ using namespace QSanProtocol;
 
 QList<CardItem *> GenericCardContainer::cloneCardItems(QList<int> card_ids)
 {
-    return _createCards(std::move(card_ids));
+    return _createCards(card_ids);
 }
 
 QList<CardItem *> GenericCardContainer::_createCards(const QList<int> &card_ids)

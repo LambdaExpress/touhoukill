@@ -601,9 +601,7 @@ public:
     }
 };
 
-Fsu0413JbdNashaCard::Fsu0413JbdNashaCard()
-{
-}
+Fsu0413JbdNashaCard::Fsu0413JbdNashaCard() = default;
 
 bool Fsu0413JbdNashaCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
@@ -988,7 +986,7 @@ public:
 class TailorFuzhongEffect : public TriggerSkill
 {
 public:
-    TailorFuzhongEffect(const QString &base = "tailorfuzhong")
+    explicit TailorFuzhongEffect(const QString &base = "tailorfuzhong")
         : TriggerSkill("#" + base + "-effect")
         , b(base)
     {

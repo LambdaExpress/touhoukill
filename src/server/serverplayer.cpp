@@ -1446,19 +1446,19 @@ void ServerPlayer::addToPile(const QString &pile_name, const Card *card, bool op
         card_ids = card->getSubcards();
     else
         card_ids << card->getEffectiveId();
-    return addToPile(pile_name, card_ids, open, std::move(open_players));
+    addToPile(pile_name, card_ids, open, std::move(open_players));
 }
 
 void ServerPlayer::addToPile(const QString &pile_name, int card_id, bool open, QList<ServerPlayer *> open_players)
 {
     QList<int> card_ids;
     card_ids << card_id;
-    return addToPile(pile_name, card_ids, open, std::move(open_players));
+    addToPile(pile_name, card_ids, open, std::move(open_players));
 }
 
-void ServerPlayer::addToPile(const QString &pile_name, QList<int> card_ids, bool open, QList<ServerPlayer *> open_players)
+void ServerPlayer::addToPile(const QString &pile_name, const QList<int> &card_ids, bool open, QList<ServerPlayer *> open_players)
 {
-    return addToPile(pile_name, std::move(card_ids), open, CardMoveReason(), std::move(open_players));
+    addToPile(pile_name, card_ids, open, CardMoveReason(), std::move(open_players));
 }
 
 void ServerPlayer::addToPile(const QString &pile_name, const QList<int> &card_ids, bool open, CardMoveReason reason, QList<ServerPlayer *> open_players)

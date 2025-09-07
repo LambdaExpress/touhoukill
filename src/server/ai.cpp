@@ -13,9 +13,7 @@ AI::AI(ServerPlayer *player)
     room = player->getRoom();
 }
 
-AI::~AI()
-{
-}
+AI::~AI() = default;
 
 typedef QPair<QString, QString> RolePair;
 
@@ -418,7 +416,7 @@ QString LuaAI::askForUseCard(const QString &pattern, const QString &prompt, cons
     const char *result = lua_tostring(L, -1);
     lua_pop(L, 1);
 
-    if (error) {
+    if (error != 0) {
         const char *error_msg = result;
         room->output(error_msg);
         return ".";
@@ -435,11 +433,11 @@ QList<int> LuaAI::askForDiscard(const QString &reason, int discard_num, int min_
     lua_pushstring(L, reason.toLatin1());
     lua_pushinteger(L, discard_num);
     lua_pushinteger(L, min_num);
-    lua_pushboolean(L, optional);
-    lua_pushboolean(L, include_equip);
+    lua_pushboolean(L, static_cast<int>(optional));
+    lua_pushboolean(L, static_cast<int>(include_equip));
 
     int error = lua_pcall(L, 6, 1, 0);
-    if (error) {
+    if (error != 0) {
         reportError(L);
         return TrustAI::askForDiscard(reason, discard_num, min_num, optional, include_equip);
     }
@@ -478,11 +476,11 @@ int LuaAI::askForAG(const QList<int> &card_ids, bool refusable, const QString &r
 
     pushCallback(L, __FUNCTION__);
     pushQIntList(L, card_ids);
-    lua_pushboolean(L, refusable);
+    lua_pushboolean(L, static_cast<int>(refusable));
     lua_pushstring(L, reason.toLatin1());
 
     int error = lua_pcall(L, 4, 1, 0);
-    if (error) {
+    if (error != 0) {
         reportError(L);
         return TrustAI::askForAG(card_ids, refusable, reason);
     }
@@ -527,9 +525,10 @@ void LuaAI::askForGuanxing(const QList<int> &cards, QList<int> &up, QList<int> &
     lua_pushinteger(L, guanxing_type);
 
     int error = lua_pcall(L, 3, 2, 0);
-    if (error) {
+    if (error != 0) {
         reportError(L);
-        return TrustAI::askForGuanxing(cards, up, bottom, guanxing_type);
+        TrustAI::askForGuanxing(cards, up, bottom, guanxing_type);
+        return;
     }
 
     getTable(L, bottom);

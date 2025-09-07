@@ -440,9 +440,7 @@ public:
     }
 };
 
-SuodingCard::SuodingCard()
-{
-}
+SuodingCard::SuodingCard() = default;
 
 bool SuodingCard::targetFilter(const QList<const Player *> & /*targets*/, const Player * /*to_select*/, const Player * /*Self*/) const
 {
@@ -944,7 +942,7 @@ public:
             if (player != nullptr && player->isAlive() && player->hasSkill(this) && move.to_place == Player::DiscardPile
                 && (move.reason.m_reason & CardMoveReason::S_MASK_BASIC_REASON) == CardMoveReason::S_REASON_USE) {
                 const Card *card = move.reason.m_extraData.value<const Card *>();
-                if (card && card->getSkillName() == objectName()) {
+                if ((card != nullptr) && card->getSkillName() == objectName()) {
                     foreach (int id, move.card_ids) {
                         if (Sanguosha->getCard(id)->isKindOf("TrickCard") && room->getCardPlace(id) == Player::DiscardPile)
                             return {SkillInvokeDetail(this, player, player)};
@@ -1777,9 +1775,7 @@ public:
     }
 };
 
-BanyueCard::BanyueCard()
-{
-}
+BanyueCard::BanyueCard() = default;
 
 bool BanyueCard::targetFilter(const QList<const Player *> &targets, const Player * /*to_select*/, const Player * /*Self*/) const
 {

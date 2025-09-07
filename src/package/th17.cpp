@@ -819,7 +819,7 @@ void WeiyiCard::use(Room *room, const CardUseStruct &card_use) const
     QStringList prompt = {"@weiyi-askforuseslashto"};
     prompt << card_use.from->objectName() << b->objectName();
 
-    if (!room->askForUseSlashTo(a, b, prompt.join(":"), false)) {
+    if (room->askForUseSlashTo(a, b, prompt.join(":"), false) == nullptr) {
         if (!a->isNude() && a != card_use.from) {
             a->tag["weiyi"] = QVariant::fromValue(card_use);
             QStringList prompt = {"@weiyi-askforexchange"};
@@ -1182,7 +1182,7 @@ public:
         invoke->invoker->tag.remove("junzhenTo");
         QString prompt = (invoke->invoker == invoke->owner) ? QStringLiteral("@junzhen-prompt2") : (QString(QStringLiteral("@junzhen-prompt1:")) + invoke->owner->objectName());
         int noticeIndex = (invoke->invoker == invoke->owner) ? 2 : 1;
-        bool invoked = room->askForUseCard(invoke->invoker, "@@junzhen-card1", prompt, noticeIndex, Card::MethodNone);
+        bool invoked = room->askForUseCard(invoke->invoker, "@@junzhen-card1", prompt, noticeIndex, Card::MethodNone) != nullptr;
         if (!invoked)
             room->setPlayerFlag(invoke->owner, "-junzhen_owner");
 
@@ -1392,7 +1392,7 @@ public:
 
     bool cost(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
     {
-        return room->askForUseCard(invoke->invoker, "@@tianxing", "@tianxing-slash");
+        return room->askForUseCard(invoke->invoker, "@@tianxing", "@tianxing-slash") != nullptr;
     }
 };
 

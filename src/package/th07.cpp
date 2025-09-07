@@ -422,7 +422,7 @@ public:
 class XijianRecord : public TriggerSkill
 {
 public:
-    XijianRecord(const QString &base = "xijian")
+    explicit XijianRecord(const QString &base = "xijian")
         : TriggerSkill("#" + base + "-record")
         , b(base)
     {
@@ -714,9 +714,7 @@ public:
     bool viewFilter(const QList<const Card *> &selected, const Card * /*to_select*/) const override
     {
         int maxnum = qMax(Self->getEquips().length(), 1);
-        if (selected.length() >= maxnum)
-            return false;
-        return true;
+        return selected.length() < maxnum;
     }
 
     const Card *viewAs(const QList<const Card *> &cards) const override
@@ -1298,9 +1296,7 @@ public:
     }
 };
 
-QimenCard::QimenCard()
-{
-}
+QimenCard::QimenCard() = default;
 
 static int qimenMax(const Player *chen)
 {
@@ -1681,9 +1677,7 @@ public:
     }
 };
 
-MocaoCard::MocaoCard()
-{
-}
+MocaoCard::MocaoCard() = default;
 
 bool MocaoCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {

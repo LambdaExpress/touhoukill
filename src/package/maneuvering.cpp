@@ -514,9 +514,7 @@ bool FireAttack::targetFilter(const QList<const Player *> &targets, const Player
     if (targets.length() >= total_num)
         return false;
     bool ignore = (Self->hasSkill("tianqu") && Sanguosha->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_PLAY && to_select != Self && !hasFlag("IgnoreFailed"));
-    if (to_select->isKongcheng() && !ignore)
-        return false;
-    return true;
+    return !(to_select->isKongcheng() && !ignore);
 }
 
 void FireAttack::onEffect(const CardEffectStruct &effect) const

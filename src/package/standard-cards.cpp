@@ -1022,7 +1022,7 @@ public:
 
         const CardPattern *pattern = Sanguosha->getPattern(ask.pattern);
 
-        if (!(pattern != nullptr && pattern->match(ask.player, jink)))
+        if (pattern == nullptr || !pattern->match(ask.player, jink))
             return {};
 
         ServerPlayer *player = ask.player;

@@ -589,7 +589,7 @@ public:
         ChainJink j(Card::SuitToBeDecided, -1);
         const CardPattern *cardPattern = Sanguosha->getPattern(ask.pattern);
 
-        if (!(cardPattern != nullptr && cardPattern->match(ask.player, &j)))
+        if (cardPattern == nullptr || !cardPattern->match(ask.player, &j))
             return {};
 
         ServerPlayer *player = ask.player;
@@ -658,7 +658,7 @@ void AllianceFeast::onEffect(const CardEffectStruct &effect) const
 {
     if (effect.to->isDead())
         return;
-    if (!(effect.to->isChained() || !effect.to->getShownHandcards().isEmpty() || !effect.to->getBrokenEquips().isEmpty())) {
+    if (!effect.to->isChained() && effect.to->getShownHandcards().isEmpty() && effect.to->getBrokenEquips().isEmpty()) {
         setFlags("-tianxieEffected_" + effect.to->objectName()); // only for skill tianxie / minghe / zhuti
     } else {
         effect.to->removeShownHandCards(effect.to->getShownHandcards(), true);

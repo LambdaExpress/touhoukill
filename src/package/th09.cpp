@@ -335,7 +335,7 @@ public:
 class FanhuaVS : public OneCardViewAsSkill
 {
 public:
-    FanhuaVS(const QString &base)
+    explicit FanhuaVS(const QString &base)
         : OneCardViewAsSkill(base)
     {
         response_or_use = true;
@@ -570,9 +570,7 @@ public:
     }
 };
 
-ToupaiCard::ToupaiCard()
-{
-}
+ToupaiCard::ToupaiCard() = default;
 
 bool ToupaiCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
@@ -826,9 +824,7 @@ public:
     }
 };
 
-TianrenCard::TianrenCard()
-{
-}
+TianrenCard::TianrenCard() = default;
 
 bool TianrenCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
@@ -1253,9 +1249,10 @@ void KuaizhaoCard::onEffect(const CardEffectStruct &effect) const
             int prompt = 2;
             if (blackBasicNdtrickUsedCount != 0)
                 prompt = 3;
-            if (!room->askForUseCard(effect.from, "@@kuaizhao-card2",
-                                     "@kuaizhao-card" + QString::number(prompt) + ":::" + QString::number(basicNum - blackBasicNdtrickUsedCount) + ":" + QString::number(basicNum),
-                                     prompt, Card::MethodUse, false))
+            if (room->askForUseCard(effect.from, "@@kuaizhao-card2",
+                                    "@kuaizhao-card" + QString::number(prompt) + ":::" + QString::number(basicNum - blackBasicNdtrickUsedCount) + ":" + QString::number(basicNum),
+                                    prompt, Card::MethodUse, false)
+                == nullptr)
                 break;
         }
     }
@@ -1385,7 +1382,7 @@ public:
 
     bool cost(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
     {
-        return room->askForUseCard(invoke->invoker, "@@kuaizhao-card1", "@kuaizhao-card1", 1, Card::MethodDiscard, true, objectName());
+        return room->askForUseCard(invoke->invoker, "@@kuaizhao-card1", "@kuaizhao-card1", 1, Card::MethodDiscard, true, objectName()) != nullptr;
     }
 
     bool effect(TriggerEvent /*triggerEvent*/, Room * /*room*/, QSharedPointer<SkillInvokeDetail> /*invoke*/, QVariant & /*data*/) const override
@@ -2004,9 +2001,7 @@ public:
     }
 };
 
-YsJieCard::YsJieCard()
-{
-}
+YsJieCard::YsJieCard() = default;
 
 bool YsJieCard::targetFilter(const QList<const Player *> & /*targets*/, const Player *to_select, const Player * /*Self*/) const
 {
@@ -2822,7 +2817,7 @@ QList<int> YucanCard::do_yucan(Room *room, ServerPlayer *eat) const
 
     QList<ServerPlayer *> ps;
 
-    if (room->askForUseCard(eat, "@@" + getSkillName() + "-card1!", getSkillName() + "-chooseplayer:::" + user_string, 1, Card::MethodNone, false)) {
+    if (room->askForUseCard(eat, "@@" + getSkillName() + "-card1!", getSkillName() + "-chooseplayer:::" + user_string, 1, Card::MethodNone, false) != nullptr) {
         foreach (ServerPlayer *p, room->getAllPlayers()) {
             int i = p->tag[getSkillName()].toInt();
             for (int n = 0; n < i; ++n)
@@ -3018,7 +3013,7 @@ void YucanSelectCard::onUse(Room * /*room*/, const CardUseStruct &card_use) cons
 class YucanVS : public ZeroCardViewAsSkill
 {
 public:
-    YucanVS(const QString &base)
+    explicit YucanVS(const QString &base)
         : ZeroCardViewAsSkill(base)
     {
     }
@@ -3125,7 +3120,7 @@ void HuiranCard::onUse(Room * /*room*/, const CardUseStruct &card_use) const
 class HuiranVS : public ZeroCardViewAsSkill
 {
 public:
-    HuiranVS(const QString &base)
+    explicit HuiranVS(const QString &base)
         : ZeroCardViewAsSkill(base)
     {
         response_pattern = "@@huiran";
@@ -3161,7 +3156,7 @@ public:
         foreach (ServerPlayer *p, room->getAllPlayers())
             p->setFlags("-" + objectName() + "selected");
 
-        bool select = room->askForUseCard(invoke->invoker, "@@huiran", "huiran-select", -1, Card::MethodNone, true, objectName());
+        bool select = room->askForUseCard(invoke->invoker, "@@huiran", "huiran-select", -1, Card::MethodNone, true, objectName()) != nullptr;
         if (!select)
             return false;
 
@@ -3197,7 +3192,7 @@ public:
 class HuiranRecord : public TriggerSkill
 {
 public:
-    HuiranRecord(const QString &b = "huiran")
+    explicit HuiranRecord(const QString &b = "huiran")
         : TriggerSkill("#" + b + "-record")
         , b(b)
     {
@@ -3224,9 +3219,7 @@ private:
     QString b;
 };
 
-YuyanCard::YuyanCard()
-{
-}
+YuyanCard::YuyanCard() = default;
 
 void YuyanCard::onEffect(const CardEffectStruct &effect) const
 {

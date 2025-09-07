@@ -6,9 +6,7 @@
 #include "skill.h"
 #include "standard.h"
 
-PuduCard::PuduCard()
-{
-}
+PuduCard::PuduCard() = default;
 
 bool PuduCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
@@ -560,9 +558,7 @@ public:
     }
 };
 
-NihuoCard::NihuoCard()
-{
-}
+NihuoCard::NihuoCard() = default;
 bool NihuoCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
     if (!targets.isEmpty())
@@ -1287,9 +1283,7 @@ public:
     }
 };
 
-NuhuoCard::NuhuoCard()
-{
-}
+NuhuoCard::NuhuoCard() = default;
 bool NuhuoCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
     return (targets.isEmpty() && to_select != Self);
@@ -1425,9 +1419,7 @@ public:
     }
 };
 
-ShuxinCard::ShuxinCard()
-{
-}
+ShuxinCard::ShuxinCard() = default;
 
 bool ShuxinCard::targetFilter(const QList<const Player *> &targets, const Player * /*to_select*/, const Player * /*Self*/) const
 {

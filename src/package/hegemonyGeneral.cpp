@@ -593,7 +593,7 @@ public:
         }
         if (triggerEvent == EventPhaseStart) {
             player = data.value<ServerPlayer *>();
-            if (!(player->getPhase() == Player::RoundStart || player->getPhase() == Player::NotActive))
+            if (player->getPhase() != Player::RoundStart && player->getPhase() != Player::NotActive)
                 return;
         }
         if (triggerEvent == Death) {
@@ -705,9 +705,7 @@ public:
             damage.damage = damage.damage - 1;
         }
         data = QVariant::fromValue(damage);
-        if (damage.damage < 1)
-            return true;
-        return false;
+        return damage.damage < 1;
     }
 };
 
@@ -1188,10 +1186,7 @@ public:
 
     bool ViewHas(const Player *player, const QString &skill_name, const QString &flag, bool /*ignore_preshow*/) const override
     {
-        if (flag == "weapon" && skill_name == "DoubleSwordHegemony" && player->isAlive() && player->hasSkill("shezheng_hegemony") && (player->getWeapon() == nullptr))
-            return true;
-
-        return false;
+        return flag == "weapon" && skill_name == "DoubleSwordHegemony" && player->isAlive() && player->hasSkill("shezheng_hegemony") && (player->getWeapon() == nullptr);
     }
 };
 
@@ -2823,7 +2818,7 @@ public:
 class Qiankun2Hegemony : public AttackRangeSkill
 {
 public:
-    Qiankun2Hegemony(const QString &owner)
+    explicit Qiankun2Hegemony(const QString &owner)
         : AttackRangeSkill("#qiankun2_" + owner)
         , owner(owner)
     {

@@ -126,7 +126,7 @@ void GraphicsPixmapHoverItem::paint(QPainter *painter, const QStyleOptionGraphic
         tempPainter.drawPixmap(offset(), pixmap());
     }
 
-    if (option->state & QStyle::State_Selected) {
+    if ((option->state & QStyle::State_Selected) != 0u) {
         qt_graphicsItem_highlightSelected(this, &tempPainter, option);
     }
 

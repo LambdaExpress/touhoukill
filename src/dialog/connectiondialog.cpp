@@ -254,9 +254,7 @@ ConnectionDialog::ConnectionDialog(QWidget *parent)
     connectbtn->setFocus();
 }
 
-ConnectionDialog::~ConnectionDialog()
-{
-}
+ConnectionDialog::~ConnectionDialog() = default;
 
 void ConnectionDialog::showEvent(QShowEvent *e)
 {

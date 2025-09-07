@@ -189,7 +189,7 @@ public:
 class LeitingVS : public ZeroCardViewAsSkill
 {
 public:
-    LeitingVS(const QString &base)
+    explicit LeitingVS(const QString &base)
         : ZeroCardViewAsSkill(base)
     {
         response_pattern = "@@leiting!";
@@ -296,7 +296,7 @@ public:
                 target->drawCards(1);
                 room->damage(DamageStruct("leiting", nullptr, target, 1, DamageStruct::Thunder));
             } else if (choice == "choice2") {
-                if (!room->askForUseCard(target, "@@leiting!", "leiting-usethunderslash", 0)) {
+                if (room->askForUseCard(target, "@@leiting!", "leiting-usethunderslash", 0) == nullptr) {
                     CardUseStruct use;
                     ThunderSlash *ts = new ThunderSlash(Card::SuitToBeDecided, -1);
                     ts->setSkillName("_" + objectName());
@@ -797,9 +797,7 @@ public:
     }
 };
 
-YuanfeiCard::YuanfeiCard()
-{
-}
+YuanfeiCard::YuanfeiCard() = default;
 
 bool YuanfeiCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {

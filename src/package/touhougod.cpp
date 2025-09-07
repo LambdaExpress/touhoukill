@@ -389,10 +389,7 @@ public:
         room->sendLog("#YewangTrigger", invoke->invoker, objectName(), QList<ServerPlayer *>(), QString::number(1));
         room->notifySkillInvoked(invoke->invoker, objectName());
         data = QVariant::fromValue(damage);
-        if (damage.damage == 0)
-            return true;
-
-        return false;
+        return damage.damage == 0;
     }
 };
 
@@ -864,9 +861,7 @@ public:
     }
 };
 
-HuimieCard::HuimieCard()
-{
-}
+HuimieCard::HuimieCard() = default;
 
 bool HuimieCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
@@ -3358,9 +3353,7 @@ public:
     }
 };
 
-WendaoCard::WendaoCard()
-{
-}
+WendaoCard::WendaoCard() = default;
 
 bool WendaoCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
@@ -3991,15 +3984,15 @@ public:
         QSet<EquipCard::Location> ls;
 
         foreach (ServerPlayer *p, r->getAlivePlayers()) {
-            if (p->getWeapon())
+            if (p->getWeapon() != nullptr)
                 ls << EquipCard::WeaponLocation;
-            if (p->getArmor())
+            if (p->getArmor() != nullptr)
                 ls << EquipCard::ArmorLocation;
-            if (p->getDefensiveHorse())
+            if (p->getDefensiveHorse() != nullptr)
                 ls << EquipCard::DefensiveHorseLocation;
-            if (p->getOffensiveHorse())
+            if (p->getOffensiveHorse() != nullptr)
                 ls << EquipCard::OffensiveHorseLocation;
-            if (p->getTreasure())
+            if (p->getTreasure() != nullptr)
                 ls << EquipCard::TreasureLocation;
         }
 
@@ -4788,9 +4781,7 @@ public:
     }
 };
 
-RumoCard::RumoCard()
-{
-}
+RumoCard::RumoCard() = default;
 
 static int rumoNum(const Player *Self)
 {
@@ -5645,7 +5636,7 @@ void XianshiDialog::popup()
             Card *c = Sanguosha->cloneCard(name);
             DELETE_OVER_SCOPE(Card, c)
 
-            if (!(cardPattern != nullptr && cardPattern->match(Self, c)))
+            if (cardPattern == nullptr || !cardPattern->match(Self, c))
                 checkedPatterns << name;
         }
     }
@@ -5866,7 +5857,7 @@ public:
             } else {
                 QString pattern = Sanguosha->currentRoomState()->getCurrentCardUsePattern();
                 const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
-                if (!(cardPattern != nullptr && cardPattern->match(Self, c)))
+                if (cardPattern == nullptr || !cardPattern->match(Self, c))
                     return false;
             }
             if (selected_effect.contains("slash"))
@@ -5905,10 +5896,7 @@ public:
             return false;
 
         QString xianshi_record = player->property("xianshi_record").toString();
-        if (xianshi_record == nullptr)
-            return false;
-
-        return true;
+        return xianshi_record != nullptr;
     }
 
     const Card *viewAs(const Card *originalCard) const override

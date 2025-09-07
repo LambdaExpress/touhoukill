@@ -591,8 +591,10 @@ void ChooseGeneralBox::reply()
         progress_bar = nullptr;
     }
 
-    if (m_viewOnly)
-        return clear();
+    if (m_viewOnly) {
+        clear();
+        return;
+    }
 
     QString generals;
     if (!selected.isEmpty()) {

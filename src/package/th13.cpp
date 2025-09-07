@@ -414,10 +414,7 @@ public:
 
         if (method == Card::MethodNone)
             method = Card::MethodUse;
-        if (player->getMark(markName) > 0 || player->isCardLimited(c, method, true))
-            return true;
-        else
-            return false;
+        return player->getMark(markName) > 0 || player->isCardLimited(c, method, true);
     }
 
     void record(TriggerEvent /*triggerEvent*/, Room *room, QVariant &data) const override
@@ -654,9 +651,7 @@ public:
         if (player->isKongcheng())
             return false;
         QString pattern = "nullification";
-        if (XihuaClear::xihua_choice_limit(player, pattern, Card::MethodResponse))
-            return false;
-        return true;
+        return !XihuaClear::xihua_choice_limit(player, pattern, Card::MethodResponse);
     }
 };
 
@@ -1243,7 +1238,7 @@ public:
 
     bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
     {
-        if (!room->askForCard(invoke->invoker, ".red", "@duzhua-discard"))
+        if (room->askForCard(invoke->invoker, ".red", "@duzhua-discard") == nullptr)
             room->loseHp(invoke->invoker);
 
         return false;
@@ -1685,7 +1680,7 @@ public:
             return invoke->invoker->askForSkillInvoke(this, data, "@zhengti-rob:" + invoke->targets.first()->objectName());
         } else {
             invoke->invoker->tag["zhengti_damage"] = data;
-            if (room->askForUseCard(invoke->invoker, "@@zhengti", "@zhengti-redirect", -1, Card::MethodNone, true, objectName())) {
+            if (room->askForUseCard(invoke->invoker, "@@zhengti", "@zhengti-redirect", -1, Card::MethodNone, true, objectName()) != nullptr) {
                 invoke->targets << invoke->invoker->tag.value("zhengti_target").value<ServerPlayer *>();
                 return true;
             }

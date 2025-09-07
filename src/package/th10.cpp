@@ -212,7 +212,7 @@ void GongfengCard::use(Room *room, const CardUseStruct &card_use) const
     if (Slash::IsAvailable(source) && room->askForSkillInvoke(source, "gongfeng_attach", QVariant::fromValue(card_use), "tooTroublesome:" + kanako->objectName())) {
         room->setPlayerFlag(kanako, "SlashRecorder_gongfeng");
         kanako->tag["gongfeng_use"] = QVariant::fromValue(card_use);
-        if (!room->askForUseCard(kanako, "slash", "@gongfeng-slash:" + source->objectName())) {
+        if (room->askForUseCard(kanako, "slash", "@gongfeng-slash:" + source->objectName()) == nullptr) {
             room->setPlayerFlag(kanako, "-SlashRecorder_gongfeng");
             kanako->tag.remove("gongfeng_use");
         }
@@ -309,7 +309,7 @@ public:
                 QVariant gongfeng_useV = use.from->tag.value("gongfeng_use");
                 if (gongfeng_useV.canConvert<CardUseStruct>()) {
                     CardUseStruct gongfeng_use = gongfeng_useV.value<CardUseStruct>();
-                    if (gongfeng_use.from && gongfeng_use.from->isAlive() && gongfeng_use.from->getPhase() == Player::Play) {
+                    if ((gongfeng_use.from != nullptr) && gongfeng_use.from->isAlive() && gongfeng_use.from->getPhase() == Player::Play) {
                         room->sendLog("#gongfeng-addhistory", gongfeng_use.from, use.card->objectName(), {}, objectName());
                         room->addPlayerHistory(gongfeng_use.from, use.card->getClassName());
                     }
@@ -510,7 +510,7 @@ public:
     bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant &data) const override
     {
         if (triggerEvent == EventPhaseEnd)
-            return room->askForCard(invoke->invoker, "@@dfgzmjiyi", "@dfgzmjiyi-discard", QVariant(), Card::MethodDiscard, nullptr, false, objectName());
+            return room->askForCard(invoke->invoker, "@@dfgzmjiyi", "@dfgzmjiyi-discard", QVariant(), Card::MethodDiscard, nullptr, false, objectName()) != nullptr;
 
         return TriggerSkill::cost(triggerEvent, room, invoke, data);
     }
@@ -956,9 +956,7 @@ public:
     }
 };
 
-ShowFengsu::ShowFengsu()
-{
-}
+ShowFengsu::ShowFengsu() = default;
 
 class FengsuDistance : public DistanceSkill
 {
@@ -1018,9 +1016,7 @@ public:
     }
 };
 
-XinshangCard::XinshangCard()
-{
-}
+XinshangCard::XinshangCard() = default;
 
 void XinshangCard::onEffect(const CardEffectStruct &effect) const
 {
@@ -1599,7 +1595,7 @@ public:
 class FengrangVS : public ZeroCardViewAsSkill
 {
 public:
-    FengrangVS(const QString &base)
+    explicit FengrangVS(const QString &base)
         : ZeroCardViewAsSkill(base)
     {
     }
@@ -1709,9 +1705,7 @@ const Card *JiliaoUseCard::validate(CardUseStruct &use) const
     return card;
 }
 
-JiliaoCard::JiliaoCard()
-{
-}
+JiliaoCard::JiliaoCard() = default;
 
 bool JiliaoCard::targetFilter(const QList<const Player *> &targets, const Player * /*to_select*/, const Player * /*Self*/) const
 {
@@ -1753,7 +1747,7 @@ void JiliaoCard::use(Room *room, const CardUseStruct &card_use) const
 
         const Card *c = Sanguosha->getCard(to_throw);
         if (c->isAvailable(source))
-            use = room->askForUseCard(source, "@@jiliao", "jiliao-use:::" + c->objectName(), 0);
+            use = (room->askForUseCard(source, "@@jiliao", "jiliao-use:::" + c->objectName(), 0) != nullptr);
 
         if (!use) {
             if (source->canDiscard(target, to_throw))

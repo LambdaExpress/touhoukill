@@ -46,7 +46,7 @@ public:
 
     bool cost(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
     {
-        auto t = room->askForPlayerChosen(invoke->invoker, room->getAllPlayers(), objectName(), "@qixiang-select", true, true);
+        auto *t = room->askForPlayerChosen(invoke->invoker, room->getAllPlayers(), objectName(), "@qixiang-select", true, true);
         if (t != nullptr) {
             invoke->targets << t;
             return true;
@@ -1856,10 +1856,7 @@ public:
                 break;
             }
         }
-        if (handnum >= player->getHandcardNum())
-            return true;
-        else
-            return false;
+        return handnum >= player->getHandcardNum();
     }
 
     int getDistanceLimit(const Player *from, const Card *card) const override
@@ -2055,9 +2052,7 @@ public:
     }
 };
 
-YinyangCard::YinyangCard()
-{
-}
+YinyangCard::YinyangCard() = default;
 
 bool YinyangCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {

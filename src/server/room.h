@@ -310,7 +310,7 @@ public:
     QList<int> getCardIdsOnTable(const QList<int> &card_ids) const;
 
     void drawCards(ServerPlayer *player, int n, const QString &reason = QString());
-    void drawCards(QList<ServerPlayer *> players, int n, const QString &reason = QString());
+    void drawCards(const QList<ServerPlayer *> &players, int n, const QString &reason = QString());
     void drawCards(const QList<ServerPlayer *> &players, const QList<int> &n_list, const QString &reason = QString());
     void obtainCard(ServerPlayer *target, const Card *card, bool unhide = true);
     void obtainCard(ServerPlayer *target, int card_id, bool unhide = true);
@@ -473,7 +473,8 @@ private:
         inline bool operator<(const _MoveSeparateClassifier &other) const
         {
             return m_from < other.m_from && m_to < other.m_to && m_from_place < other.m_from_place && m_to_place < other.m_to_place && m_from_pile_name < other.m_from_pile_name
-                && m_to_pile_name < other.m_to_pile_name && m_open < other.m_open && m_is_last_handcard < other.m_is_last_handcard;
+                && m_to_pile_name < other.m_to_pile_name && static_cast<int>(m_open) < static_cast<int>(other.m_open)
+                && static_cast<int>(m_is_last_handcard) < static_cast<int>(other.m_is_last_handcard);
         }
         Player *m_from;
         Player *m_to;

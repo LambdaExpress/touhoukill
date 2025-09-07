@@ -1422,7 +1422,7 @@ void RoomScene::enableTargets(const Card *card)
         if (card->isKindOf("Slash") && Self->hasFlag("slashTargetFixToOne")) {
             unselectAllTargets();
             foreach (Photo *photo, photos) {
-                if (photo->flags() & QGraphicsItem::ItemIsSelectable)
+                if ((photo->flags() & QGraphicsItem::ItemIsSelectable) != 0u)
                     if (!photo->isSelected()) {
                         photo->setSelected(true);
                         break;
@@ -1433,9 +1433,9 @@ void RoomScene::enableTargets(const Card *card)
                 unselectAllTargets();
                 int count = 0;
                 foreach (Photo *photo, photos)
-                    if (photo->flags() & QGraphicsItem::ItemIsSelectable)
+                    if ((photo->flags() & QGraphicsItem::ItemIsSelectable) != 0u)
                         count++;
-                if (dashboard->flags() & QGraphicsItem::ItemIsSelectable)
+                if ((dashboard->flags() & QGraphicsItem::ItemIsSelectable) != 0u)
                     count++;
                 if (count == 1)
                     selectNextTarget(false);
@@ -1499,7 +1499,7 @@ void RoomScene::updateSelectedTargets()
 
     const Card *card = dashboard->getSelected();
     if (card != nullptr) {
-        const ClientPlayer *player = item2player.value(item, NULL);
+        const ClientPlayer *player = item2player.value(item, nullptr);
         if (item->isSelected())
             selected_targets.append(player);
         else {
@@ -1529,8 +1529,8 @@ void RoomScene::keyReleaseEvent(QKeyEvent *event)
     if (chat_edit->hasFocus())
         return;
 
-    bool control_is_down = event->modifiers() & Qt::ControlModifier;
-    bool alt_is_down = event->modifiers() & Qt::AltModifier;
+    bool control_is_down = ((event->modifiers() & Qt::ControlModifier) != 0u);
+    bool alt_is_down = ((event->modifiers() & Qt::AltModifier) != 0u);
 
     switch (event->key()) {
     case Qt::Key_F1:
@@ -1693,7 +1693,7 @@ void RoomScene::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 
         bool enabled = false;
         foreach (PlayerCardContainer *container, item2player.keys()) {
-            const ClientPlayer *player = item2player.value(container, NULL);
+            const ClientPlayer *player = item2player.value(container, nullptr);
             QStringList piles = player->getPileNames();
             if (!piles.isEmpty()) {
                 foreach (QString pile_name, piles) {
@@ -1720,7 +1720,7 @@ void RoomScene::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
             QMenu *known_cards = menu->addMenu(tr("Known cards"));
 
             foreach (PlayerCardContainer *container, item2player.keys()) {
-                const ClientPlayer *player = item2player.value(container, NULL);
+                const ClientPlayer *player = item2player.value(container, nullptr);
                 if (player == Self)
                     continue;
                 QList<const Card *> known = player->getHandcards();
@@ -2011,7 +2011,7 @@ GenericCardContainer *RoomScene::_getGenericCardContainer(Player::Place place, P
     else if (player == Self)
         return dashboard;
     else if (player != nullptr)
-        return name2photo.value(player->objectName(), NULL);
+        return name2photo.value(player->objectName(), nullptr);
     else
         Q_ASSERT(false);
     return nullptr;
@@ -2584,7 +2584,7 @@ void RoomScene::selectTarget(int order, bool multiple)
 
     if (to_select == nullptr)
         return;
-    if (!(to_select->isSelected() || (to_select->flags() & QGraphicsItem::ItemIsSelectable)))
+    if (!(to_select->isSelected() || ((to_select->flags() & QGraphicsItem::ItemIsSelectable) != 0u)))
         return;
 
     to_select->setSelected(!to_select->isSelected());
@@ -2597,11 +2597,11 @@ void RoomScene::selectNextTarget(bool multiple)
 
     QList<QGraphicsItem *> targets;
     foreach (Photo *photo, photos) {
-        if (photo->flags() & QGraphicsItem::ItemIsSelectable)
+        if ((photo->flags() & QGraphicsItem::ItemIsSelectable) != 0u)
             targets << photo;
     }
 
-    if (dashboard->flags() & QGraphicsItem::ItemIsSelectable)
+    if ((dashboard->flags() & QGraphicsItem::ItemIsSelectable) != 0u)
         targets << dashboard;
 
     for (int i = 0; i < targets.length(); i++) {
@@ -3201,7 +3201,7 @@ void RoomScene::changeTableBg(const QString &tableBgImage_path)
 void RoomScene::changeHp(const QString &who, int delta, DamageStruct::Nature nature, bool losthp)
 {
     // update
-    Photo *photo = name2photo.value(who, NULL);
+    Photo *photo = name2photo.value(who, nullptr);
     if (photo != nullptr)
         photo->updateHp();
     else
@@ -3353,7 +3353,7 @@ void RoomScene::addRestartButton(QDialog *dialog)
     QHBoxLayout *hlayout = new QHBoxLayout;
     hlayout->addStretch();
 
-    if (ClientInstance->findChild<Replayer *>() == NULL && QUrl(Config.HostAddress).path().isEmpty()) {
+    if (ClientInstance->findChild<Replayer *>() == nullptr && QUrl(Config.HostAddress).path().isEmpty()) {
         QPushButton *restart_button = new QPushButton(tr("Restart Game"));
         connect(restart_button, SIGNAL(clicked()), dialog, SLOT(accept()));
         connect(restart_button, SIGNAL(clicked()), this, SIGNAL(restart()));
@@ -3913,7 +3913,7 @@ void RoomScene::detachSkill(const QString &skill_name, bool head)
 {
     // for all the skills has a ViewAsSkill Effect { Client::setMark(const Json::Value &) }
     // this is a DIRTY HACK!!! for we should prevent the ViewAsSkill button been removed temporily by duanchang
-    if (Self != NULL && Self->getMark("ViewAsSkill_" + skill_name + "Effect") > 0) {
+    if (Self != nullptr && Self->getMark("ViewAsSkill_" + skill_name + "Effect") > 0) {
         Self->addMark("ViewAsSkill_" + skill_name + "Lost", 1);
     } else {
         QSanSkillButton *btn = dashboard->removeSkillButton(skill_name, head);
@@ -4543,7 +4543,7 @@ void RoomScene::doAnimation(int name, const QStringList &args)
         anim_name[S_ANIMATE_BATTLEARRAY] = "battlearray";
     }
 
-    AnimationFunc func = map.value((AnimateType)name, NULL);
+    AnimationFunc func = map.value((AnimateType)name, nullptr);
     if (func != nullptr)
         (this->*func)(anim_name.value((AnimateType)name, QString()), args);
 }
@@ -5142,7 +5142,7 @@ void RoomScene::showBubbleChatBox(const QString &who, const QString &line)
 const QSize BUBBLE_CHAT_BOX_SHOW_AREA_SIZE(138, 64);
 QRect RoomScene::getBubbleChatBoxShowArea(const QString &who) const
 {
-    Photo *photo = name2photo.value(who, NULL);
+    Photo *photo = name2photo.value(who, nullptr);
     if (photo != nullptr) {
         QRectF rect = photo->sceneBoundingRect();
         return QRect(QPoint(rect.left() + 18, rect.top() + 26), BUBBLE_CHAT_BOX_SHOW_AREA_SIZE);
@@ -5316,9 +5316,7 @@ CommandLinkDoubleClickButton::CommandLinkDoubleClickButton(const QString &text, 
 {
 }
 
-CommandLinkDoubleClickButton::~CommandLinkDoubleClickButton()
-{
-}
+CommandLinkDoubleClickButton::~CommandLinkDoubleClickButton() = default;
 
 void CommandLinkDoubleClickButton::mouseDoubleClickEvent(QMouseEvent *event)
 {

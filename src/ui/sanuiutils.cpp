@@ -4,9 +4,9 @@
 #include <QImage>
 #include <QPixmap>
 
-#define NEW_PIXEL_CHANNEL(x, y, channel) (newImage[(y * cols + x) * 4 + channel])
+#define NEW_PIXEL_CHANNEL(x, y, channel) (newImage[((y) * cols + (x)) * 4 + (channel)])
 #define NEW_PIXEL(x, y) NEW_PIXEL_CHANNEL(x, y, 3)
-#define OLD_PIXEL(x, y) (oldImage[(y * cols + x) * 4 + 3])
+#define OLD_PIXEL(x, y) (oldImage[((y) * cols + (x)) * 4 + 3])
 
 void SanUiUtils::makeGray(QPixmap &pixmap)
 {

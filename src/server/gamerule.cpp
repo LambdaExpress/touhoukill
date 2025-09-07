@@ -949,7 +949,7 @@ bool GameRule::effect(TriggerEvent triggerEvent, Room *room, QSharedPointer<Skil
     }
     case BuryVictim: {
         DeathStruct death = data.value<DeathStruct>();
-        bool skipRewardAndPunish = death.who->hasFlag("skipRewardAndPunish") ? true : false;
+        bool skipRewardAndPunish = death.who->hasFlag("skipRewardAndPunish");
         if (room->getMode() == "03_1v2" || room->getMode() == "04_2v2")
             skipRewardAndPunish = true;
         death.who->bury();

@@ -183,7 +183,7 @@ public:
 
         const Card *c = Sanguosha->getCard(id);
         if (c->isAvailable(target))
-            used = room->askForUseCard(target, "@@ZhushiOtherVS", "@zhushi-othervs");
+            used = (room->askForUseCard(target, "@@ZhushiOtherVS", "@zhushi-othervs") != nullptr);
 
         if (!used)
             room->obtainCard(target, id);
@@ -541,9 +541,7 @@ public:
         SlashEffectStruct effect = data.value<SlashEffectStruct>();
         effect.from->tag["guaili_target"] = QVariant::fromValue(effect.to);
         const Card *card = room->askForCard(effect.from, ".|red|.|hand", "@guaili:" + effect.to->objectName(), data, objectName());
-        if (card != nullptr)
-            return true;
-        return false;
+        return card != nullptr;
     }
 
     bool effect(TriggerEvent /*triggerEvent*/, Room *room, QSharedPointer<SkillInvokeDetail> /*invoke*/, QVariant &data) const override

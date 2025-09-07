@@ -1502,10 +1502,7 @@ public:
         room->sendLog("#HuanweiTrigger", invoke->invoker, "huanwei", logto, QString::number(1));
         room->notifySkillInvoked(invoke->invoker, "huanwei");
         data = QVariant::fromValue(damage);
-        if (damage.damage == 0)
-            return true;
-
-        return false;
+        return damage.damage == 0;
     }
 };
 
@@ -1821,9 +1818,7 @@ public:
             if (p->hasSkill("modian") && !p->hasFlag("modianInvoked"))
                 return true;
         }
-        if (player->hasSkill("modian") && !player->hasFlag("modianInvoked"))
-            return true;
-        return false;
+        return player->hasSkill("modian") && !player->hasFlag("modianInvoked");
     }
 
     bool viewFilter(const Card *to_select) const override
@@ -2017,55 +2012,6 @@ public:
         f->addSubcard(s);
         f->setSkillName(objectName());
         return f;
-#if 0
-        //Play
-        if (Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_PLAY) {
-            if (cards.length() == 1 && cards.first()->isKindOf("TrickCard")) {
-                Slash *slash = new Slash(cards.first()->getSuit(), cards.first()->getNumber());
-                slash->addSubcard(cards.first());
-                slash->setSkillName(objectName());
-                return slash;
-
-            } else if (cards.length() == 2) {
-                foreach (const Card *c, cards) {
-                    if (c->isKindOf("TrickCard")) {
-                        Card *card = Sanguosha->cloneCard(c->objectName());
-                        foreach (const Card *c, cards) {
-                            if (c->isKindOf("Slash")) {
-                                card->addSubcard(c);
-                                card->setSkillName(objectName());
-                                card->setCanRecast(false);
-                                return card;
-                            }
-                        }
-                    }
-                }
-            }
-        } else { // RESPONSE_USE
-            QString pattern = Sanguosha->currentRoomState()->getCurrentCardUsePattern();
-            if (cards.length() == 1 && cards.first()->isKindOf("TrickCard") && matchAvaliablePattern("slash", pattern)) {
-                Slash *slash = new Slash(cards.first()->getSuit(), cards.first()->getNumber());
-                slash->addSubcard(cards.first());
-                slash->setSkillName(objectName());
-                return slash;
-            } else if (cards.length() == 2) {
-                foreach (const Card *c, cards) {
-                    if (c->isKindOf("TrickCard") && matchAvaliablePattern(c->objectName(), pattern)) {
-                        Card *card = Sanguosha->cloneCard(c->objectName());
-                        foreach (const Card *c, cards) {
-                            if (c->isKindOf("Slash")) {
-                                card->addSubcard(c);
-                                card->setSkillName(objectName());
-                                card->setCanRecast(false);
-                                return card;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-#endif
-        return nullptr;
     }
 
     bool isEnabledAtNullification(const ServerPlayer *player) const override
@@ -2197,9 +2143,7 @@ public:
     }
 };
 
-MoyanCard::MoyanCard()
-{
-}
+MoyanCard::MoyanCard() = default;
 
 bool MoyanCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
@@ -2329,9 +2273,9 @@ public:
     bool cost(TriggerEvent triggerEvent, Room *room, QSharedPointer<SkillInvokeDetail> invoke, QVariant & /*data*/) const override
     {
         if (triggerEvent != EventPhaseStart)
-            return room->askForUseCard(invoke->invoker, "@@zongjiu-card1", "@zongjiu-card1", 1, Card::MethodUse, true, objectName());
+            return room->askForUseCard(invoke->invoker, "@@zongjiu-card1", "@zongjiu-card1", 1, Card::MethodUse, true, objectName()) != nullptr;
         else
-            return room->askForUseCard(invoke->invoker, "@@zongjiu-card2", "@zongjiu-card2", 2, Card::MethodUse, true, objectName());
+            return room->askForUseCard(invoke->invoker, "@@zongjiu-card2", "@zongjiu-card2", 2, Card::MethodUse, true, objectName()) != nullptr;
     }
 
     bool effect(TriggerEvent /*triggerEvent*/, Room * /*room*/, QSharedPointer<SkillInvokeDetail> /*invoke*/, QVariant & /*data*/) const override

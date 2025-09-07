@@ -724,7 +724,7 @@ void GeneralOverview::startSearch(bool include_hidden, const QString &nickname, 
         }
         if (!kingdoms.isEmpty() && !kingdoms.contains(general->getKingdom()))
             continue;
-        if (!(lower == 0 && upper == 0) && (general->getMaxHp() < lower || general->getMaxHp() > upper))
+        if ((lower != 0 || upper != 0) && (general->getMaxHp() < lower || general->getMaxHp() > upper))
             continue;
         if (!packages.isEmpty() && !packages.contains(general->getPackage()))
             continue;

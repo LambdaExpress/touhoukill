@@ -14,9 +14,7 @@ MyPixmapItem::MyPixmapItem(const QPixmap &pixmap, QGraphicsItem *parentItem)
     easytext = Sanguosha->getChattingEasyTexts();
 }
 
-MyPixmapItem::~MyPixmapItem()
-{
-}
+MyPixmapItem::~MyPixmapItem() = default;
 
 void MyPixmapItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
@@ -167,9 +165,7 @@ ChatWidget::ChatWidget()
     connect(returnButton, SIGNAL(clicked()), this, SLOT(sendText()));
 }
 
-ChatWidget::~ChatWidget()
-{
-}
+ChatWidget::~ChatWidget() = default;
 
 void ChatWidget::showEasyTextBoard()
 {

@@ -33,9 +33,7 @@ GraphicsBox::GraphicsBox(const QString &title)
     stylize(this);
 }
 
-GraphicsBox::~GraphicsBox()
-{
-}
+GraphicsBox::~GraphicsBox() = default;
 
 void GraphicsBox::paintGraphicsBoxStyle(QPainter *painter, const QString &boxTitle, const QRectF &rect)
 {
