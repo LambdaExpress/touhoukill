@@ -73,12 +73,12 @@ void Button::init()
             int y = j;
 
             if (x >= pad && x <= (tw - pad))
-                x = pad + (x - pad) * xc;
+                x = pad + ((x - pad) * xc);
             else if (x >= (tw - pad))
                 x = w - (tw - x);
 
             if (y >= pad && y <= (th - pad))
-                y = pad + (y - pad) * yc;
+                y = pad + ((y - pad) * yc);
             else if (y >= (th - pad))
                 y = h - (th - y);
 

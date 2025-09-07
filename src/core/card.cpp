@@ -448,7 +448,9 @@ const Card *Card::Parse(const QString &str)
         QRegExp ex_pattern("@(\\w*)\\[(\\w+):(.+)\\]=([^:]+)(:.+)?");
 
         QStringList texts;
-        QString card_name, card_suit, card_number;
+        QString card_name;
+        QString card_suit;
+        QString card_number;
         QStringList subcard_ids;
         QString subcard_str;
         QString user_string;
@@ -527,11 +529,11 @@ const Card *Card::Parse(const QString &str)
             return nullptr;
 
         QStringList texts = pattern.capturedTexts();
-        QString card_name = texts.at(1);
-        QString m_skillName = texts.at(2);
-        QString suit_string = texts.at(3);
-        QString number_string = texts.at(4);
-        QString subcard_str = texts.at(5);
+        const QString &card_name = texts.at(1);
+        const QString &m_skillName = texts.at(2);
+        const QString &suit_string = texts.at(3);
+        const QString &number_string = texts.at(4);
+        const QString &subcard_str = texts.at(5);
         QStringList subcard_ids;
         if (subcard_str != ".")
             subcard_ids = subcard_str.split("+");

@@ -128,7 +128,7 @@ QTextDocument *ClientPlayer::getMarkDoc() const
     return mark_doc;
 }
 
-void ClientPlayer::changePile(const QString &name, bool add, QList<int> card_ids)
+void ClientPlayer::changePile(const QString &name, bool add, const QList<int> &card_ids)
 {
     if (name == "shown_card" || name == "huashencard")
         emit pile_changed(name);

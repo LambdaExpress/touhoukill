@@ -31,7 +31,7 @@ QRectF TablePile::boundingRect() const
 void TablePile::setSize(double width, double height)
 {
     m_cardsDisplayRegion = QRect(0, 0, width, height);
-    m_numCardsVisible = width / G_COMMON_LAYOUT.m_cardNormalHeight + 1;
+    m_numCardsVisible = (width / G_COMMON_LAYOUT.m_cardNormalHeight) + 1;
     resetTransform();
     setTransform(QTransform::fromTranslate(-width / 2, -height / 2), true);
 }

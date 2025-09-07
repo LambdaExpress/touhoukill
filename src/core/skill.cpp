@@ -595,7 +595,7 @@ ViewHasSkill::ViewHasSkill(const QString &name)
 {
 }
 
-BattleArraySkill::BattleArraySkill(const QString &name, const QString type) //
+BattleArraySkill::BattleArraySkill(const QString &name, const QString &type) //
     : TriggerSkill(name)
     , array_type(type)
 {

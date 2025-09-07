@@ -121,7 +121,7 @@ public:
         events << CardUsed;
     }
 
-    static bool canShayiDamage(CardUseStruct use)
+    static bool canShayiDamage(const CardUseStruct &use)
     {
         if (use.card->canDamage())
             return true;

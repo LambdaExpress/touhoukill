@@ -24,6 +24,7 @@
 #include <QTimer>
 #include <QTimerEvent>
 #include <ctime>
+#include <utility>
 
 #ifdef QSAN_UI_LIBRARY_AVAILABLE
 #pragma message WARN("UI elements detected in server side!!!")
@@ -1082,7 +1083,7 @@ QString Room::askForChoice(ServerPlayer *player, const QString &skill_name, cons
         validChoices.append(choice.split("+"));
     Q_ASSERT(!validChoices.isEmpty());
     QStringList titles = skill_name.split("%");
-    QString skillname = titles.at(0);
+    const QString &skillname = titles.at(0);
 
     AI *ai = player->getAI();
     QString answer;
@@ -1363,7 +1364,7 @@ bool Room::_askForNullification(const Card *trick, ServerPlayer *from, ServerPla
         QVariantList qtargets = tag["targets" + trick->toString()].toList();
         QList<ServerPlayer *> targets;
         for (int i = 0; i < qtargets.size(); i++) {
-            QVariant n = qtargets.at(i);
+            const QVariant &n = qtargets.at(i);
             targets.append(n.value<ServerPlayer *>());
         }
         QList<ServerPlayer *> targets_copy = targets;
@@ -1898,7 +1899,7 @@ const Card *Room::askForUseCard(ServerPlayer *player, const QString &pattern, co
     return nullptr;
 }
 
-const Card *Room::askForUseSlashTo(ServerPlayer *slasher, QList<ServerPlayer *> victims, const QString &prompt, bool distance_limit, bool disable_extra, bool addHistory)
+const Card *Room::askForUseSlashTo(ServerPlayer *slasher, const QList<ServerPlayer *> &victims, const QString &prompt, bool distance_limit, bool disable_extra, bool addHistory)
 {
     Q_ASSERT(!victims.isEmpty());
 
@@ -2779,7 +2780,7 @@ void Room::prepareForStart()
 
                 for (int i = 0; i < n; i++) {
                     ServerPlayer *player = all_players[i];
-                    QString role = roles.at(i);
+                    const QString &role = roles.at(i);
 
                     player->setRole(role);
                     if (mode == "03_1v2" || mode == "04_2v2") {
@@ -3520,7 +3521,7 @@ void Room::assignRoles()
 
     for (int i = 0; i < n; i++) {
         ServerPlayer *player = m_players[i];
-        QString role = roles.at(i);
+        const QString &role = roles.at(i);
 
         player->setRole(role);
         if (role == "lord") {
@@ -3669,7 +3670,7 @@ int Room::getCardFromPile(const QString &card_pattern)
             }
         }
     } else {
-        QString card_name = card_pattern;
+        const QString &card_name = card_pattern;
         foreach (int card_id, *m_drawPile) {
             const Card *card = Sanguosha->getCard(card_id);
             if (card->objectName() == card_name)
@@ -3820,8 +3821,8 @@ void Room::speakCommand(ServerPlayer *player, const QVariant &arg)
             _NO_BROADCAST_SPEAKING;
             QStringList arg = sentence.mid(17).split(":");
             if (arg.length() == 2) {
-                QString name = arg.first();
-                QString pile_name = arg.last();
+                const QString &name = arg.first();
+                const QString &pile_name = arg.last();
                 foreach (ServerPlayer *p, m_alivePlayers) {
                     if (p->objectName() == name || p->getGeneralName() == name) {
                         if (!p->getPile(pile_name).isEmpty()) {
@@ -4275,7 +4276,7 @@ bool Room::isJinkEffected(SlashEffectStruct effect, const Card *jink)
     Q_ASSERT(jink->isKindOf("Jink"));
     JinkEffectStruct j;
     j.jink = jink;
-    j.slashEffect = effect;
+    j.slashEffect = std::move(effect);
     QVariant jink_data = QVariant::fromValue(j);
     return !thread->trigger(JinkEffect, this, jink_data);
 }
@@ -4428,7 +4429,8 @@ bool Room::hasWelfare(const ServerPlayer *player) const
 ServerPlayer *Room::getFront(ServerPlayer *a, ServerPlayer *b) const
 {
     QList<ServerPlayer *> players = getAllPlayers(true);
-    int index_a = players.indexOf(a), index_b = players.indexOf(b);
+    int index_a = players.indexOf(a);
+    int index_b = players.indexOf(b);
     if (index_a < index_b)
         return a;
     else
@@ -4657,13 +4659,14 @@ void Room::drawCards(QList<ServerPlayer *> players, int n, const QString &reason
 {
     QList<int> n_list;
     n_list.append(n);
-    drawCards(players, n_list, reason);
+    drawCards(std::move(players), n_list, reason);
 }
 
-void Room::drawCards(QList<ServerPlayer *> players, QList<int> n_list, const QString &reason)
+void Room::drawCards(const QList<ServerPlayer *> &players, const QList<int> &n_list, const QString &reason)
 {
     QList<CardsMoveStruct> moves;
-    int index = -1, len = n_list.length();
+    int index = -1;
+    int len = n_list.length();
     Q_ASSERT(len >= 1);
     foreach (ServerPlayer *player, players) {
         index++;
@@ -4852,7 +4855,7 @@ QList<CardsMoveOneTimeStruct> Room::_mergeMoves(const QList<CardsMoveStruct> &ca
     }
 
     if (result.size() > 1) {
-        std::sort(result.begin(), result.end(), [](CardsMoveOneTimeStruct move1, CardsMoveOneTimeStruct move2) -> bool {
+        std::sort(result.begin(), result.end(), [](const CardsMoveOneTimeStruct &move1, const CardsMoveOneTimeStruct &move2) -> bool {
             ServerPlayer *a = (ServerPlayer *)move1.from;
             if (a == nullptr)
                 a = (ServerPlayer *)move1.to;
@@ -4942,7 +4945,7 @@ QList<CardsMoveStruct> Room::_separateMoves(const QList<CardsMoveOneTimeStruct> 
         i++;
     }
     if (card_moves.size() > 1) {
-        std::sort(card_moves.begin(), card_moves.end(), [](CardsMoveStruct move1, CardsMoveStruct move2) -> bool {
+        std::sort(card_moves.begin(), card_moves.end(), [](const CardsMoveStruct &move1, const CardsMoveStruct &move2) -> bool {
             ServerPlayer *a = (ServerPlayer *)move1.from;
             if (a == nullptr)
                 a = (ServerPlayer *)move1.to;
@@ -4960,7 +4963,7 @@ QList<CardsMoveStruct> Room::_separateMoves(const QList<CardsMoveOneTimeStruct> 
     return card_moves;
 }
 
-void Room::moveCardsAtomic(CardsMoveStruct cards_move, bool forceMoveVisible)
+void Room::moveCardsAtomic(const CardsMoveStruct &cards_move, bool forceMoveVisible)
 {
     QList<CardsMoveStruct> cards_moves;
     cards_moves.append(cards_move);
@@ -5067,7 +5070,7 @@ void Room::moveCardsAtomic(QList<CardsMoveStruct> cards_moves, bool forceMoveVis
     }
 }
 
-void Room::moveCardsToEndOfDrawpile(QList<int> card_ids, bool forceVisible)
+void Room::moveCardsToEndOfDrawpile(const QList<int> &card_ids, bool forceVisible)
 {
     QList<CardsMoveStruct> moves;
     CardsMoveStruct move(card_ids, nullptr, Player::DrawPile, CardMoveReason(CardMoveReason::S_REASON_UNKNOWN, QString()));
@@ -5953,7 +5956,7 @@ bool Room::askForDiscard(ServerPlayer *player, const QString &reason, int discar
     return true;
 }
 
-void Room::doJileiShow(ServerPlayer *player, QList<int> jilei_ids)
+void Room::doJileiShow(ServerPlayer *player, const QList<int> &jilei_ids)
 {
     JsonArray gongxinArgs;
     gongxinArgs << player->objectName();
@@ -6095,7 +6098,8 @@ void Room::askForGuanxing(ServerPlayer *zhuge, const QList<int> &cards, Guanxing
     // ATTENTION: DO REMOVE THE CARD FROM getDrawPile (But keep their place in DrawPile, via getNCards or something) BEFORE USING THIS FUNCTION!
     // Else duplicated card ids will appear in the bottom of draw pile, which will cause card stuck when accessed, and (maybe other) subsequent Client / Server misbehave
 
-    QList<int> top_cards, bottom_cards;
+    QList<int> top_cards;
+    QList<int> bottom_cards;
     tryPause();
     notifyMoveFocus(zhuge, S_COMMAND_SKILL_GUANXING);
 
@@ -6192,7 +6196,7 @@ void Room::askForGuanxing(ServerPlayer *zhuge, const QList<int> &cards, Guanxing
     thread->trigger(AfterGuanXing, this, v);
 }
 
-int Room::doGongxin(ServerPlayer *shenlvmeng, ServerPlayer *target, QList<int> enabled_ids, QString skill_name, bool cancellable)
+int Room::doGongxin(ServerPlayer *shenlvmeng, ServerPlayer *target, QList<int> enabled_ids, const QString &skill_name, bool cancellable)
 {
     Q_ASSERT(!target->isKongcheng());
     tryPause();
@@ -6313,7 +6317,8 @@ QList<const Card *> Room::askForPindianRace(ServerPlayer *from, ServerPlayer *to
     countdown.type = Countdown::S_COUNTDOWN_USE_SPECIFIED;
     notifyMoveFocus(QList<ServerPlayer *>() << from << to, S_COMMAND_PINDIAN, countdown);
 
-    const Card *from_card = nullptr, *to_card = nullptr;
+    const Card *from_card = nullptr;
+    const Card *to_card = nullptr;
 
     if (from->getHandcardNum() == 1)
         from_card = from->getHandcards().constFirst();
@@ -6501,7 +6506,7 @@ QString Room::askForGeneral(ServerPlayer *player, const QStringList &generals, Q
 
 QString Room::askForGeneral(ServerPlayer *player, const QString &generals, QString default_choice)
 {
-    return askForGeneral(player, generals.split("+"), default_choice); // For Lua only!!!
+    return askForGeneral(player, generals.split("+"), std::move(default_choice)); // For Lua only!!!
 }
 
 bool Room::makeCheat(ServerPlayer *player)
@@ -7352,7 +7357,7 @@ void Room::countDescription()
     file.close();
 }
 
-void Room::transformGeneral(ServerPlayer *player, QString general_name, int head)
+void Room::transformGeneral(ServerPlayer *player, const QString &general_name, int head)
 {
     if (!player->canTransform(head != 0))
         return; //check sujiang

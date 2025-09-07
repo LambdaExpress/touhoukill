@@ -17,7 +17,7 @@ public:
         frequency = Compulsory;
     }
 
-    static void adjustHandcardNum(ServerPlayer *player, int card_num, QString reason)
+    static void adjustHandcardNum(ServerPlayer *player, int card_num, const QString &reason)
     {
         Room *room = player->getRoom();
         int hc_num = player->getHandcardNum();

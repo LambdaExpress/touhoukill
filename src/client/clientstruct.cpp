@@ -43,7 +43,7 @@ bool ServerInfoStruct::parse(const QString &str)
     } else {
         DuringGame = true;
 
-        QString server_name = texts.at(1);
+        const QString &server_name = texts.at(1);
         Name = QString::fromUtf8(QByteArray::fromBase64(server_name.toLatin1()));
 
         GameMode = texts.at(2);
@@ -64,7 +64,7 @@ bool ServerInfoStruct::parse(const QString &str)
             Extensions << package_name;
         }
 
-        QString flags = texts.at(6);
+        const QString &flags = texts.at(6);
 
         RandomSeat = flags.contains("R");
         EnableCheat = flags.contains("C");

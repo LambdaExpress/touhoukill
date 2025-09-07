@@ -1594,7 +1594,7 @@ public:
 class YaoliVS : public OneCardViewAsSkill
 {
 public:
-    YaoliVS(QString name, bool attach)
+    YaoliVS(const QString &name, bool attach)
         : OneCardViewAsSkill(name)
     {
         attached_lord_skill = attach;

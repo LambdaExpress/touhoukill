@@ -459,7 +459,8 @@ void Dashboard::selectCard(const QString &pattern, bool forward, bool multiple)
         }
     }
 
-    int index = matches.indexOf(selected), n = matches.length();
+    int index = matches.indexOf(selected);
+    int n = matches.length();
     index = (index + (forward ? 1 : n - 1)) % n;
 
     CardItem *to_select = matches[index];
@@ -543,7 +544,7 @@ void Dashboard::selectCard(CardItem *item, bool isSelected)
     item->setSelected(isSelected);
     QPointF oldPos = item->homePos();
     QPointF newPos = oldPos;
-    newPos.setY(newPos.y() + (isSelected ? 1 : -1) * S_PENDING_OFFSET_Y);
+    newPos.setY(newPos.y() + ((isSelected ? 1 : -1) * S_PENDING_OFFSET_Y));
     item->setHomePos(newPos);
     selected = item;
 
@@ -660,7 +661,7 @@ QSanSkillButton *Dashboard::removeSkillButton(const QString &skillName, bool hea
     return btn;
 }
 
-void Dashboard::highlightEquip(QString skillName, bool highlight)
+void Dashboard::highlightEquip(const QString &skillName, bool highlight)
 {
     int i = 0;
     for (i = 0; i < 5; i++) {
@@ -890,8 +891,8 @@ void Dashboard::_adjustCards()
 
     if (maxCards >= n)
         maxCards = n;
-    else if (maxCards <= (n - 1) / 2 + 1)
-        maxCards = (n - 1) / 2 + 1;
+    else if (maxCards <= ((n - 1) / 2) + 1)
+        maxCards = ((n - 1) / 2) + 1;
     QList<CardItem *> row;
     QSanRoomSkin::DashboardLayout *layout = (QSanRoomSkin::DashboardLayout *)_m_layout;
     int leftWidth = layout->m_leftWidth;
@@ -1782,7 +1783,7 @@ void Dashboard::showSeat()
     PixmapAnimation *pma = PixmapAnimation::GetPixmapAnimation(_m_rightFrame, "seat");
     if (pma != nullptr) {
         pma->setTransform(QTransform::fromTranslate(-pma->boundingRect().width() / 2, -pma->boundingRect().height() / 2));
-        pma->setPos(region.x() + region.width() / 2, region.y() + region.height() / 2);
+        pma->setPos(region.x() + (region.width() / 2), region.y() + (region.height() / 2));
     }
     _paintPixmap(_m_seatItem, region, _getPixmap(QSanRoomSkin::S_SKIN_KEY_SEAT_NUMBER, QString::number(m_player->getSeat())), _m_rightFrame);
     //save the seat number for later use

@@ -388,7 +388,8 @@ int Player::getAttackRange(bool include_weapon) const
     if (fixeddis > 0)
         return fixeddis;
 
-    int original_range = 1, weapon_range = 0;
+    int original_range = 1;
+    int weapon_range = 0;
 
     if (include_weapon) {
         const Weapon *card = qobject_cast<const Weapon *>(weapon->getRealCard());
@@ -970,7 +971,11 @@ void Player::removeEquip(WrappedCard *equip)
 bool Player::hasEquip(const Card *card) const
 {
     Q_ASSERT(card != nullptr);
-    int weapon_id = -1, armor_id = -1, def_id = -1, off_id = -1, tr_id = -1;
+    int weapon_id = -1;
+    int armor_id = -1;
+    int def_id = -1;
+    int off_id = -1;
+    int tr_id = -1;
     if (weapon != nullptr)
         weapon_id = weapon->getEffectiveId();
     if (armor != nullptr)
@@ -1166,7 +1171,9 @@ int Player::getMaxCards(const QString &except) const
     int origin = Sanguosha->correctMaxCards(this, true, except);
     if (origin == 0)
         origin = qMax(getHp(), 0);
-    int rule = 0, total = 0, extra = 0;
+    int rule = 0;
+    int total = 0;
+    int extra = 0;
     if (Config.MaxHpScheme == 3 && (general2 != nullptr)) {
         total = general->getMaxHp() + general2->getMaxHp();
         if (total % 2 != 0 && getMark("AwakenLostMaxHp") == 0)
@@ -2214,7 +2221,8 @@ QStringList Player::disableShow(bool head) const
 
 bool Player::canShowGeneral(const QString &flags) const
 {
-    bool head = true, deputy = true;
+    bool head = true;
+    bool deputy = true;
     foreach (const QString &dis_str, disable_show) {
         QStringList dis_list = dis_str.split(',');
         if (dis_list.at(0).contains("h"))

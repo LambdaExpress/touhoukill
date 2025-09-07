@@ -204,8 +204,8 @@ void HeroSkinContainer::fillSkins()
         connect(m_vScrollBar, SIGNAL(valueChanged(int)), this, SLOT(scrollBarValueChanged(int)));
 
         m_vScrollBar->setMaximum((rows - 1) * (SKIN_ITEM_HEIGHT + Y_STEP));
-        m_vScrollBar->setPageStep(12 + (rows - 1) * 3);
-        m_vScrollBar->setSingleStep(15 + (rows - 1) * 3);
+        m_vScrollBar->setPageStep(12 + ((rows - 1) * 3));
+        m_vScrollBar->setSingleStep(15 + ((rows - 1) * 3));
 
         QGraphicsProxyWidget *scrollBarWidget = new QGraphicsProxyWidget(this);
         scrollBarWidget->setWidget(m_vScrollBar);

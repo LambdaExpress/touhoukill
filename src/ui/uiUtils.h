@@ -9,7 +9,7 @@
 namespace QSanUiUtils {
 // This is in no way a generic diation function. It is some dirty trick that
 // produces a shadow image for a pixmap whose foreground mask is binaryImage
-QImage produceShadow(const QImage &image, QColor shadowColor, int radius, double decade);
+QImage produceShadow(const QImage &image, const QColor &shadowColor, int radius, double decade);
 void makeGray(QPixmap &pixmap);
 
 namespace QSanFreeTypeFont {
@@ -31,11 +31,11 @@ QString resolveFont(const QString &fontName);
 // @param orient
 //        Suggest whether the text is laid out horizontally or vertically.
 // @return True if succeed.
-bool paintQString(QPainter *painter, QString text, int *font, QColor color, QSize &fontSize, int spacing, int weight, QRect boundingBox, Qt::Orientation orient,
+bool paintQString(QPainter *painter, const QString &text, int *font, const QColor &color, QSize &fontSize, int spacing, int weight, QRect boundingBox, Qt::Orientation orient,
                   Qt::Alignment align);
 
 // Currently, we online support horizotal layout for multiline text
-bool paintQStringMultiLine(QPainter *painter, QString text, int *font, QColor color, QSize &fontSize, int spacing, QRect boundingBox, Qt::Alignment align);
+bool paintQStringMultiLine(QPainter *painter, const QString &text, int *font, const QColor &color, QSize &fontSize, int spacing, QRect boundingBox, Qt::Alignment align);
 } // namespace QSanFreeTypeFont
 } // namespace QSanUiUtils
 

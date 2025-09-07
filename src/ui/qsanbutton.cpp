@@ -494,7 +494,9 @@ void QSanInvokeSkillDock::setWidth(int width)
 void QSanInvokeSkillDock::update()
 {
     if (!_m_buttons.isEmpty()) {
-        QList<QSanInvokeSkillButton *> regular_buttons, lordskill_buttons, all_buttons;
+        QList<QSanInvokeSkillButton *> regular_buttons;
+        QList<QSanInvokeSkillButton *> lordskill_buttons;
+        QList<QSanInvokeSkillButton *> all_buttons;
 
         foreach (QSanInvokeSkillButton *btn, _m_buttons) {
             if (!btn->getSkill()->shouldBeVisible(Self)) {
@@ -513,7 +515,7 @@ void QSanInvokeSkillDock::update()
         int numButtons = regular_buttons.length();
         int lordskillNum = lordskill_buttons.length();
         //Q_ASSERT(lordskillNum <= 6); // HuangTian, ZhiBa, DrJiuYuan and XianSi
-        int rows = (numButtons == 0) ? 0 : (numButtons - 1) / 3 + 1;
+        int rows = (numButtons == 0) ? 0 : ((numButtons - 1) / 3) + 1;
         int rowH = G_DASHBOARD_LAYOUT.m_skillButtonsSize[0].height();
         //G_DASHBOARD_LAYOUT.m_normalHeight
         //  _m_width  G_DASHBOARD_LAYOUT.m_rightWidth
@@ -550,7 +552,7 @@ void QSanInvokeSkillDock::update()
 
         //for regular skill
         for (int i = 0; i < rows; i++) {
-            int rowTop = (RoomSceneInstance->m_skillButtonSank) ? (-rowH - 2 * (rows - i - 1)) : ((-rows + i) * rowH);
+            int rowTop = (RoomSceneInstance->m_skillButtonSank) ? (-rowH - (2 * (rows - i - 1))) : ((-rows + i) * rowH);
             int btnWidth = (_m_width - 20) / btnNum[i];
             if (ServerInfo.Enable2ndGeneral)
                 btnWidth = (this->objectName() == "left") ? (_m_width + 30) / btnNum[i] : (_m_width - 20) / btnNum[i];
@@ -559,7 +561,7 @@ void QSanInvokeSkillDock::update()
                 button->setButtonWidth((QSanInvokeSkillButton::SkillButtonWidth)(btnNum[i] - 1));
                 button->setPos(btnWidth * j, rowTop);
                 if (ServerInfo.Enable2ndGeneral)
-                    button->setPos(btnWidth * j + 30, rowTop);
+                    button->setPos((btnWidth * j) + 30, rowTop);
             }
         }
 
@@ -571,7 +573,7 @@ void QSanInvokeSkillDock::update()
         if (lordskillNum > 3)
             x_ls++;
         for (int i = 0; i < x_ls; i++) {
-            int rowTop = (RoomSceneInstance->m_skillButtonSank) ? (-rowH - 2 * (x_ls - i - 1)) : ((-x_ls + i) * rowH);
+            int rowTop = (RoomSceneInstance->m_skillButtonSank) ? (-rowH - (2 * (x_ls - i - 1))) : ((-x_ls + i) * rowH);
             int btnWidth = _m_width / lordBtnNum[i];
             if (lordBtnNum[i] == 1)
                 btnWidth = _m_width / 2;
@@ -583,7 +585,7 @@ void QSanInvokeSkillDock::update()
                 if (btntype == 0)
                     btntype = 1;
                 button->setButtonWidth((QSanInvokeSkillButton::SkillButtonWidth)(btntype));
-                button->setPos(0 - btnWidth * (j + 1) - G_DASHBOARD_LAYOUT.m_rightWidth + 45, rowTop - G_DASHBOARD_LAYOUT.m_normalHeight);
+                button->setPos(0 - (btnWidth * (j + 1)) - G_DASHBOARD_LAYOUT.m_rightWidth + 45, rowTop - G_DASHBOARD_LAYOUT.m_normalHeight);
             }
         }
 

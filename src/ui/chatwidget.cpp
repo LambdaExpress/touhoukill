@@ -95,16 +95,20 @@ void MyPixmapItem::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*o
 
 void MyPixmapItem::initFaceBoardPos()
 {
-    const int start_x = 5, start_y = 5;
-    int x = 0, y = 0;
-    int icon_w = 16, icon_h = 16;
-    int x_offset = 6, y_offset = 6;
+    const int start_x = 5;
+    const int start_y = 5;
+    int x = 0;
+    int y = 0;
+    int icon_w = 16;
+    int icon_h = 16;
+    int x_offset = 6;
+    int y_offset = 6;
 
     // total 7 x 8 icons in QList <QRect> faceboardPos;
     for (int j = 0; j < 8; j++) {
-        y = j * (icon_h + y_offset) + start_y;
+        y = (j * (icon_h + y_offset)) + start_y;
         for (int i = 0; i < 7; i++) {
-            x = i * (icon_w + x_offset) + start_x;
+            x = (i * (icon_w + x_offset)) + start_x;
             faceboardPos << QRect(x, y, icon_w, icon_h);
         }
     }
@@ -112,14 +116,16 @@ void MyPixmapItem::initFaceBoardPos()
 
 void MyPixmapItem::initEasyTextPos()
 {
-    const int start_x = 5, start_y = 5;
+    const int start_x = 5;
+    const int start_y = 5;
     int y = 0;
-    int icon_w = 210, icon_h = 12;
+    int icon_w = 210;
+    int icon_h = 12;
     int y_offset = 10;
 
     // only 10 text QList <QRect> easytextPos;
     for (int j = 0; j < 10; j++) {
-        y = j * (icon_h + y_offset) + start_y;
+        y = (j * (icon_h + y_offset)) + start_y;
         easytextPos << QRect(start_x, y, icon_w, icon_h);
     }
 }
@@ -132,7 +138,9 @@ ChatWidget::ChatWidget()
     setAcceptedMouseButtons(Qt::LeftButton);
 
     base = new QGraphicsRectItem(QRectF(base_pixmap.rect()), this);
-    QPushButton *returnButton = nullptr, *chatfaceButton = nullptr, *easytextButton = nullptr;
+    QPushButton *returnButton = nullptr;
+    QPushButton *chatfaceButton = nullptr;
+    QPushButton *easytextButton = nullptr;
 
     returnButton = addButton("returnBt", -1);
     chatfaceButton = addButton("chatfaceBt", 24);
@@ -184,7 +192,7 @@ void ChatWidget::sendText()
 
 QRectF ChatWidget::boundingRect() const
 {
-    return QRectF(-1, 0, 24 * 3 + 2, 24);
+    return QRectF(-1, 0, (24 * 3) + 2, 24);
 }
 
 void ChatWidget::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)

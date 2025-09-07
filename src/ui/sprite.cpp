@@ -122,7 +122,7 @@ void EmphasizeEffect::draw(QPainter *painter)
 
     QPoint offset;
     QPixmap pixmap = sourcePixmap(Qt::LogicalCoordinates, &offset);
-    const QRectF target = boundingRect().adjusted(s.width() * scale - 1, s.height() * scale, -s.width() * scale, -s.height() * scale);
+    const QRectF target = boundingRect().adjusted((s.width() * scale) - 1, s.height() * scale, -s.width() * scale, -s.height() * scale);
     const QRectF source(s.width() * 0.1, s.height() * 0.1, s.width(), s.height());
 
     painter->setRenderHint(QPainter::SmoothPixmapTransform);

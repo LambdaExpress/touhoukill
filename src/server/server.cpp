@@ -104,8 +104,10 @@ QWidget *ServerDialog::createPackageTab()
     box1->setLayout(layout1);
     box2->setLayout(layout2);
 
-    int i = 0, j = 0;
-    int row = 0, column = 0;
+    int i = 0;
+    int j = 0;
+    int row = 0;
+    int column = 0;
     foreach (const QString &extension, extensions) {
         const Package *package = Sanguosha->findChild<const Package *>(extension);
         if (package == nullptr)
@@ -1144,7 +1146,7 @@ void Server::processRequest(const char *request)
                 emit server_message(tr("unimplemented operation: %1").arg(ps.first()));
                 messageBodyToSend = "OPERATION_NOT_IMPLEMENTED";
             } else if (ps.first() == "getwinners") {
-                QString tableName = ps.last();
+                const QString &tableName = ps.last();
                 getWinnersTableFile(socket, tableName);
                 return;
             } else {

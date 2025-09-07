@@ -957,7 +957,6 @@ public:
 };
 
 ShowFengsu::ShowFengsu()
-    : ShowDistanceCard()
 {
 }
 

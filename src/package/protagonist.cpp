@@ -1272,7 +1272,7 @@ public:
         return true;
     }
 
-    static bool BllmWuyuCost(Room *room, ServerPlayer *bllm, QString prompt)
+    static bool BllmWuyuCost(Room *room, ServerPlayer *bllm, const QString &prompt)
     {
         //tag for AI
         bllm->tag["wuyu_prompt"] = QVariant::fromValue(prompt);
@@ -1888,7 +1888,7 @@ public:
         events << PreCardUsed;
     }
 
-    static bool isQishu(QList<ServerPlayer *> players, const Card *card)
+    static bool isQishu(const QList<ServerPlayer *> &players, const Card *card)
     {
         if (card->isKindOf("GlobalEffect") || card->isKindOf("AOE"))
             return false;

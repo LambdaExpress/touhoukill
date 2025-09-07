@@ -14,15 +14,16 @@
 #include <QPropertyAnimation>
 #include <QPushButton>
 #include <QTextDocument>
+#include <utility>
 
 using namespace QSanProtocol;
 
 QList<CardItem *> GenericCardContainer::cloneCardItems(QList<int> card_ids)
 {
-    return _createCards(card_ids);
+    return _createCards(std::move(card_ids));
 }
 
-QList<CardItem *> GenericCardContainer::_createCards(QList<int> card_ids)
+QList<CardItem *> GenericCardContainer::_createCards(const QList<int> &card_ids)
 {
     QList<CardItem *> result;
     foreach (int card_id, card_ids) {
@@ -71,11 +72,11 @@ void GenericCardContainer::_disperseCards(QList<CardItem *> &cards, QRectF fillR
         CardItem *card = cards[i];
         double newX = 0;
         if (align == Qt::AlignHCenter)
-            newX = fillRegion.center().x() + step * (i - (numCards - 1) / 2.0);
+            newX = fillRegion.center().x() + (step * (i - (numCards - 1) / 2.0));
         else if (align == Qt::AlignLeft)
-            newX = fillRegion.left() + step * i + card->boundingRect().width() / 2.0;
+            newX = fillRegion.left() + (step * i) + (card->boundingRect().width() / 2.0);
         else if (align == Qt::AlignRight)
-            newX = fillRegion.right() + step * (i - numCards) + card->boundingRect().width() / 2.0;
+            newX = fillRegion.right() + (step * (i - numCards)) + (card->boundingRect().width() / 2.0);
         else
             continue;
         QPointF newPos = QPointF(newX, fillRegion.center().y());
@@ -471,7 +472,9 @@ void PlayerCardContainer::updatePile(const QString &pile_name)
     QPoint start = (ServerInfo.Enable2ndGeneral && getPlayer() == Self) ? _m_layout->m_privatePileStartPosDouble : _m_layout->m_privatePileStartPos;
     QPoint step = _m_layout->m_privatePileStep;
     QSize size = _m_layout->m_privatePileButtonSize;
-    QList<QGraphicsProxyWidget *> widgets_t, widgets_p, widgets = _m_privatePiles.values();
+    QList<QGraphicsProxyWidget *> widgets_t;
+    QList<QGraphicsProxyWidget *> widgets_p;
+    QList<QGraphicsProxyWidget *> widgets = _m_privatePiles.values();
     foreach (QGraphicsProxyWidget *widget, widgets) {
         if (widget->objectName() == treasure_name)
             widgets_t << widget;
@@ -544,9 +547,9 @@ void PlayerCardContainer::updateMarks()
             _m_markItem->setPos(newRect.topLeft());
     } else {
         if (ServerInfo.Enable2ndGeneral)
-            _m_markItem->setPos(newRect.left() - 150, newRect.top() + newRect.height() / 2);
+            _m_markItem->setPos(newRect.left() - 150, newRect.top() + (newRect.height() / 2));
         else
-            _m_markItem->setPos(newRect.left(), newRect.top() + newRect.height() / 2);
+            _m_markItem->setPos(newRect.left(), newRect.top() + (newRect.height() / 2));
     }
 }
 

@@ -197,7 +197,7 @@ void IQSanComponentSkin::QSanShadowTextFont::paintText(QPainter *painter, QRect 
     image.fill(Qt::transparent);
     QPainter imagePainter(&image);
     // @todo: currently, we have not considered _m_sahdowOffset yet
-    QSanSimpleTextFont::paintText(&imagePainter, QRect(m_shadowRadius, m_shadowRadius, pos.width() - m_shadowRadius * 2, pos.height() - m_shadowRadius * 2), align, text);
+    QSanSimpleTextFont::paintText(&imagePainter, QRect(m_shadowRadius, m_shadowRadius, pos.width() - (m_shadowRadius * 2), pos.height() - (m_shadowRadius * 2)), align, text);
     if (m_shadowRadius < 0 || (m_shadowRadius == 0 && m_shadowOffset.x() == 0 && m_shadowOffset.y() == 0)) {
         painter->drawImage(0, 0, image);
         return;
@@ -214,7 +214,7 @@ void IQSanComponentSkin::QSanShadowTextFont::paintText(QGraphicsPixmapItem *pixm
     image.fill(Qt::transparent);
     QPainter imagePainter(&image);
     // @todo: currently, we have not considered _m_shadowOffset yet
-    QSanSimpleTextFont::paintText(&imagePainter, QRect(m_shadowRadius, m_shadowRadius, pos.width() - m_shadowRadius * 2, pos.height() - m_shadowRadius * 2), align, text);
+    QSanSimpleTextFont::paintText(&imagePainter, QRect(m_shadowRadius, m_shadowRadius, pos.width() - (m_shadowRadius * 2), pos.height() - (m_shadowRadius * 2)), align, text);
     QImage shadow = QSanUiUtils::produceShadow(image, m_shadowColor, m_shadowRadius, m_shadowDecadeFactor);
     // now, overlay foreground on shadow
     QPixmap pixmap = QPixmap::fromImage(shadow);
@@ -782,7 +782,7 @@ QAbstractAnimation *QSanRoomSkin::createHuaShenAnimation(QPixmap &huashenAvatar,
         animation->setDuration(duration);
         JsonArray keyValues = huashenConfig[1].value<JsonArray>();
         for (int i = 0; i < keyValues.size(); i++) {
-            QVariant keyValue = keyValues[i];
+            const QVariant &keyValue = keyValues[i];
             if (!keyValue.canConvert<JsonArray>() || keyValue.value<JsonArray>().length() != 2)
                 continue;
             double step = NAN;
@@ -820,7 +820,7 @@ const QSanRoomSkin::CommonLayout &QSanRoomSkin::getCommonLayout() const
 QSanRoomSkin::QSanShadowTextFont QSanRoomSkin::DashboardLayout::getSkillTextFont(QSanButton::ButtonState state, QSanInvokeSkillButton::SkillType type,
                                                                                  QSanInvokeSkillButton::SkillButtonWidth width) const
 {
-    int i = QSanButton::S_NUM_BUTTON_STATES * (int)type + (int)state;
+    int i = (QSanButton::S_NUM_BUTTON_STATES * (int)type) + (int)state;
     QSanShadowTextFont font = m_skillTextFonts[width];
     font.m_color = m_skillTextColors[i];
     font.m_shadowColor = m_skillTextShadowColors[i];
@@ -1019,7 +1019,7 @@ bool QSanRoomSkin::_loadLayoutConfig(const QVariant &layout)
     if (!tryParse(config["focusFrameArea"], _m_photoLayout.m_focusFrameArea) && isNumber(config["borderWidth"])) {
         int borderWidth = 0;
         tryParse(config["borderWidth"], borderWidth);
-        _m_photoLayout.m_focusFrameArea = QRect(-borderWidth, -borderWidth, _m_photoLayout.m_normalWidth + 2 * borderWidth, _m_photoLayout.m_normalHeight + 2 * borderWidth);
+        _m_photoLayout.m_focusFrameArea = QRect(-borderWidth, -borderWidth, _m_photoLayout.m_normalWidth + (2 * borderWidth), _m_photoLayout.m_normalHeight + (2 * borderWidth));
     }
     tryParse(config["mainFrameArea"], _m_photoLayout.m_mainFrameArea);
     tryParse(config["onlineStatusArea"], _m_photoLayout.m_onlineStatusArea);
@@ -1100,7 +1100,7 @@ bool QSanRoomSkin::_loadLayoutConfig(const QVariant &layout)
 
         JsonArray subconfig = config[key].value<JsonArray>();
         for (int j = 0; j < QSanButton::S_NUM_BUTTON_STATES && j < subconfig.size(); j++) {
-            int index = i * QSanButton::S_NUM_BUTTON_STATES + j;
+            int index = (i * QSanButton::S_NUM_BUTTON_STATES) + j;
             JsonArray config = subconfig[j].value<JsonArray>();
             if (config.size() < 2)
                 continue;
@@ -1158,7 +1158,7 @@ const QSanSkinScheme &QSanSkinFactory::getCurrentSkinScheme()
     return _sm_currentSkin;
 }
 
-bool QSanSkinFactory::switchSkin(QString skinName)
+bool QSanSkinFactory::switchSkin(const QString &skinName)
 {
     if (skinName == _m_skinName)
         return false;

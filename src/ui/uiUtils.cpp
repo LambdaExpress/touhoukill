@@ -7,7 +7,7 @@
 #include <QMutex>
 #include <QPixmap>
 
-QImage QSanUiUtils::produceShadow(const QImage &image, QColor shadowColor, int radius, double decade)
+QImage QSanUiUtils::produceShadow(const QImage &image, const QColor &shadowColor, int radius, double decade)
 {
     const uchar *oldImage = image.bits();
     int cols = image.width();
@@ -35,12 +35,12 @@ QImage QSanUiUtils::produceShadow(const QImage &image, QColor shadowColor, int r
                 for (int dx = -radius; dx <= radius; dx++) {
                     int wx = x + dx;
                     int wy = y + dy;
-                    int dist = dx * dx + dy * dy;
+                    int dist = (dx * dx) + (dy * dy);
                     if (wx < 0 || wy < 0 || wx >= cols || wy >= rows)
                         continue;
-                    if (dx * dx + dy * dy > radius * radius)
+                    if ((dx * dx) + (dy * dy) > radius * radius)
                         continue;
-                    int newVal = alpha - decade * dist;
+                    int newVal = alpha - (decade * dist);
                     Q_ASSERT((wy * cols + wx) * 4 < cols * rows * 4);
                     _NEW_PIXEL(wx, wy) = (uchar)qMax((int)_NEW_PIXEL(wx, wy), newVal);
                 }
@@ -135,8 +135,8 @@ int *QSanUiUtils::QSanFreeTypeFont::loadFont(const QString &fontName)
 
 static QMutex _paintTextMutex;
 
-bool QSanUiUtils::QSanFreeTypeFont::paintQString(QPainter *painter, QString text, int *font, QColor color, QSize &fontSize, int spacing, int weight, QRect boundingBox,
-                                                 Qt::Orientation orient, Qt::Alignment align)
+bool QSanUiUtils::QSanFreeTypeFont::paintQString(QPainter *painter, const QString &text, int *font, const QColor &color, QSize &fontSize, int spacing, int weight,
+                                                 QRect boundingBox, Qt::Orientation orient, Qt::Alignment align)
 {
     if (!_ftLibInitialized || font == nullptr || painter == nullptr || text.isNull())
         return false;
@@ -144,7 +144,8 @@ bool QSanUiUtils::QSanFreeTypeFont::paintQString(QPainter *painter, QString text
     QVector<uint> charcodes = text.toUcs4();
     int len = charcodes.size();
     int pixelsAdded = (weight >> 6) * 2;
-    int xstep = 0, ystep = 0;
+    int xstep = 0;
+    int ystep = 0;
     Qt::Alignment hAlign = align & Qt::AlignHorizontal_Mask;
     Qt::Alignment vAlign = align & Qt::AlignVertical_Mask;
     if (hAlign == 0)
@@ -293,7 +294,8 @@ bool QSanUiUtils::QSanFreeTypeFont::paintQString(QPainter *painter, QString text
 #undef _FONT_PIXEL
     _paintTextMutex.unlock();
 
-    int xstart = 0, ystart = 0;
+    int xstart = 0;
+    int ystart = 0;
     if (orient == Qt::Vertical) {
         if (hAlign & Qt::AlignLeft)
             xstart = spacing;
@@ -348,7 +350,7 @@ bool QSanUiUtils::QSanFreeTypeFont::paintQString(QPainter *painter, QString text
     return true;
 }
 
-bool QSanUiUtils::QSanFreeTypeFont::paintQStringMultiLine(QPainter *painter, QString text, int *font, QColor color, QSize &fontSize, int spacing, QRect boundingBox,
+bool QSanUiUtils::QSanFreeTypeFont::paintQStringMultiLine(QPainter *painter, const QString &text, int *font, const QColor &color, QSize &fontSize, int spacing, QRect boundingBox,
                                                           Qt::Alignment align)
 {
     if (!_ftLibInitialized || font == nullptr || painter == nullptr)
@@ -357,7 +359,7 @@ bool QSanUiUtils::QSanFreeTypeFont::paintQStringMultiLine(QPainter *painter, QSt
     QVector<uint> charcodes = text.toUcs4();
     int len = charcodes.size();
     int charsPerLine = boundingBox.width() / fontSize.width();
-    int numLines = (len - 1) / charsPerLine + 1;
+    int numLines = ((len - 1) / charsPerLine) + 1;
     QPoint topLeft = boundingBox.topLeft();
     boundingBox.moveTopLeft(QPoint(0, 0));
     int xstep = 0;
@@ -366,7 +368,7 @@ bool QSanUiUtils::QSanFreeTypeFont::paintQStringMultiLine(QPainter *painter, QSt
     else
         xstep = spacing + fontSize.width();
     if (fontSize.height() * numLines > boundingBox.height())
-        fontSize.setHeight(boundingBox.height() / numLines - spacing);
+        fontSize.setHeight((boundingBox.height() / numLines) - spacing);
 
     int ystep = fontSize.height() + spacing;
 
@@ -484,7 +486,8 @@ bool QSanUiUtils::QSanFreeTypeFont::paintQStringMultiLine(QPainter *painter, QSt
     maxY = currentY + ystep;
     Qt::Alignment hAlign = align & Qt::AlignHorizontal_Mask;
     Qt::Alignment vAlign = align & Qt::AlignVertical_Mask;
-    int xstart = 0, ystart = 0;
+    int xstart = 0;
+    int ystart = 0;
     if (hAlign & Qt::AlignLeft)
         xstart = spacing;
     else if (hAlign & Qt::AlignHCenter || align & Qt::AlignJustify)

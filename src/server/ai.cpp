@@ -47,7 +47,9 @@ AI::Relation AI::GetRelation(const ServerPlayer *a, const ServerPlayer *b)
 {
     if (a == b)
         return Friend;
-    static RoleMapping map, map_good, map_bad;
+    static RoleMapping map;
+    static RoleMapping map_good;
+    static RoleMapping map_bad;
     if (map.isEmpty()) {
         map.set("lord", "lord", Friend);
         map.set("lord", "rebel", Enemy);
@@ -88,7 +90,8 @@ AI::Relation AI::GetRelation(const ServerPlayer *a, const ServerPlayer *b)
 
     Room *room = a->getRoom();
 
-    int good = 0, bad = 0;
+    int good = 0;
+    int bad = 0;
     QList<ServerPlayer *> players = room->getAlivePlayers();
     foreach (ServerPlayer *player, players) {
         switch (player->getRoleEnum()) {

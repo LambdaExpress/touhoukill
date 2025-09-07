@@ -1107,7 +1107,6 @@ public:
 };
 
 ShowShezhengCard::ShowShezhengCard()
-    : SkillCard()
 {
     mute = true;
     target_fixed = true;
@@ -1750,7 +1749,7 @@ public:
         }
     }
 
-    static bool can_add(CardUseStruct use)
+    static bool can_add(const CardUseStruct &use)
     {
         return use.card->isNDTrick() && !(use.card->isKindOf("IronChain") || use.card->isKindOf("LureTiger") || use.card->isKindOf("Nullification"));
     }
@@ -2429,7 +2428,7 @@ public:
         if (!invoke->invoker->isOnline()) { //  ai: Just make a random choice
             //QString general_name = room->askForChoice(invoke->invoker, objectName(), choices.join("+"));
             int idx = qrand() % choices.length();
-            QString general_name = choices.at(idx);
+            const QString &general_name = choices.at(idx);
             const General *general = Sanguosha->getGeneral(general_name);
 
             QStringList skill_names;
@@ -2471,7 +2470,7 @@ public:
         return false;
     }
 
-    static void skillProcess(Room *room, ServerPlayer *yori, QString pingyi_general = QString(), const Skill *skill = nullptr)
+    static void skillProcess(Room *room, ServerPlayer *yori, const QString &pingyi_general = QString(), const Skill *skill = nullptr)
     {
         JsonArray arg;
         arg << (int)QSanProtocol::S_GAME_EVENT_HUASHEN;
@@ -2904,7 +2903,6 @@ public:
 };
 
 ShowFengsuCard::ShowFengsuCard()
-    : SkillCard()
 {
     mute = true;
     target_fixed = true;

@@ -85,7 +85,7 @@ public:
     void reply();
 
 public slots:
-    void doGuanxing(const QList<int> &card_ids, bool up_only, QString skillName);
+    void doGuanxing(const QList<int> &card_ids, bool up_only, const QString &skillName);
     void adjust();
 
 private:

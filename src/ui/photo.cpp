@@ -36,7 +36,6 @@ using namespace QSanProtocol;
 // make layers (drawing order) configurable
 
 Photo::Photo()
-    : PlayerCardContainer()
 {
     _m_mainFrame = nullptr;
     m_player = nullptr;

@@ -3702,7 +3702,6 @@ public:
 };
 
 ShowShenbaoCard::ShowShenbaoCard()
-    : SkillCard()
 {
     mute = true;
     handling_method = Card::MethodNone;
@@ -3884,7 +3883,7 @@ public:
             if ((skill_name == "Crossbow" || skill_name == "SixSwords") && !player->hasShownSkill("shenbao"))
                 return false;
             //return true;
-            QString weapon_name = skill_name;
+            const QString &weapon_name = skill_name;
             foreach (const Player *p, player->getAliveSiblings()) {
                 if (p->getWeapon() != nullptr) {
                     if (weapon_name == "shenbao")
@@ -3908,7 +3907,7 @@ public:
             }
             //    return (weapon == NULL || weapon->objectName() != skill_name || player->isBrokenEquip(weapon->getEffectiveId()));
         } else if (flag == "armor") {
-            QString armor_name = skill_name;
+            const QString &armor_name = skill_name;
             foreach (const Player *p, player->getAliveSiblings()) {
                 if (p->getArmor() != nullptr) {
                     if (armor_name == "shenbao")
@@ -3932,7 +3931,7 @@ public:
             }
             //return (armor == NULL || armor->objectName() != skill_name || player->isBrokenEquip(armor->getEffectiveId()));
         } else if (flag == "treasure") {
-            QString treasure_name = skill_name;
+            const QString &treasure_name = skill_name;
             if (skill_name != "wooden_ox") {
                 foreach (const Player *p, player->getAliveSiblings()) {
                     if (p->getTreasure() != nullptr) {
@@ -5085,7 +5084,7 @@ public:
         return d;
     }
 
-    static void AcquireGenerals(ServerPlayer *zuoci, int n, bool init, QStringList deleteName)
+    static void AcquireGenerals(ServerPlayer *zuoci, int n, bool init, const QStringList &deleteName)
     {
         Room *room = zuoci->getRoom();
         QStringList huashens = zuoci->getHiddenGenerals();
@@ -5145,7 +5144,8 @@ public:
             foreach (ServerPlayer *p, room->getAlivePlayers())
                 all.subtract(p->tag["1v1Arrange"].toStringList().toSet());
         }
-        QSet<QString> huashen_set, room_set;
+        QSet<QString> huashen_set;
+        QSet<QString> room_set;
         huashen_set = zuoci->getHiddenGenerals().toSet();
 
         foreach (ServerPlayer *player, room->getAllPlayers(true)) {
@@ -5260,7 +5260,7 @@ public:
         events << TargetConfirming;
     }
 
-    static QStringList getProhibitSkills(ServerPlayer *nue, CardUseStruct use, bool once = false)
+    static QStringList getProhibitSkills(ServerPlayer *nue, const CardUseStruct &use, bool once = false)
     {
         QStringList show;
         QString shown = nue->getShownHiddenGeneral();
@@ -5414,7 +5414,7 @@ public:
         related_mark = "@star";
     }
 
-    static bool can_add(CardUseStruct use)
+    static bool can_add(const CardUseStruct &use)
     {
         return use.from->getMark("@star") > 0 && use.card->getTypeId() != Card::TypeEquip && !use.card->isKindOf("DelayedTrick")
             && !(use.card->isKindOf("IronChain") || use.card->isKindOf("LureTiger"));
@@ -5514,7 +5514,7 @@ public:
         related_mark = "@star";
     }
 
-    static bool hasCardValue(CardUseStruct use)
+    static bool hasCardValue(const CardUseStruct &use)
     {
         return !(use.card->isKindOf("IronChain") || use.card->isKindOf("LureTiger"));
     }
@@ -6072,7 +6072,8 @@ void WenyueCard::use(Room *room, const CardUseStruct &card_use) const
     ServerPlayer *source = card_use.from;
     const QList<ServerPlayer *> &targets = card_use.to;
 
-    int throw_id = -1, card_id = -1;
+    int throw_id = -1;
+    int card_id = -1;
     foreach (int id, subcards) {
         if (Sanguosha->getCard(id)->getTypeId() == Card::TypeEquip)
             card_id = id;
@@ -6774,7 +6775,7 @@ public:
             pos = 0;
         //ServerPlayer *current = room->getCurrent();
         //QString choice = room->askForChoice(current, "qizhi", names.join("+"), QVariant());
-        QString next = names.at(pos);
+        const QString &next = names.at(pos);
         room->setTag("dimai_card", next);
         room->sendLog("#dimai", nullptr, next);
     }

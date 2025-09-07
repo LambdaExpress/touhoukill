@@ -173,7 +173,8 @@ void GlobalEffect::onUse(Room *room, const CardUseStruct &card_use) const
     }
 
     ServerPlayer *source = card_use.from;
-    QList<ServerPlayer *> targets, all_players = room->getAllPlayers();
+    QList<ServerPlayer *> targets;
+    QList<ServerPlayer *> all_players = room->getAllPlayers();
     QList<const Player *> useTos;
     foreach (ServerPlayer *p, room->getAllPlayers())
         useTos << p;
@@ -251,7 +252,8 @@ void AOE::onUse(Room *room, const CardUseStruct &card_use) const
     }
 
     ServerPlayer *source = card_use.from;
-    QList<ServerPlayer *> targets, all_players = room->getOtherPlayers(source);
+    QList<ServerPlayer *> targets;
+    QList<ServerPlayer *> all_players = room->getOtherPlayers(source);
     QList<const Player *> useTos;
     foreach (ServerPlayer *p, room->getOtherPlayers(source))
         useTos << p;
@@ -491,7 +493,7 @@ QString Weapon::getSubtype() const
 
 void Weapon::onUse(Room *room, const CardUseStruct &card_use) const
 {
-    CardUseStruct use = card_use;
+    const CardUseStruct &use = card_use;
     ServerPlayer *player = card_use.from;
     if (room->getMode() == "04_1v3" && use.card->isKindOf("Weapon")
         && (player->isCardLimited(use.card, Card::MethodUse)

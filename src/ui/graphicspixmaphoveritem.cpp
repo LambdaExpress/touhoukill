@@ -109,7 +109,7 @@ void GraphicsPixmapHoverItem::paint(QPainter *painter, const QStyleOptionGraphic
     if (m_val > 0) {
         tempPainter.drawPixmap(offset(), m_heroSkinPixmap);
 
-        double percent = 1 - (double)m_val / (double)m_max;
+        double percent = 1 - ((double)m_val / (double)m_max);
         QRectF rect = QRectF(offset().x(), offset().y(), boundingRect().width(), percent * boundingRect().height());
 
         tempPainter.setClipRect(rect);

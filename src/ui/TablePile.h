@@ -16,8 +16,7 @@ class TablePile : public GenericCardContainer
 
 public:
     inline TablePile()
-        : GenericCardContainer()
-        , m_currentTime(0)
+        : m_currentTime(0)
     {
         m_timer = startTimer(S_CLEARANCE_UPDATE_INTERVAL_MSEC);
     }

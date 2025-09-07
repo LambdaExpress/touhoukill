@@ -403,7 +403,8 @@ public:
         QList<int> h2 = p2->handCards();
 
         QList<CardsMoveStruct> moves;
-        CardsMoveStruct move1, move2;
+        CardsMoveStruct move1;
+        CardsMoveStruct move2;
         move1.card_ids = h1;
         move1.to = p2;
         move1.to_place = Player::PlaceHand;

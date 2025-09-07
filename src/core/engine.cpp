@@ -369,7 +369,7 @@ const General *Engine::getGeneral(const QString &name) const
     return generals.value(name, nullptr);
 }
 
-const QStringList Engine::getGenerals() const
+QStringList Engine::getGenerals() const
 {
     return generals.keys();
 }
@@ -1118,7 +1118,9 @@ QStringList Engine::getLatestGenerals(const QSet<QString> &ban_set) const
 
 QList<int> Engine::getRandomCards() const
 {
-    bool exclude_disaters = false, using_2012_3v3 = false, using_2013_3v3 = false;
+    bool exclude_disaters = false;
+    bool using_2012_3v3 = false;
+    bool using_2013_3v3 = false;
 
     if (Config.GameMode == "06_3v3") {
         using_2012_3v3 = (Config.value("3v3/OfficialRule", "2013").toString() == "2012");
@@ -1400,7 +1402,7 @@ int Engine::correctAttackRange(const Player *target, bool include_weapon /* = tr
     return extra;
 }
 
-int Engine::operationTimeRate(QSanProtocol::CommandType command, QVariant msg)
+int Engine::operationTimeRate(QSanProtocol::CommandType command, const QVariant &msg)
 {
     int rate = 2; //default
     JsonArray arg = msg.value<JsonArray>();

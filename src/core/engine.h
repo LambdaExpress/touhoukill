@@ -76,7 +76,7 @@ public:
     QList<const Package *> getPackages() const;
 
     const General *getGeneral(const QString &name) const;
-    const QStringList getGenerals() const;
+    QStringList getGenerals() const;
     int getGeneralCount(bool include_banned = false) const;
     const Skill *getSkill(const QString &skill_name) const;
     const Skill *getSkill(const EquipCard *card) const;
@@ -131,7 +131,7 @@ public:
     QStringList LordBGMConvertList;
     QStringList LordBackdropConvertList;
     QStringList LatestGeneralList;
-    int operationTimeRate(QSanProtocol::CommandType command, QVariant msg);
+    int operationTimeRate(QSanProtocol::CommandType command, const QVariant &msg);
 
     QString GetMappedKingdom(const QString &role); //hegemony
 

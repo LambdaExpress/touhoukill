@@ -188,7 +188,7 @@ void Settings::init()
     EffectVolume = value("EffectVolume", 1.0F).toFloat();
 
     int length = 8;
-    int index = qrand() % length + 1;
+    int index = (qrand() % length) + 1;
     QString bgFilename = QString("%1%2%3").arg("backdrop/hall/gensoukyou_").arg(index).arg(".jpg");
 
     BackgroundImage = bgFilename; // value("BackgroundImage", bgFilename).toString();
@@ -200,7 +200,15 @@ void Settings::init()
     RecordSavePath = value("RecordSavePath", "records/").toString();
 
     lua_State *lua = Sanguosha->getLuaState();
-    QStringList roles_ban, peasantsvslandlord_ban, contest2v2_ban, kof_ban, hulao_ban, xmode_ban, basara_ban, hegemony_ban, pairs_ban;
+    QStringList roles_ban;
+    QStringList peasantsvslandlord_ban;
+    QStringList contest2v2_ban;
+    QStringList kof_ban;
+    QStringList hulao_ban;
+    QStringList xmode_ban;
+    QStringList basara_ban;
+    QStringList hegemony_ban;
+    QStringList pairs_ban;
 
     roles_ban = GetConfigFromLuaState(lua, "roles_ban").toStringList();
     peasantsvslandlord_ban = GetConfigFromLuaState(lua, "peasantsvslandlord_ban").toStringList();

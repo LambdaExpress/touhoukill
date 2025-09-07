@@ -1491,7 +1491,8 @@ public:
         ServerPlayer *second = invoke->targets.first();
         room->doAnimate(QSanProtocol::S_ANIMATE_INDICATE, first->objectName(), second->objectName());
 
-        QList<int> equips1, equips2;
+        QList<int> equips1;
+        QList<int> equips2;
         foreach (const Card *equip, first->getEquips())
             equips1.append(equip->getId());
         foreach (const Card *equip, second->getEquips())

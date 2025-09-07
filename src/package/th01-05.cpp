@@ -104,7 +104,7 @@ public:
         events << EventPhaseStart;
     }
 
-    static Player::Phase ciyuanPhase(QString choice)
+    static Player::Phase ciyuanPhase(const QString &choice)
     {
         Player::Phase phase = Player::Finish;
         if (choice == "start")

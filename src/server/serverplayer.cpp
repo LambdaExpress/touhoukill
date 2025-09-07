@@ -1,4 +1,5 @@
 #include "serverplayer.h"
+
 #include "ai.h"
 #include "engine.h"
 #include "gamerule.h"
@@ -7,6 +8,7 @@
 #include "settings.h"
 #include "skill.h"
 #include "standard.h"
+#include <utility>
 
 using namespace QSanProtocol;
 using namespace JsonUtils;
@@ -134,7 +136,7 @@ void ServerPlayer::throwAllMarks(bool visible_only)
         marks.clear();
 }
 
-void ServerPlayer::clearOnePrivatePile(QString pile_name)
+void ServerPlayer::clearOnePrivatePile(const QString &pile_name)
 {
     if (!piles.contains(pile_name))
         return;
@@ -1444,22 +1446,22 @@ void ServerPlayer::addToPile(const QString &pile_name, const Card *card, bool op
         card_ids = card->getSubcards();
     else
         card_ids << card->getEffectiveId();
-    return addToPile(pile_name, card_ids, open, open_players);
+    return addToPile(pile_name, card_ids, open, std::move(open_players));
 }
 
 void ServerPlayer::addToPile(const QString &pile_name, int card_id, bool open, QList<ServerPlayer *> open_players)
 {
     QList<int> card_ids;
     card_ids << card_id;
-    return addToPile(pile_name, card_ids, open, open_players);
+    return addToPile(pile_name, card_ids, open, std::move(open_players));
 }
 
 void ServerPlayer::addToPile(const QString &pile_name, QList<int> card_ids, bool open, QList<ServerPlayer *> open_players)
 {
-    return addToPile(pile_name, card_ids, open, CardMoveReason(), open_players);
+    return addToPile(pile_name, std::move(card_ids), open, CardMoveReason(), std::move(open_players));
 }
 
-void ServerPlayer::addToPile(const QString &pile_name, QList<int> card_ids, bool open, CardMoveReason reason, QList<ServerPlayer *> open_players)
+void ServerPlayer::addToPile(const QString &pile_name, const QList<int> &card_ids, bool open, CardMoveReason reason, QList<ServerPlayer *> open_players)
 {
     if (open)
         open_players = room->getAllPlayers();
@@ -1473,11 +1475,11 @@ void ServerPlayer::addToPile(const QString &pile_name, QList<int> card_ids, bool
     move.card_ids = card_ids;
     move.to = this;
     move.to_place = Player::PlaceSpecial;
-    move.reason = reason;
+    move.reason = std::move(reason);
     room->moveCardsAtomic(move, open);
 }
 
-void ServerPlayer::addToShownHandCards(QList<int> card_ids)
+void ServerPlayer::addToShownHandCards(const QList<int> &card_ids)
 {
     QList<int> add_ids;
     foreach (int id, card_ids) {
@@ -1514,7 +1516,7 @@ void ServerPlayer::addToShownHandCards(QList<int> card_ids)
     room->filterCards(this, this->getCards("hs"), true);
 }
 
-void ServerPlayer::removeShownHandCards(QList<int> card_ids, bool sendLog, bool moveFromHand)
+void ServerPlayer::removeShownHandCards(const QList<int> &card_ids, bool sendLog, bool moveFromHand)
 {
     QList<int> removed_ids;
     foreach (int id, card_ids) {
@@ -1550,7 +1552,7 @@ void ServerPlayer::removeShownHandCards(QList<int> card_ids, bool sendLog, bool 
     room->getThread()->trigger(ShownCardChanged, room, v);
 }
 
-void ServerPlayer::addBrokenEquips(QList<int> card_ids)
+void ServerPlayer::addBrokenEquips(const QList<int> &card_ids)
 {
     QList<int> add_ids;
     foreach (int id, card_ids) {
@@ -1588,7 +1590,7 @@ void ServerPlayer::addBrokenEquips(QList<int> card_ids)
     room->getThread()->trigger(BrokenEquipChanged, room, bv);
 }
 
-void ServerPlayer::removeBrokenEquips(QList<int> card_ids, bool sendLog, bool moveFromEquip)
+void ServerPlayer::removeBrokenEquips(const QList<int> &card_ids, bool sendLog, bool moveFromEquip)
 {
     QList<int> removed_ids;
     foreach (int id, card_ids) {
@@ -2222,7 +2224,8 @@ void ServerPlayer::hideGeneral(bool head_general)
 void ServerPlayer::removeGeneral(bool head_general)
 
 {
-    QString general_name, from_general;
+    QString general_name;
+    QString from_general;
     room->tryPause();
     room->setEmotion(this, "remove");
 
@@ -2435,7 +2438,7 @@ bool ServerPlayer::inFormationRalation(ServerPlayer *teammate) const
     return teammates.length() > 1 && teammates.contains(teammate);
 }
 
-void ServerPlayer::summonFriends(const QString type)
+void ServerPlayer::summonFriends(const QString &type)
 {
     room->tryPause();
 
