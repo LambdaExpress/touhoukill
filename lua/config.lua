@@ -90,6 +90,7 @@ config = {
 		"Standard", --此包内带pattern的定义 不能屏蔽。。。
 		"Test",
 		"Playground",
+		"YuriTest",
 	},
 
 	hulao_packages = {
