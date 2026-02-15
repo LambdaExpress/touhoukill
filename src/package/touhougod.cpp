@@ -2054,12 +2054,12 @@ public:
                 if (new_card == nullptr)
                     continue;
                 DELETE_OVER_SCOPE(Card, new_card)
-                if (!checkedPatterns.contains(name) && (cardPattern != nullptr && cardPattern->match(Self, new_card)) && !Self->isCardLimited(new_card, method)) {
-                    if (name.contains("jink") && Self->getMaxHp() > 3)
+                if (!checkedPatterns.contains(name) && (cardPattern != nullptr && cardPattern->match(OperationSelf(), new_card)) && !OperationSelf()->isCardLimited(new_card, method)) {
+                    if (name.contains("jink") && OperationSelf()->getMaxHp() > 3)
                         continue;
-                    else if (name.contains("peach") && Self->getMaxHp() > 2)
+                    else if (name.contains("peach") && OperationSelf()->getMaxHp() > 2)
                         continue;
-                    else if (name.contains("nullification") && Self->getMaxHp() > 1)
+                    else if (name.contains("nullification") && OperationSelf()->getMaxHp() > 1)
                         continue;
                     checkedPatterns << name;
                 }
@@ -5668,7 +5668,7 @@ void XianshiDialog::popup()
     QString pattern = Sanguosha->currentRoomState()->getCurrentCardUsePattern();
     const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
     bool play = (Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_PLAY);
-    QString xianshi_record = Self->property("xianshi_record").toString();
+    QString xianshi_record = OperationSelf()->property("xianshi_record").toString();
 
     if (play)
         checkedPatterns = xianshi_record.split("+");
@@ -5677,7 +5677,7 @@ void XianshiDialog::popup()
             Card *c = Sanguosha->cloneCard(name);
             DELETE_OVER_SCOPE(Card, c)
 
-            if (cardPattern == nullptr || !cardPattern->match(Self, c))
+            if (cardPattern == nullptr || !cardPattern->match(OperationSelf(), c))
                 checkedPatterns << name;
         }
     }
@@ -5878,7 +5878,7 @@ public:
         foreach (const Card *card, cards) {
             if (!ban_list.contains(card->getPackage())) {
                 QString name = card->objectName();
-                if (!checkedPatterns.contains(name) && (pattern != nullptr && pattern->match(Self, card)) && !Self->isCardLimited(card, method))
+                if (!checkedPatterns.contains(name) && (pattern != nullptr && pattern->match(OperationSelf(), card)) && !OperationSelf()->isCardLimited(card, method))
                     checkedPatterns << name;
             }
         }

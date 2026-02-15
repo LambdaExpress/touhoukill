@@ -1283,7 +1283,7 @@ public:
 
     QString getExpandPile() const override
     {
-        QList<int> blackList = StringList2IntList(Self->property("kuaizhao_black").toString().split("+"));
+        QList<int> blackList = StringList2IntList(OperationSelf()->property("kuaizhao_black").toString().split("+"));
         if (!blackList.isEmpty())
             return "*kuaizhao_black";
 
@@ -1640,7 +1640,7 @@ void NianliDialog::popup()
     static const QStringList cardNamesInitial = {"slash", "snatch"};
     QStringList card_names;
     foreach (const QString &card_name, cardNamesInitial) {
-        if (!Self->hasUsed("nianli" + card_name))
+        if (!OperationSelf()->hasUsed("nianli" + card_name))
             card_names << card_name;
     }
 
@@ -1658,7 +1658,7 @@ void NianliDialog::popup()
         bool can = true;
         Card *c = Sanguosha->cloneCard(card_name);
         c->setSkillName("nianli");
-        if (Self->isCardLimited(c, Card::MethodUse) || !c->isAvailable(Self))
+        if (OperationSelf()->isCardLimited(c, Card::MethodUse) || !c->isAvailable(OperationSelf()))
             can = false;
 
         button->setEnabled(can);
@@ -3032,7 +3032,7 @@ public:
         foreach (const Card *card, cards) {
             if ((card->isNDTrick() || card->isKindOf("BasicCard")) && !ban_list.contains(card->getPackage())) {
                 QString p = card->objectName();
-                if (!checkedPatterns.contains(p) && (pattern != nullptr && pattern->match(Self, card)) && !Self->isCardLimited(card, method))
+                if (!checkedPatterns.contains(p) && (pattern != nullptr && pattern->match(OperationSelf(), card)) && !OperationSelf()->isCardLimited(card, method))
                     checkedPatterns << p;
             }
         }

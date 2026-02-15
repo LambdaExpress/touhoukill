@@ -739,6 +739,15 @@ void HezhouDialog::popup()
 {
     Self->tag.remove(object_name);
 
+    // In control mode, use the operation player (the controlled target)
+    // for phase and availability checks.
+    const Player *opPlayer = Self;
+    if (ClientInstance != nullptr) {
+        const Player *op = ClientInstance->getOperationPlayer();
+        if (op != nullptr)
+            opPlayer = op;
+    }
+
     QSet<QString> validPatterns;
     QStringList ban_list = Sanguosha->getBanPackages();
     QList<const Card *> cards = Sanguosha->findChildren<const Card *>();
@@ -746,7 +755,7 @@ void HezhouDialog::popup()
     foreach (const Card *card, cards) {
         if (!ban_list.contains(card->getPackage())) {
             bool available = false;
-            if (Self->getPhase() == Player::NotActive)
+            if (opPlayer->getPhase() == Player::NotActive)
                 available = card->objectName() == "peach";
             else
                 available = card->isNDTrick();
@@ -762,7 +771,7 @@ void HezhouDialog::popup()
     const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
     bool play = (Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_PLAY);
 
-    const Player *user = Self;
+    const Player *user = opPlayer;
 
     QSet<QString> checkedPatterns;
     foreach (const QString &str, validPatterns) {
@@ -856,13 +865,21 @@ public:
 
     bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const override
     {
+        // In control mode, check the operation player's wooden_ox pile
+        const Player *opPlayer = Self;
+        if (ClientInstance != nullptr) {
+            const Player *op = ClientInstance->getOperationPlayer();
+            if (op != nullptr)
+                opPlayer = op;
+        }
+
         if (selected.length() == 0)
             return true;
         else if (selected.length() == 1) {
             if (to_select->getTypeId() == selected.first()->getTypeId())
                 return false;
             else {
-                QList<int> ids = Self->getPile("wooden_ox");
+                QList<int> ids = opPlayer->getPile("wooden_ox");
                 if (to_select->isKindOf("WoodenOx") && ids.contains(selected.first()->getId()))
                     return false;
                 else if (selected.first()->isKindOf("WoodenOx") && ids.contains(to_select->getId()))

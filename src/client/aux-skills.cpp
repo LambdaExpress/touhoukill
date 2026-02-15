@@ -42,7 +42,7 @@ bool DiscardSkill::viewFilter(const QList<const Card *> &selected, const Card *c
     if (!include_equip && card->isEquipped())
         return false;
 
-    if (is_discard && Self->isCardLimited(card, Card::MethodDiscard))
+    if (is_discard && ClientInstance->getOperationPlayer()->isCardLimited(card, Card::MethodDiscard))
         return false;
 
     return true;
@@ -86,7 +86,7 @@ bool ResponseSkill::matchPattern(const Player *player, const Card *card) const
 
 bool ResponseSkill::viewFilter(const Card *card) const
 {
-    return matchPattern(Self, card);
+    return matchPattern(ClientInstance->getOperationPlayer(), card);
 }
 
 const Card *ResponseSkill::viewAs(const Card *originalCard) const

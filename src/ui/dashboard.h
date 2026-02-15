@@ -74,6 +74,16 @@ public:
     bool isAvatarUnderMouse();
 
     void highlightEquip(const QString &skillName, bool highlight);
+    QSanSkillButton *getEquipSkillButton(int index) const
+    {
+        return (index >= 0 && index < 5) ? _m_equipSkillBtns[index] : nullptr;
+    }
+    void relinkEquipSkillButton(int index, QSanSkillButton *btn)
+    {
+        if (index >= 0 && index < 5)
+            _m_equipSkillBtns[index] = btn;
+    }
+    void relinkEquipSkillButtonsFromList(const QList<QSanSkillButton *> &buttons);
 
     void setTrust(bool trust);
     void killPlayer() override;
@@ -134,6 +144,9 @@ public:
         if (_m_rightSkillDock != nullptr)
             _m_rightSkillDock->update();
     }
+
+    QSanInvokeSkillDock *getSkillDock() const { return _m_skillDock; }
+    QSanInvokeSkillDock *getRightSkillDock() const { return _m_rightSkillDock; }
 
     void playBattleArrayAnimations();
     static const int CARDITEM_Z_DATA_KEY = 0413;

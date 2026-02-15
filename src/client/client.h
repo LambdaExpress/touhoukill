@@ -52,6 +52,15 @@ public:
     explicit Client(QObject *parent, const QString &filename = QString());
     ~Client() override;
 
+    // Perspective source types (mirrors server-side Room::PerspectiveSource)
+    enum PerspectiveSource
+    {
+        PerspectiveSourceNone = 0,
+        PerspectiveSourceSpectate = 1,
+        PerspectiveSourceControl = 2,
+        PerspectiveSourceAssist = 3
+    };
+
     // cheat functions
     void requestCheatGetOneCard(int card_id);
     void requestCheatChangeGeneral(const QString &name, bool isSecondaryHero = false);
@@ -65,6 +74,12 @@ public:
     void requestPerspectiveSwitch(const QString &targetName);
     QString perspectiveTargetName() const { return m_perspectiveTargetName; }
     bool isPerspectiveActive() const { return !m_perspectiveTargetName.isEmpty(); }
+    PerspectiveSource perspectiveSource() const { return m_perspectiveSource; }
+    ClientPlayer *getOperationPlayer();
+
+    // Temporarily suspend control-mode override so getOperationPlayer() returns Self.
+    // Used when the controller must respond to their own request mid-control.
+    void setControlSuspended(bool suspended);
 
     void disconnectFromHost();
     void replyToServer(QSanProtocol::CommandType command, const QVariant &arg = QVariant());
@@ -281,6 +296,8 @@ private:
 
     // Perspective switching
     QString m_perspectiveTargetName;
+    PerspectiveSource m_perspectiveSource = PerspectiveSourceNone;
+    bool m_controlSuspended = false;
     int m_lastPerspectiveSyncSerial;
     QMap<QString, bool> m_savedPileOpenState; // true if the pile was already open before spectate sync
 
@@ -356,7 +373,9 @@ signals:
     void move_cards_lost(int moveId, QList<CardsMoveStruct> moves);
     void move_cards_got(int moveId, QList<CardsMoveStruct> moves);
 
-    void perspective_changed(const QString &targetName, const QList<int> &handCardIds, const QVariantMap &piles);
+    void perspective_changed(const QString &targetName, const QList<int> &handCardIds, const QVariantMap &piles, int source);
+
+    void request_routed(const QString &onBehalfOf);
 
     void skill_attached(const QString &skill_name, bool from_left);
     void skill_detached(const QString &skill_name, bool head = true);
@@ -387,5 +406,47 @@ signals:
 };
 
 extern Client *ClientInstance;
+
+// Returns the effective "self" player for skill logic: the operation
+// player in control mode, or the real Self otherwise.  Use this in
+// dialog popup() / responsePatterns where a scoped Self-swap is unsafe
+// (nested event-loop).  Does NOT mutate the global Self.
+inline ClientPlayer *OperationSelf()
+{
+    if (ClientInstance != nullptr) {
+        ClientPlayer *op = ClientInstance->getOperationPlayer();
+        if (op != nullptr)
+            return op;
+    }
+    return Self;
+}
+
+// RAII guard: temporarily swaps global Self to operationPlayer for the
+// duration of a synchronous scope (viewFilter / viewAs calls, etc.).
+// MUST NEVER be held across a nested event-loop (QDialog::exec()).
+class ScopedOperationPlayerSwap
+{
+public:
+    ScopedOperationPlayerSwap()
+        : m_saved(Self)
+    {
+        if (ClientInstance != nullptr) {
+            ClientPlayer *op = ClientInstance->getOperationPlayer();
+            if (op != nullptr)
+                Self = op;
+        }
+    }
+
+    ~ScopedOperationPlayerSwap()
+    {
+        Self = m_saved;
+    }
+
+    ScopedOperationPlayerSwap(const ScopedOperationPlayerSwap &) = delete;
+    ScopedOperationPlayerSwap &operator=(const ScopedOperationPlayerSwap &) = delete;
+
+private:
+    ClientPlayer *m_saved;
+};
 
 #endif

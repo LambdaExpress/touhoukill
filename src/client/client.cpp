@@ -433,10 +433,23 @@ void Client::processServerPacket(const char *cmd)
 
 bool Client::processServerRequest(const Packet &packet)
 {
+    CommandType command = packet.getCommandType();
     setStatus(NotActive);
     _m_lastServerSerial = packet.globalSerial;
-    CommandType command = packet.getCommandType();
-    const QVariant &msg = packet.getMessageBody();
+    QVariant msg = packet.getMessageBody();
+
+    // Unwrap routed request: extract onBehalfOf and actual payload
+    QString onBehalfOf;
+    if (msg.canConvert<QVariantMap>()) {
+        QVariantMap routedMap = msg.toMap();
+        if (routedMap.value("routed").toBool()) {
+            onBehalfOf = routedMap.value("onBehalfOf").toString();
+            msg = routedMap.value("payload");
+        }
+    }
+
+    if (!onBehalfOf.isEmpty())
+        emit request_routed(onBehalfOf);
 
     if (replayer == nullptr) {
         //process count max
@@ -735,6 +748,9 @@ void Client::fillRobots()
 
 void Client::onPlayerResponseCard(const Card *card, const QList<const Player *> &targets)
 {
+    const ClientPlayer *operationPlayer = getOperationPlayer();
+    // Client_PreventPeach is always set on Self (in askForSinglePeach),
+    // so always clear it on Self regardless of control mode.
     if (Self->hasFlag("Client_PreventPeach")) {
         Self->setFlags("-Client_PreventPeach");
         Self->removeCardLimitation("use", "Peach$0", "Global_PreventPeach");
@@ -745,7 +761,7 @@ void Client::onPlayerResponseCard(const Card *card, const QList<const Player *> 
         replyToServer(S_COMMAND_RESPONSE_CARD);
     } else {
         JsonArray targetNames;
-        if (!card->targetFixed(Self)) {
+        if (!card->targetFixed(operationPlayer)) {
             foreach (const Player *target, targets)
                 targetNames << target->objectName();
         }
@@ -833,7 +849,13 @@ void Client::notifyRoleChange(const QString &new_role)
 
 void Client::activate(const QVariant &playerId)
 {
-    setStatus(playerId.toString() == Self->objectName() ? Playing : NotActive);
+    const QString id = playerId.toString();
+    // In Control mode the routed payload carries the controlled player's name,
+    // so also accept getOperationPlayer() which returns the controlled target.
+    if (id == Self->objectName() || id == getOperationPlayer()->objectName())
+        setStatus(Playing);
+    else
+        setStatus(NotActive);
 }
 
 void Client::startGame(const QVariant &arg)
@@ -1338,6 +1360,21 @@ void Client::requestPerspectiveSwitch(const QString &targetName)
     notifyServer(S_COMMAND_PERSPECTIVE_REQUEST, targetName);
 }
 
+ClientPlayer *Client::getOperationPlayer()
+{
+    if (!m_controlSuspended && m_perspectiveSource == PerspectiveSourceControl && !m_perspectiveTargetName.isEmpty()) {
+        ClientPlayer *target = getPlayer(m_perspectiveTargetName);
+        if (target != nullptr)
+            return target;
+    }
+    return Self;
+}
+
+void Client::setControlSuspended(bool suspended)
+{
+    m_controlSuspended = suspended;
+}
+
 void Client::perspectiveSync(const QVariant &arg)
 {
     JsonArray args = arg.value<JsonArray>();
@@ -1348,6 +1385,9 @@ void Client::perspectiveSync(const QVariant &arg)
     if (syncSerial <= m_lastPerspectiveSyncSerial)
         return;
     m_lastPerspectiveSyncSerial = syncSerial;
+
+    // Any new perspective sync from the server supersedes a local suspension.
+    m_controlSuspended = false;
 
     QString targetName = args[1].toString();
 
@@ -1372,7 +1412,8 @@ void Client::perspectiveSync(const QVariant &arg)
 
     if (targetName.isEmpty()) {
         m_perspectiveTargetName.clear();
-        emit perspective_changed(QString(), QList<int>(), QVariantMap());
+        m_perspectiveSource = PerspectiveSourceNone;
+        emit perspective_changed(QString(), QList<int>(), QVariantMap(), PerspectiveSourceNone);
         return;
     }
 
@@ -1437,7 +1478,13 @@ void Client::perspectiveSync(const QVariant &arg)
             target->setPile(pileName, QList<int>());
     }
 
-    emit perspective_changed(targetName, handCardIds, pilesMap);
+    // Parse perspective source type (6th field, optional for backward compatibility)
+    PerspectiveSource source = PerspectiveSourceSpectate;
+    if (args.size() >= 6)
+        source = static_cast<PerspectiveSource>(args[5].toInt());
+    m_perspectiveSource = source;
+
+    emit perspective_changed(targetName, handCardIds, pilesMap, static_cast<int>(source));
 }
 
 void Client::speakToServer(const QString &text)
@@ -1461,11 +1508,11 @@ void Client::addHistory(const QVariant &history)
         emit card_used();
         return;
     } else if (add_str == ".") {
-        Self->clearHistory();
+        getOperationPlayer()->clearHistory();
         return;
     }
 
-    Self->addHistory(add_str, times);
+    getOperationPlayer()->addHistory(add_str, times);
 }
 
 int Client::alivePlayerCount() const

@@ -356,8 +356,8 @@ void Dashboard::revivePlayer()
 {
     _m_votesGot = 0;
     setGraphicsEffect(nullptr);
-    Q_ASSERT(_m_deathIcon);
-    _m_deathIcon->hide();
+    if (_m_deathIcon != nullptr)
+        _m_deathIcon->hide();
     refresh();
 }
 
@@ -409,8 +409,12 @@ void Dashboard::addHandCards(QList<CardItem *> &card_items)
 
 void Dashboard::_addHandCard(CardItem *card_item, bool prepend, const QString &footnote)
 {
+    const ClientPlayer *opPlayer = ClientInstance->getOperationPlayer();
+    if (opPlayer == nullptr)
+        opPlayer = Self;
+
     if (ClientInstance->getStatus() == Client::Playing && (card_item->getCard() != nullptr))
-        card_item->setEnabled(card_item->getCard()->isAvailable(Self));
+        card_item->setEnabled(card_item->getCard()->isAvailable(opPlayer));
     else
         card_item->setEnabled(false); //false
 
@@ -745,7 +749,11 @@ void Dashboard::skillButtonDeactivated()
 
 void Dashboard::selectAll()
 {
-    foreach (const QString &pile, Self->getPileNames()) {
+    // Use the dashboard's current player (target in control mode) for pile queries.
+    const ClientPlayer *opPlayer = ClientInstance->getOperationPlayer();
+    if (opPlayer == nullptr)
+        opPlayer = Self;
+    foreach (const QString &pile, opPlayer->getPileNames()) {
         if (pile.startsWith("&") || pile == "wooden_ox")
             retractPileCards(pile);
     }
@@ -816,6 +824,33 @@ void Dashboard::_onEquipSelectChanged()
             }
         }
     }
+}
+
+void Dashboard::relinkEquipSkillButtonsFromList(const QList<QSanSkillButton *> &buttons)
+{
+    // After exiting perspective view, _m_equipSkillBtns was nulled by
+    // syncContainerFromPlayer but the actual button objects still exist in
+    // RoomScene::m_skillButtons.  Re-link them by matching skill names
+    // against the current equip cards.
+    _mutexEquipAnim.lock();
+    for (int i = 0; i < 5; i++) {
+        if (_m_equipCards[i] == nullptr)
+            continue;
+        const EquipCard *equip = qobject_cast<const EquipCard *>(_m_equipCards[i]->getCard()->getRealCard());
+        if (equip == nullptr)
+            continue;
+        const Skill *skill = Sanguosha->getSkill(equip);
+        if (skill == nullptr)
+            continue;
+        foreach (QSanSkillButton *btn, buttons) {
+            const Skill *btnSkill = btn->getSkill();
+            if (btnSkill != nullptr && btnSkill->objectName() == skill->objectName()) {
+                _m_equipSkillBtns[i] = btn;
+                break;
+            }
+        }
+    }
+    _mutexEquipAnim.unlock();
 }
 
 void Dashboard::_createEquipBorderAnimations()
@@ -1178,13 +1213,16 @@ void Dashboard::disableAllCards()
 
 void Dashboard::enableCards()
 {
+    const ClientPlayer *operationPlayer = ClientInstance->getOperationPlayer();
     m_mutexEnableCards.lock();
-    foreach (const QString &pile, Self->getHandPileList(false))
+
+    foreach (const QString &pile, operationPlayer->getHandPileList(false)) {
         expandPileCards(pile);
+    }
     expandSpecialCard();
 
     foreach (CardItem *card_item, m_handCards)
-        card_item->setEnabled(card_item->getCard()->isAvailable(Self));
+        card_item->setEnabled(card_item->getCard()->isAvailable(operationPlayer));
 
     m_mutexEnableCards.unlock();
 }
@@ -1204,6 +1242,11 @@ void Dashboard::startPending(const ViewAsSkill *skill)
     pendings.clear();
     unselectAll();
 
+    // Use the operation player (target in control mode) for pile/flag queries.
+    const ClientPlayer *opPlayer = ClientInstance->getOperationPlayer();
+    if (opPlayer == nullptr)
+        opPlayer = Self;
+
     bool expand = ((skill != nullptr) && skill->isResponseOrUse());
     if (!expand && (skill != nullptr) && skill->inherits("ResponseSkill")) {
         const ResponseSkill *resp_skill = qobject_cast<const ResponseSkill *>(skill);
@@ -1211,7 +1254,7 @@ void Dashboard::startPending(const ViewAsSkill *skill)
             expand = true;
     }
 
-    if (Self->hasFlag("Global_expandpileFailed"))
+    if (opPlayer->hasFlag("Global_expandpileFailed"))
         expand = true;
 
     foreach (const QString &pileName, _m_pile_expanded.keys()) {
@@ -1221,16 +1264,19 @@ void Dashboard::startPending(const ViewAsSkill *skill)
     retractSpecialCard();
 
     if (expand) {
-        foreach (const QString &pile, Self->getHandPileList(false))
+        foreach (const QString &pile, opPlayer->getHandPileList(false))
             expandPileCards(pile);
         if ((skill == nullptr) || !skill->isResponseOrUse())
             expandSpecialCard();
     } else {
-        foreach (const QString &pile, Self->getPileNames()) {
+        foreach (const QString &pile, opPlayer->getPileNames()) {
             if (pile.startsWith("&") || pile == "wooden_ox")
                 retractPileCards(pile);
         }
         retractSpecialCard();
+        // getExpandPile() may use Self internally; swap for control mode.
+        // Guard covers both the condition check and the loop body.
+        ScopedOperationPlayerSwap selfGuard;
         if ((skill != nullptr) && !skill->getExpandPile().isEmpty()) {
             foreach (const QString &pile_name, skill->getExpandPile().split(","))
                 expandPileCards(pile_name);
@@ -1251,6 +1297,8 @@ void Dashboard::stopPending()
 {
     m_mutexEnableCards.lock();
     if (view_as_skill != nullptr) {
+        // getExpandPile() may use Self internally; swap for control mode.
+        ScopedOperationPlayerSwap selfGuard;
         if (!view_as_skill->getExpandPile().isEmpty()) {
             retractPileCards(view_as_skill->getExpandPile());
         }
@@ -1258,7 +1306,11 @@ void Dashboard::stopPending()
 
     view_as_skill = nullptr;
     pending_card = nullptr;
-    foreach (const QString &pile, Self->getPileNames()) {
+    // In control mode, use the controlled player's piles instead of Self's.
+    const ClientPlayer *opPlayer = ClientInstance->getOperationPlayer();
+    if (opPlayer == nullptr)
+        opPlayer = Self;
+    foreach (const QString &pile, opPlayer->getPileNames()) {
         if (pile.startsWith("&") || pile == "wooden_ox")
             retractPileCards(pile);
     }
@@ -1290,12 +1342,13 @@ void Dashboard::expandPileCards(const QString &pile_name)
     if (_m_pile_expanded.contains(pile_name))
         return;
 
+    const ClientPlayer *operationPlayer = ClientInstance->getOperationPlayer();
     QList<int> pile;
     if (pile_name.startsWith("%") || pile_name.startsWith("+")) {
         QString new_name = pile_name.mid(1);
         if (pile_name.startsWith("+"))
-            pile += Self->getPile(new_name);
-        foreach (const Player *p, Self->getAliveSiblings())
+            pile += operationPlayer->getPile(new_name);
+        foreach (const Player *p, operationPlayer->getAliveSiblings())
             pile += p->getPile(new_name);
     } else if (pile_name == "#xiuye_temp") {
         foreach (const Card *c, ClientInstance->discarded_list) {
@@ -1308,18 +1361,18 @@ void Dashboard::expandPileCards(const QString &pile_name)
                 pile << c->getEffectiveId();
         }
     } else if (pile_name == "#shijie") {
-        QString dyingPlayerName = Self->property("currentdying").toString();
+        QString dyingPlayerName = operationPlayer->property("currentdying").toString();
         const Player *p = ClientInstance->findChild<const Player *>(dyingPlayerName);
-        if (p != nullptr && p != Self) {
+        if (p != nullptr && p != operationPlayer) {
             foreach (const Card *c, p->getEquips())
                 pile << c->getEffectiveId();
         }
     } else if (pile_name == "#judging_area") {
-        pile = Self->getJudgingAreaID();
+        pile = operationPlayer->getJudgingAreaID();
     } else if (pile_name.startsWith("*")) {
-        pile = StringList2IntList(Self->property(pile_name.mid(1).toUtf8().constData()).toString().split("+"));
+        pile = StringList2IntList(operationPlayer->property(pile_name.mid(1).toUtf8().constData()).toString().split("+"));
     } else {
-        pile = Self->getPile(pile_name);
+        pile = operationPlayer->getPile(pile_name);
     }
 
     if (pile.isEmpty())
@@ -1336,7 +1389,7 @@ void Dashboard::expandPileCards(const QString &pile_name)
     foreach (CardItem *card_item, card_items) {
         QString pile_string = pile_name;
         if (pile_name == "%shown_card") {
-            foreach (const Player *p, Self->getAliveSiblings()) {
+            foreach (const Player *p, operationPlayer->getAliveSiblings()) {
                 if (p->getPile("shown_card").contains(card_item->getId())) {
                     pile_string = ClientInstance->getPlayerName(p->objectName());
                     break;
@@ -1344,19 +1397,19 @@ void Dashboard::expandPileCards(const QString &pile_name)
             }
         } else if (pile_name == "*mengxiang_temp") {
             QString target_name;
-            foreach (const Player *p, Self->getAliveSiblings()) {
+            foreach (const Player *p, operationPlayer->getAliveSiblings()) {
                 if (p->hasFlag("mengxiangtarget")) {
                     target_name = p->objectName();
                     break;
                 }
             }
             if (target_name.isEmpty())
-                target_name = Self->objectName();
+                target_name = operationPlayer->objectName();
             pile_string = ClientInstance->getPlayerName(target_name);
         } else if (pile_name == "*chunhua") {
             bool isUse = false;
             if (card_items.indexOf(card_item) == 0)
-                isUse = Self->property("chunhua_firstCardIsUsing").toString() == "1";
+                isUse = operationPlayer->property("chunhua_firstCardIsUsing").toString() == "1";
             if (isUse)
                 pile_string = "use";
             else
@@ -1457,16 +1510,20 @@ void Dashboard::updateChaoren()
 }
 void Dashboard::updateHandPile()
 {
-    WrappedCard *t = Self->getTreasure();
+    const ClientPlayer *displayPlayer = (m_player != nullptr) ? m_player : Self;
+    WrappedCard *t = displayPlayer->getTreasure();
     if (t != nullptr) {
-        if (Self->isBrokenEquip(t->getEffectiveId(), true))
+        if (displayPlayer->isBrokenEquip(t->getEffectiveId(), true))
             retractPileCards("wooden_ox");
     }
 }
 
 void Dashboard::selectLingshou()
 {
-    foreach (const QString &pile, Self->getPileNames()) {
+    const ClientPlayer *opPlayer = ClientInstance->getOperationPlayer();
+    if (opPlayer == nullptr)
+        opPlayer = Self;
+    foreach (const QString &pile, opPlayer->getPileNames()) {
         if (pile.startsWith("&") || pile == "wooden_ox")
             retractPileCards(pile);
     }
@@ -1475,7 +1532,7 @@ void Dashboard::selectLingshou()
     if (view_as_skill != nullptr) {
         unselectAll();
         bool ok = false;
-        int selectedId = Self->property("lingshouSelected").toString().toInt(&ok);
+        int selectedId = opPlayer->property("lingshouSelected").toString().toInt(&ok);
         if (!ok)
             return;
 
@@ -1505,7 +1562,10 @@ void Dashboard::selectLingshou()
 
 void Dashboard::selectWeiyi()
 {
-    foreach (const QString &pile, Self->getPileNames()) {
+    const ClientPlayer *opPlayer = ClientInstance->getOperationPlayer();
+    if (opPlayer == nullptr)
+        opPlayer = Self;
+    foreach (const QString &pile, opPlayer->getPileNames()) {
         if (pile.startsWith("&") || pile == "wooden_ox")
             retractPileCards(pile);
     }
@@ -1514,7 +1574,7 @@ void Dashboard::selectWeiyi()
     if (view_as_skill != nullptr) {
         unselectAll();
         bool ok = false;
-        int selectedId = Self->property("weiyiSelected").toString().toInt(&ok);
+        int selectedId = opPlayer->property("weiyiSelected").toString().toInt(&ok);
         if (!ok)
             return;
 
@@ -1583,6 +1643,12 @@ void Dashboard::updatePending()
 
     if (view_as_skill == nullptr)
         return;
+
+    // Temporarily let Self point to the operation player so that all
+    // ViewAsSkill::viewFilter / viewAs implementations see the correct
+    // player context in control mode.  Scoped – restored on return.
+    ScopedOperationPlayerSwap selfGuard;
+
     QList<const Card *> cards;
     foreach (CardItem *item, pendings)
         cards.append(item->getCard());
@@ -1966,6 +2032,20 @@ void Dashboard::syncContainerFromPlayer()
         _m_equipRegions[index]->setPos(_m_layout->m_equipAreas[index].topLeft());
         _m_equipRegions[index]->setOpacity(255);
         _m_equipRegions[index]->show();
+
+        // In perspective-control mode (m_player != Self), create equip skill
+        // buttons for the controlled target.  For Self the buttons already
+        // exist in RoomScene::m_skillButtons and will be re-linked after
+        // exitPerspectiveView via relinkEquipSkillButton().
+        if (m_player != Self) {
+            const Skill *equipSkill = Sanguosha->getSkill(equipCard);
+            if (equipSkill != nullptr && _m_equipSkillBtns[index] == nullptr) {
+                _m_equipSkillBtns[index] = new QSanInvokeSkillButton();
+                _m_equipSkillBtns[index]->setSkill(equipSkill);
+                connect(_m_equipSkillBtns[index], SIGNAL(clicked()), this, SLOT(_onEquipSelectChanged()));
+                connect(_m_equipSkillBtns[index], SIGNAL(enable_changed()), this, SLOT(_onEquipSelectChanged()));
+            }
+        }
     }
 
     QList<const Card *> judges = m_player->getJudgingArea();
@@ -1999,7 +2079,21 @@ void Dashboard::syncContainerFromPlayer()
         updatePile("shown_card");
 
     updatePending();
-    adjustCards();
+
+    // Use non-animated positioning: syncContainerFromPlayer rebuilds cards from
+    // scratch (e.g. during perspective switch).  Cards start at pos=(0,0) with
+    // opacity 0.  If we use animated adjustCards(), the goBack animations have
+    // no chance to run before enableCards -> expandPileCards calls adjustCards()
+    // again, leaving cards stuck at (0,0) invisible.  Position them immediately.
+    adjustCards(false);
+    foreach (CardItem *card, m_handCards) {
+        card->setOpacity(card->getHomeOpacity());
+        // Cards are created with setAcceptedMouseButtons(nullptr).  Normally
+        // onAnimationFinished() enables LeftButton after the goBack animation,
+        // but adjustCards(false) skips animation so we must enable it here.
+        card->setAcceptedMouseButtons(Qt::LeftButton);
+    }
+
     updateHandcardNum();
 
     updateHp();

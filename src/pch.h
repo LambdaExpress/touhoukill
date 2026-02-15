@@ -181,6 +181,7 @@
 #include <QWinTaskbarProgress>
 #endif
 
+// Crash-safe file logger: each call opens, writes, flushes, closes.
 #endif
 
 #endif

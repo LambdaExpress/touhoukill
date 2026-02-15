@@ -5,6 +5,7 @@
 #include "gamerule.h"
 #include "lua-wrapper.h"
 #include "recorder.h"
+#include "room.h"
 #include "settings.h"
 #include "skill.h"
 #include "standard.h"
@@ -1037,7 +1038,13 @@ AI *ServerPlayer::getAI() const
 {
     if (getState() == "online")
         return nullptr;
-    else if (getState() != "robot" && !Config.EnableCheat)
+
+    // When controlled by an online player, suppress AI so that all askFor*
+    // functions fall through to doRequest, routing to the controller.
+    if (room != nullptr && room->isPlayerControlled(this))
+        return nullptr;
+
+    if (getState() != "robot" && !Config.EnableCheat)
         return trust_ai;
     else
         return ai;

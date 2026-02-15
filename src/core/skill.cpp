@@ -298,9 +298,22 @@ bool OneCardViewAsSkill::viewFilter(const QList<const Card *> &selected, const C
 bool OneCardViewAsSkill::viewFilter(const Card *to_select) const
 {
     if (!inherits("FilterSkill") && !filter_pattern.isEmpty()) {
+        // In control mode the operation player is the controlled target,
+        // whose hand cards are shown on the dashboard.  Use that player
+        // for pattern matching instead of Self (the controller).
+        const Player *invoker = Self;
+        if (ClientInstance != nullptr) {
+            const Player *op = ClientInstance->getOperationPlayer();
+            if (op != nullptr)
+                invoker = op;
+        }
+
+        if (invoker == nullptr)
+            return false;
+
         QString pat = filter_pattern;
         if (pat.endsWith("!")) {
-            if (Self->isJilei(to_select))
+            if (invoker->isJilei(to_select))
                 return false;
             pat.chop(1);
         } else if (response_or_use && pat.contains("hand")) {
@@ -308,7 +321,7 @@ bool OneCardViewAsSkill::viewFilter(const Card *to_select) const
             //pat.replace("hand", handlist.join(","));
         }
         ExpPattern pattern(pat);
-        return pattern.match(Self, to_select);
+        return pattern.match(invoker, to_select);
     }
     return false;
 }
