@@ -131,6 +131,7 @@ SOURCES += \
     src/ui/playercardbox.cpp \
     src/package/hegemonyCard.cpp \
     src/package/playground.cpp \
+    src/package/yuritest.cpp \
     src/ui/hegemonyrolecombobox.cpp \
     src/package/peasants_vs_landlord.cpp
 
@@ -242,6 +243,7 @@ HEADERS += \
     src/ui/playercardbox.h \
     src/package/hegemonyCard.h \
     src/package/playground.h \
+    src/package/yuritest.h \
     src/pch.h \
     src/package/peasants_vs_landlord.h
 
