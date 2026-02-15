@@ -1484,8 +1484,8 @@ void PlayerCardContainer::revivePlayer()
 {
     _m_votesGot = 0;
     _m_groupMain->setGraphicsEffect(nullptr);
-    Q_ASSERT(_m_deathIcon);
-    _m_deathIcon->hide();
+    if (_m_deathIcon != nullptr)
+        _m_deathIcon->hide();
     refresh();
 }
 

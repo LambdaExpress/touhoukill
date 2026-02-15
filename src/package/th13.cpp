@@ -243,7 +243,7 @@ void XihuaDialog::popup()
             else if (pattern.contains("peach"))
                 pattern = "peach";
             QString markName = "xihua_record_" + pattern;
-            if (!validPatterns.contains(name) && Self->getMark(markName) == 0)
+            if (!validPatterns.contains(name) && OperationSelf()->getMark(markName) == 0)
                 validPatterns << card->objectName();
         }
     }
@@ -252,7 +252,7 @@ void XihuaDialog::popup()
     foreach (const QString &str, validPatterns) {
         Card *card = Sanguosha->cloneCard(str);
         DELETE_OVER_SCOPE(Card, card)
-        if (play || ((cardPattern != nullptr && cardPattern->match(Self, card)) && !Self->isCardLimited(card, method)))
+        if (play || ((cardPattern != nullptr && cardPattern->match(OperationSelf(), card)) && !OperationSelf()->isCardLimited(card, method)))
             checkedPatterns << str;
     }
 
@@ -264,7 +264,7 @@ void XihuaDialog::popup()
 
     foreach (QAbstractButton *button, group->buttons()) {
         const Card *card = map[button->objectName()];
-        const Player *user = Self;
+        const Player *user = OperationSelf();
 
         bool available = (!play) || card->isAvailable(user);
         if (card->isKindOf("Peach"))

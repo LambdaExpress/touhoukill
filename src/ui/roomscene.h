@@ -173,7 +173,8 @@ public:
     enum PerspectiveSource
     {
         PerspectiveSourceNone = 0,
-        PerspectiveSourceSpectate
+        PerspectiveSourceSpectate,
+        PerspectiveSourceControl
     };
 
     explicit RoomScene(QMainWindow *main_window);
@@ -345,8 +346,10 @@ private:
     PerspectiveSource m_perspectiveSource = PerspectiveSourceNone;
     QList<Photo *> m_originalPhotosOrder;
     QString m_perspectiveTargetName;
+    QString m_controlSuspendedTargetName; // Temporarily suspended Control target during self-response
 
     QList<QSanSkillButton *> m_skillButtons;
+    QList<QSanSkillButton *> m_savedControllerSkillButtons;
 
     ResponseSkill *response_skill;
     ShowOrPindianSkill *showorpindian_skill;
@@ -542,11 +545,19 @@ private slots:
     void trust();
     void skillInvalidityChange(ClientPlayer *player);
 
-    void onPerspectiveChanged(const QString &targetName, const QList<int> &handCardIds, const QVariantMap &piles);
+    void onPerspectiveChanged(const QString &targetName, const QList<int> &handCardIds, const QVariantMap &piles, int source);
+    void onRequestRouted(const QString &onBehalfOf);
 
     // Perspective view
     void enterPerspectiveView(const QString &targetName, PerspectiveSource source, bool lockInput);
     void exitPerspectiveView();
+    bool shouldDisplayPerspectiveSkill(const ClientPlayer *player, const Skill *skill) const;
+    void saveControllerSkillButtons();
+    void restoreControllerSkillButtons();
+    void cleanupControlModeSkillButtons();
+    void registerControlModeSkillButtons(const ClientPlayer *target);
+    void cleanupControlModeEquipButtons();
+    void registerControlModeEquipButtons();
 
 signals:
     void restart();

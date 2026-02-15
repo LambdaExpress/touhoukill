@@ -1477,7 +1477,7 @@ public:
         foreach (const Card *card, cards) {
             if ((card->isKindOf("BasicCard")) && !ban_list.contains(card->getPackage())) { //&& !ServerInfo.Extensions.contains("!" + card->getPackage())
                 QString name = card->objectName();
-                if (!checkedPatterns.contains(name) && (cardPattern != nullptr && cardPattern->match(Self, card)) && !Self->isCardLimited(card, method))
+                if (!checkedPatterns.contains(name) && (cardPattern != nullptr && cardPattern->match(OperationSelf(), card)) && !OperationSelf()->isCardLimited(card, method))
                     checkedPatterns << name;
             }
         }

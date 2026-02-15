@@ -412,6 +412,10 @@ void Room::killPlayer(ServerPlayer *victim, DamageStruct *reason)
     // Clear all perspective viewers watching this dying player
     clearAllPerspectiveViewersOf(victim);
 
+    // If the dying player was a controller, clear their control relation
+    if (m_perspectiveViewers.contains(victim) && getPerspectiveSource(victim) == PerspectiveControl)
+        clearPerspectiveViewer(victim);
+
     thread->trigger(BeforeGameOverJudge, this, data);
     death = data.value<DeathStruct>();
 
@@ -791,8 +795,15 @@ bool Room::doRequest(ServerPlayer *player, QSanProtocol::CommandType command, co
 
 bool Room::doRequest(ServerPlayer *player, QSanProtocol::CommandType command, const QVariant &arg, time_t timeOut, bool wait)
 {
+    if (player == nullptr)
+        return false;
+
+    ServerPlayer *receiver = resolveRequestReceiver(player);
+    if (receiver == nullptr)
+        return false;
+
     Packet packet(S_SRC_ROOM | S_TYPE_REQUEST | S_DEST_CLIENT, command);
-    packet.setMessageBody(arg);
+    packet.setMessageBody(buildRoutedRequestArg(player, receiver, arg));
     player->acquireLock(ServerPlayer::SEMA_MUTEX);
     player->m_isClientResponseReady = false;
     player->drainLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
@@ -805,11 +816,7 @@ bool Room::doRequest(ServerPlayer *player, QSanProtocol::CommandType command, co
     else
         player->m_expectedReplyCommand = command;
 
-    // [PERSPECTIVE EXTENSION POINT] Future: check getCommandProxy(player)
-    // If a proxy exists, redirect this request to the proxy player instead.
-    // The proxy's client will need to know it's acting on behalf of `player`.
-
-    player->invoke(&packet);
+    receiver->invoke(&packet);
     player->releaseLock(ServerPlayer::SEMA_MUTEX);
     if (wait)
         return getResult(player, timeOut);
@@ -825,17 +832,33 @@ bool Room::doBroadcastRequest(QList<ServerPlayer *> &players, QSanProtocol::Comm
 
 bool Room::doBroadcastRequest(QList<ServerPlayer *> &players, QSanProtocol::CommandType command, time_t timeOut)
 {
-    foreach (ServerPlayer *player, players)
-        doRequest(player, command, player->m_commandArgs, timeOut, false);
+    // When multiple logical players map to the same physical receiver (Control mode),
+    // serialize their requests to avoid the client receiving concurrent interactions.
+    QHash<ServerPlayer *, ServerPlayer *> pendingByReceiver;
 
     QTime timer;
-    time_t remainTime = timeOut;
     timer.start();
+
     foreach (ServerPlayer *player, players) {
-        remainTime = timeOut - timer.elapsed();
+        ServerPlayer *receiver = resolveRequestReceiver(player);
+        if (pendingByReceiver.contains(receiver)) {
+            // Same receiver already has an in-flight request; wait for it first
+            ServerPlayer *prevActor = pendingByReceiver.take(receiver);
+            time_t remainTime = timeOut - timer.elapsed();
+            if (remainTime < 0)
+                remainTime = 0;
+            getResult(prevActor, remainTime);
+        }
+        doRequest(player, command, player->m_commandArgs, timeOut, false);
+        pendingByReceiver[receiver] = player;
+    }
+
+    // Collect remaining results
+    foreach (ServerPlayer *actor, pendingByReceiver.values()) {
+        time_t remainTime = timeOut - timer.elapsed();
         if (remainTime < 0)
             remainTime = 0;
-        getResult(player, remainTime);
+        getResult(actor, remainTime);
     }
     return true;
 }
@@ -980,7 +1003,12 @@ bool Room::getResult(ServerPlayer *player, time_t timeOut)
     bool validResult = false;
     player->acquireLock(ServerPlayer::SEMA_MUTEX);
 
-    if (player->isOnline()) {
+    // When a player is controlled by an online controller, the request was
+    // routed to the controller via resolveRequestReceiver/doRequest.  We must
+    // wait for the controller's response even though the player itself is an
+    // offline AI.  processResponse will route the controller's reply back to
+    // this player and release the semaphore.
+    if (player->isOnline() || isPlayerControlled(player)) {
         player->releaseLock(ServerPlayer::SEMA_MUTEX);
 
         if (Config.OperationNoLimit)
@@ -2224,9 +2252,14 @@ void Room::addPlayerHistory(ServerPlayer *player, const QString &key, int times)
     arg << key;
     arg << times;
 
-    if (player != nullptr)
+    if (player != nullptr) {
         doNotify(player, S_COMMAND_ADD_HISTORY, arg);
-    else
+        // When the target is controlled, also notify the controller so its
+        // client-side history (slash count, etc.) stays in sync.
+        ServerPlayer *proxy = getCommandProxy(player);
+        if (proxy != nullptr && proxy != player)
+            doNotify(proxy, S_COMMAND_ADD_HISTORY, arg);
+    } else
         doBroadcastNotify(S_COMMAND_ADD_HISTORY, arg);
 }
 
@@ -2904,6 +2937,17 @@ void Room::reportDisconnection()
             } else
                 player->releaseLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
         }
+
+        // Release proxied player's waiting lock if this controller disconnects
+        ServerPlayer *proxiedPlayer = getProxiedPlayer(player);
+        if (proxiedPlayer != nullptr && proxiedPlayer != player && proxiedPlayer->m_isWaitingReply) {
+            if (_m_raceStarted) {
+                _m_raceWinner.store(proxiedPlayer);
+                _m_semRaceRequest.release();
+            } else
+                proxiedPlayer->releaseLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
+        }
+
         setPlayerProperty(player, "state", "offline");
 
         bool someone_is_online = false;
@@ -2947,6 +2991,16 @@ void Room::trustCommand(ServerPlayer *player, const QVariant & /*unused*/)
                 _m_semRaceRequest.release();
             } else
                 player->releaseLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
+
+            // Release proxied player's waiting lock if this controller enters trust
+            ServerPlayer *proxiedPlayer = getProxiedPlayer(player);
+            if (proxiedPlayer != nullptr && proxiedPlayer != player && proxiedPlayer->m_isWaitingReply) {
+                if (_m_raceStarted) {
+                    _m_raceWinner.store(proxiedPlayer);
+                    _m_semRaceRequest.release();
+                } else
+                    proxiedPlayer->releaseLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
+            }
         }
     } else
         player->setState("online");
@@ -3901,48 +3955,71 @@ void Room::speakCommand(ServerPlayer *player, const QVariant &arg)
 
 void Room::processResponse(ServerPlayer *player, const Packet *packet)
 {
-    player->acquireLock(ServerPlayer::SEMA_MUTEX);
-    bool success = false;
-    if (player == nullptr)
+    // Validate reply against a target player
+    auto validateReply = [packet](ServerPlayer *target) -> bool {
+        if (target == nullptr)
+            return false;
+        if (!target->m_isWaitingReply || target->m_isClientResponseReady)
+            return false;
+        if (packet->getCommandType() != target->m_expectedReplyCommand)
+            return false;
+        if (packet->localSerial != target->m_expectedReplySerial)
+            return false;
+        return true;
+    };
+
+    if (player == nullptr) {
         emit room_message(tr("Unable to parse player"));
-    else if (!player->m_isWaitingReply || player->m_isClientResponseReady)
+        return;
+    }
+
+    player->acquireLock(ServerPlayer::SEMA_MUTEX);
+
+    // First try direct validation against the sender
+    ServerPlayer *responsePlayer = nullptr;
+    if (validateReply(player)) {
+        responsePlayer = player;
+    } else {
+        // Proxy scenario: sender is a controller, route to the proxied player
+        ServerPlayer *proxiedPlayer = getProxiedPlayer(player);
+        if (proxiedPlayer != nullptr && proxiedPlayer != player) {
+            proxiedPlayer->acquireLock(ServerPlayer::SEMA_MUTEX);
+            if (validateReply(proxiedPlayer)) {
+                responsePlayer = proxiedPlayer;
+            } else {
+                proxiedPlayer->releaseLock(ServerPlayer::SEMA_MUTEX);
+            }
+        }
+    }
+
+    if (responsePlayer == nullptr) {
         emit room_message(tr("Server is not waiting for reply from %1").arg(player->objectName()));
-    else if (packet->getCommandType() != player->m_expectedReplyCommand)
-        emit room_message(tr("Reply command should be %1 instead of %2").arg(player->m_expectedReplyCommand).arg(packet->getCommandType()));
-    else if (packet->localSerial != player->m_expectedReplySerial)
-        emit room_message(tr("Reply serial should be %1 instead of %2").arg(player->m_expectedReplySerial).arg(packet->localSerial));
-    else
-        success = true;
-
-    // [PERSPECTIVE EXTENSION POINT] Future: check getProxiedPlayer(player)
-    // If this player is a proxy, route the response to the proxied player's
-    // semaphore so that getResult() on the original player unblocks.
-
-    if (!success) {
         player->releaseLock(ServerPlayer::SEMA_MUTEX);
         return;
-    } else {
-        _m_semRoomMutex.acquire();
-        if (_m_raceStarted) {
-            player->setClientReply(packet->getMessageBody());
-            player->m_isClientResponseReady = true;
-            // Warning: the statement below must be the last one before releasing the lock!!!
-            // Any statement after this statement will totally compromise the synchronization
-            // because getRaceResult will then be able to acquire the lock, reading a non-null
-            // raceWinner and proceed with partial data. The current implementation is based on
-            // the assumption that the following line is ATOMIC!!!
-            _m_raceWinner.store(player);
-            // the _m_semRoomMutex.release() signal is in getRaceResult();
-            _m_semRaceRequest.release();
-        } else {
-            _m_semRoomMutex.release();
-            player->setClientReply(packet->getMessageBody());
-            player->m_isClientResponseReady = true;
-            player->releaseLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
-        }
-
-        player->releaseLock(ServerPlayer::SEMA_MUTEX);
     }
+
+    _m_semRoomMutex.acquire();
+    if (_m_raceStarted) {
+        responsePlayer->setClientReply(packet->getMessageBody());
+        responsePlayer->m_isClientResponseReady = true;
+        // Warning: the statement below must be the last one before releasing the lock!!!
+        // Any statement after this statement will totally compromise the synchronization
+        // because getRaceResult will then be able to acquire the lock, reading a non-null
+        // raceWinner and proceed with partial data. The current implementation is based on
+        // the assumption that the following line is ATOMIC!!!
+        _m_raceWinner.store(responsePlayer);
+        // the _m_semRoomMutex.release() signal is in getRaceResult();
+        _m_semRaceRequest.release();
+    } else {
+        _m_semRoomMutex.release();
+        responsePlayer->setClientReply(packet->getMessageBody());
+        responsePlayer->m_isClientResponseReady = true;
+        responsePlayer->releaseLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
+    }
+
+    if (responsePlayer != player)
+        responsePlayer->releaseLock(ServerPlayer::SEMA_MUTEX);
+    player->releaseLock(ServerPlayer::SEMA_MUTEX);
 }
 
 bool Room::useCard(const CardUseStruct &use, bool add_history)
@@ -4557,6 +4634,8 @@ void Room::marshal(ServerPlayer *player)
     PerspectiveSource perspectiveSource = getPerspectiveSource(player);
     if (perspectiveTarget != nullptr) {
         if (perspectiveSource == PerspectiveSpectate && isDeadPlayerRevivable(player))
+            clearPerspectiveViewer(player);
+        else if (perspectiveSource == PerspectiveControl && !perspectiveTarget->isAlive())
             clearPerspectiveViewer(player);
         else if (perspectiveTarget->isAlive())
             sendPerspectiveSync(player, perspectiveTarget);
@@ -5319,17 +5398,35 @@ bool Room::notifyMoveCards(bool isLostPhase, QList<CardsMoveStruct> cards_moves,
 
 void Room::spectateCommand(ServerPlayer *player, const QVariant &arg)
 {
-    if (player->isAlive())
+    // Support both old format (plain string) and new format (JsonArray [targetName, sourceInt])
+    QString targetName;
+    PerspectiveSource requestedSource = PerspectiveSpectate;
+
+    if (arg.canConvert<JsonArray>()) {
+        JsonArray arr = arg.value<JsonArray>();
+        if (arr.size() >= 1)
+            targetName = arr[0].toString();
+        if (arr.size() >= 2)
+            requestedSource = static_cast<PerspectiveSource>(arr[1].toInt());
+    } else {
+        targetName = arg.toString();
+    }
+
+    // Spectate source: only dead players can use free spectate
+    if (requestedSource == PerspectiveSpectate && player->isAlive())
         return;
 
-    QString targetName = arg.toString();
+    // Control source: validated by server-side API only (setControlRelation)
+    // Client cannot directly request Control mode via this command
+    if (requestedSource == PerspectiveControl)
+        return;
 
     if (targetName.isEmpty()) {
         clearPerspectiveViewer(player);
         return;
     }
 
-    if (isDeadPlayerRevivable(player)) {
+    if (requestedSource == PerspectiveSpectate && isDeadPlayerRevivable(player)) {
         if (m_perspectiveViewers.contains(player))
             clearPerspectiveViewer(player);
 
@@ -5347,7 +5444,7 @@ void Room::spectateCommand(ServerPlayer *player, const QVariant &arg)
     if (m_perspectiveViewers.contains(player))
         clearPerspectiveViewer(player);
 
-    addPerspectiveViewer(player, target, PerspectiveSpectate);
+    addPerspectiveViewer(player, target, requestedSource);
     sendPerspectiveSync(player, target);
 }
 
@@ -5396,6 +5493,10 @@ void Room::sendPerspectiveSync(ServerPlayer *viewer, ServerPlayer *target)
     }
     arg << QVariant(modifiedCards);
 
+    // Append perspective source type (6th field)
+    PerspectiveSource source = getPerspectiveSource(viewer);
+    arg << static_cast<int>(source);
+
     notifyProperty(viewer, target, "chaoren");
     doNotify(viewer, S_COMMAND_PERSPECTIVE_SYNC, arg);
 }
@@ -5411,6 +5512,7 @@ void Room::clearPerspectiveViewer(ServerPlayer *viewer)
     arg << JsonUtils::toJsonArray(QList<int>());
     arg << QVariant(JsonObject());
     arg << QVariant(JsonArray());
+    arg << static_cast<int>(PerspectiveNone);
     doNotify(viewer, S_COMMAND_PERSPECTIVE_SYNC, arg);
 }
 
@@ -5419,6 +5521,43 @@ void Room::clearAllPerspectiveViewersOf(ServerPlayer *target)
     QList<ServerPlayer *> viewers = getPerspectiveViewersOf(target);
     foreach (ServerPlayer *viewer, viewers)
         clearPerspectiveViewer(viewer);
+}
+
+void Room::setControlRelation(ServerPlayer *controller, ServerPlayer *target)
+{
+    if (controller == nullptr || target == nullptr || controller == target)
+        return;
+
+    // Verify target is not already controlled by someone else
+    if (isPlayerControlled(target))
+        return;
+
+    // Clear any existing perspective relation for the controller
+    if (m_perspectiveViewers.contains(controller))
+        clearPerspectiveViewer(controller);
+
+    addPerspectiveViewer(controller, target, PerspectiveControl);
+    sendPerspectiveSync(controller, target);
+}
+
+void Room::clearControlRelation(ServerPlayer *controller)
+{
+    if (controller == nullptr)
+        return;
+
+    PerspectiveEntry entry = m_perspectiveViewers.value(controller);
+    if (entry.source != PerspectiveControl)
+        return;
+
+    clearPerspectiveViewer(controller);
+}
+
+bool Room::isPlayerControlled(const ServerPlayer *player) const
+{
+    if (player == nullptr)
+        return false;
+
+    return getCommandProxy(player) != nullptr;
 }
 
 QList<ServerPlayer *> Room::getPerspectiveViewersOf(ServerPlayer *target) const
@@ -5453,19 +5592,58 @@ ServerPlayer *Room::getPerspectiveTarget(ServerPlayer *viewer) const
     return m_perspectiveViewers.value(viewer).target;
 }
 
-ServerPlayer *Room::getCommandProxy(ServerPlayer *player) const
+ServerPlayer *Room::getCommandProxy(const ServerPlayer *player) const
 {
-    // Future: when PerspectiveControl is active, return the controller.
-    // For now, always return nullptr (no proxy).
-    Q_UNUSED(player);
+    if (player == nullptr)
+        return nullptr;
+
+    for (auto it = m_perspectiveViewers.constBegin(); it != m_perspectiveViewers.constEnd(); ++it) {
+        if (it.value().source == PerspectiveControl && it.value().target == player) {
+            ServerPlayer *controller = it.key();
+            if (controller != nullptr && controller->isOnline())
+                return controller;
+        }
+    }
     return nullptr;
 }
 
 ServerPlayer *Room::getProxiedPlayer(ServerPlayer *proxy) const
 {
-    // Future: reverse lookup of getCommandProxy.
-    Q_UNUSED(proxy);
+    if (proxy == nullptr)
+        return nullptr;
+
+    PerspectiveEntry entry = m_perspectiveViewers.value(proxy);
+    if (entry.source == PerspectiveControl && entry.target != nullptr)
+        return entry.target;
     return nullptr;
+}
+
+ServerPlayer *Room::resolveRequestReceiver(ServerPlayer *player) const
+{
+    ServerPlayer *proxy = getCommandProxy(player);
+    if (proxy != nullptr)
+        return proxy;
+    return player;
+}
+
+QVariant Room::buildRoutedRequestArg(ServerPlayer *actor, ServerPlayer *receiver, const QVariant &originalArg) const
+{
+    if (actor == nullptr || receiver == nullptr)
+        return originalArg;
+
+    // Wrap with routing info when:
+    // 1. Proxy scenario: receiver is acting on behalf of actor (receiver != actor)
+    // 2. Self-response while in Control: receiver is the controller responding for themselves,
+    //    but their client is currently viewing the controlled player's perspective
+    if (receiver != actor || getPerspectiveSource(receiver) == PerspectiveControl) {
+        JsonObject routedArg;
+        routedArg["routed"] = true;
+        routedArg["onBehalfOf"] = actor->objectName();
+        routedArg["payload"] = originalArg;
+        return routedArg;
+    }
+
+    return originalArg;
 }
 
 void Room::notifySkillInvoked(ServerPlayer *player, const QString &skill_name)

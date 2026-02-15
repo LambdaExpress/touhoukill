@@ -258,6 +258,12 @@ public:
     bool notifyProperty(ServerPlayer *playerToNotify, const ServerPlayer *propertyOwner, const char *propertyName, const QString &value = QString());
     QList<ServerPlayer *> getPerspectiveViewersOf(ServerPlayer *target) const;
 
+    // Control mode lifecycle
+    void setControlRelation(ServerPlayer *controller, ServerPlayer *target);
+    void clearControlRelation(ServerPlayer *controller);
+    bool isPlayerControlled(const ServerPlayer *player) const;
+
+    bool isHuanhunDefinitelyImpossible(const ServerPlayer *player) const;
     bool isDeadPlayerRevivable(const ServerPlayer *player) const;
     bool notifyUpdateCard(ServerPlayer *player, int cardId, const Card *newCard);
     bool broadcastUpdateCard(const QList<ServerPlayer *> &players, int cardId, const Card *newCard);
@@ -587,8 +593,10 @@ private:
     void clearPerspectiveViewer(ServerPlayer *viewer);
     void clearAllPerspectiveViewersOf(ServerPlayer *target);
 
-    // Command proxy interface (skeleton for future Control mode)
-    ServerPlayer *getCommandProxy(ServerPlayer *player) const;
+    // Command proxy interface (Control mode)
+    ServerPlayer *resolveRequestReceiver(ServerPlayer *player) const;
+    QVariant buildRoutedRequestArg(ServerPlayer *actor, ServerPlayer *receiver, const QVariant &originalArg) const;
+    ServerPlayer *getCommandProxy(const ServerPlayer *player) const;
     ServerPlayer *getProxiedPlayer(ServerPlayer *proxy) const;
 
     static QString generatePlayerName();

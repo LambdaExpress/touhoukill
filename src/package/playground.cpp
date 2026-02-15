@@ -1,4 +1,5 @@
 #include "playground.h"
+#include "client.h"
 #include "clientplayer.h"
 #include "engine.h"
 #include "general.h"
@@ -204,23 +205,23 @@ void Fsu0413GainianDialog::popup()
         foreach (const Card *c, map) {
             QScopedPointer<Card> copy(Sanguosha->cloneCard(c));
             copy->setSkillName("fsu0413gainian");
-            foreach (const Card *handCard, Self->getHandcards()) {
+            foreach (const Card *handCard, OperationSelf()->getHandcards()) {
                 if (handCard->isKindOf("DelayedTrick")) {
                     copy->clearSubcards();
                     copy->addSubcard(handCard);
-                    if (pattern->match(Self, copy.data()) && !Self->isCardLimited(copy.data(), Card::MethodUse)) {
+                    if (pattern->match(OperationSelf(), copy.data()) && !OperationSelf()->isCardLimited(copy.data(), Card::MethodUse)) {
                         availableCards << copy->objectName();
                         break;
                     }
                 }
             }
 
-            foreach (int handPileId, Self->getHandPile()) {
+            foreach (int handPileId, OperationSelf()->getHandPile()) {
                 const Card *handCard = Sanguosha->getCard(handPileId);
                 if (handCard != nullptr && handCard->isKindOf("DelayedTrick")) {
                     copy->clearSubcards();
                     copy->addSubcard(handCard);
-                    if (pattern->match(Self, copy.data()) && !Self->isCardLimited(copy.data(), Card::MethodUse)) {
+                    if (pattern->match(OperationSelf(), copy.data()) && !OperationSelf()->isCardLimited(copy.data(), Card::MethodUse)) {
                         availableCards << copy->objectName();
                         break;
                     }
@@ -240,23 +241,23 @@ void Fsu0413GainianDialog::popup()
         foreach (const Card *c, map) {
             QScopedPointer<Card> copy(Sanguosha->cloneCard(c));
             copy->setSkillName("fsu0413gainian");
-            foreach (const Card *handCard, Self->getHandcards()) {
+            foreach (const Card *handCard, OperationSelf()->getHandcards()) {
                 if (handCard->isKindOf("DelayedTrick")) {
                     copy->clearSubcards();
                     copy->addSubcard(handCard);
-                    if (copy->isAvailable(Self) && !Self->isCardLimited(copy.data(), Card::MethodUse)) {
+                    if (copy->isAvailable(OperationSelf()) && !OperationSelf()->isCardLimited(copy.data(), Card::MethodUse)) {
                         availableCards << copy->objectName();
                         break;
                     }
                 }
             }
 
-            foreach (int handPileId, Self->getHandPile()) {
+            foreach (int handPileId, OperationSelf()->getHandPile()) {
                 const Card *handCard = Sanguosha->getCard(handPileId);
                 if (handCard != nullptr && handCard->isKindOf("DelayedTrick")) {
                     copy->clearSubcards();
                     copy->addSubcard(handCard);
-                    if (copy->isAvailable(Self) && !Self->isCardLimited(copy.data(), Card::MethodUse)) {
+                    if (copy->isAvailable(OperationSelf()) && !OperationSelf()->isCardLimited(copy.data(), Card::MethodUse)) {
                         availableCards << copy->objectName();
                         break;
                     }

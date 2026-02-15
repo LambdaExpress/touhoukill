@@ -174,7 +174,15 @@ Card::Color Card::getColor() const
 
 bool Card::isEquipped() const
 {
-    return Self->hasEquip(this);
+    // In control mode the operation player is the controlled target,
+    // whose equips are displayed on the dashboard.
+    const Player *owner = Self;
+    if (ClientInstance != nullptr) {
+        const Player *op = ClientInstance->getOperationPlayer();
+        if (op != nullptr)
+            owner = op;
+    }
+    return owner != nullptr && owner->hasEquip(this);
 }
 
 bool Card::matchTypeOrName(const QString &pattern) const

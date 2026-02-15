@@ -154,6 +154,7 @@ RoomScene::RoomScene(QMainWindow *main_window)
     connect(ClientInstance, SIGNAL(player_killed(QString)), this, SLOT(killPlayer(QString)));
     connect(ClientInstance, SIGNAL(player_revived(QString)), this, SLOT(revivePlayer(QString)));
     connect(ClientInstance, &Client::perspective_changed, this, &RoomScene::onPerspectiveChanged);
+    connect(ClientInstance, &Client::request_routed, this, &RoomScene::onRequestRouted);
     connect(ClientInstance, SIGNAL(dashboard_death(QString)), this, SLOT(setDashboardShadow(QString)));
     connect(ClientInstance, SIGNAL(card_shown(QString, int)), this, SLOT(showCard(QString, int)));
     connect(ClientInstance, SIGNAL(gongxin(QList<int>, bool, QList<int>, QList<int>)), this, SLOT(doGongxin(QList<int>, bool, QList<int>, QList<int>)));
@@ -1372,19 +1373,20 @@ void RoomScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
 void RoomScene::enableTargets(const Card *card)
 {
+    const ClientPlayer *operationPlayer = ClientInstance->getOperationPlayer();
     bool enabled = true;
     if (card != nullptr) {
         Client::Status status = ClientInstance->getStatus();
-        if (status == Client::Playing && !card->isAvailable(Self))
+        if (status == Client::Playing && !card->isAvailable(operationPlayer))
             enabled = false;
         if (status == Client::Responding || status == Client::RespondingUse) {
             Card::HandlingMethod method = card->getHandlingMethod();
             if (status == Client::Responding && method == Card::MethodUse)
                 method = Card::MethodResponse;
-            if (Self->isCardLimited(card, method))
+            if (operationPlayer->isCardLimited(card, method))
                 enabled = false;
         }
-        if (status == Client::RespondingForDiscard && Self->isCardLimited(card, Card::MethodDiscard))
+        if (status == Client::RespondingForDiscard && operationPlayer->isCardLimited(card, Card::MethodDiscard))
             enabled = false;
     }
     if (!enabled) {
@@ -1412,7 +1414,7 @@ void RoomScene::enableTargets(const Card *card)
 
     Client::Status status = ClientInstance->getStatus();
 
-    if (card->targetFixed(Self)
+    if (card->targetFixed(operationPlayer)
         || ((status & Client::ClientStatusBasicMask) == Client::Responding
             && (status == Client::Responding || (card->getTypeId() != Card::TypeSkill && status != Client::RespondingUse)))
         || ClientInstance->getStatus() == Client::AskForShowOrPindian) {
@@ -1422,11 +1424,11 @@ void RoomScene::enableTargets(const Card *card)
             item->setFlag(QGraphicsItem::ItemIsSelectable, false);
         }
         if (card->isKindOf("AOE") && status == Client::RespondingUse) //(card->isKindOf("SavageAssault") || card->isKindOf("ArcheryAttack"))
-            ok_button->setEnabled(card->isAvailable(Self));
+            ok_button->setEnabled(card->isAvailable(operationPlayer));
         else if (card->isKindOf("Peach") && status == Client::RespondingUse)
-            ok_button->setEnabled(card->isAvailable(Self));
+            ok_button->setEnabled(card->isAvailable(operationPlayer));
         else if (card->isKindOf("QirenCard") && status == Client::RespondingUse)
-            ok_button->setEnabled(card->isAvailable(Self));
+            ok_button->setEnabled(card->isAvailable(operationPlayer));
         else
             ok_button->setEnabled(true);
         return;
@@ -1435,7 +1437,7 @@ void RoomScene::enableTargets(const Card *card)
     updateTargetsEnablity(card);
 
     if (selected_targets.isEmpty()) {
-        if (card->isKindOf("Slash") && Self->hasFlag("slashTargetFixToOne")) {
+        if (card->isKindOf("Slash") && operationPlayer->hasFlag("slashTargetFixToOne")) {
             unselectAllTargets();
             foreach (Photo *photo, photos) {
                 if ((photo->flags() & QGraphicsItem::ItemIsSelectable) != 0u)
@@ -1445,7 +1447,7 @@ void RoomScene::enableTargets(const Card *card)
                     }
             }
         } else if (Config.EnableAutoTarget) {
-            if (!card->targetsFeasible(selected_targets, Self)) {
+            if (!card->targetsFeasible(selected_targets, operationPlayer)) {
                 unselectAllTargets();
                 int count = 0;
                 foreach (Photo *photo, photos)
@@ -1459,11 +1461,12 @@ void RoomScene::enableTargets(const Card *card)
         }
     }
 
-    ok_button->setEnabled(card->targetsFeasible(selected_targets, Self));
+    ok_button->setEnabled(card->targetsFeasible(selected_targets, operationPlayer));
 }
 
 void RoomScene::updateTargetsEnablity(const Card *card)
 {
+    const ClientPlayer *operationPlayer = ClientInstance->getOperationPlayer();
     QMapIterator<PlayerCardContainer *, const ClientPlayer *> itor(item2player);
     while (itor.hasNext()) {
         itor.next();
@@ -1473,7 +1476,7 @@ void RoomScene::updateTargetsEnablity(const Card *card)
         int maxVotes = 0;
 
         if (card != nullptr) {
-            card->targetFilter(selected_targets, player, Self, maxVotes);
+            card->targetFilter(selected_targets, player, operationPlayer, maxVotes);
             item->setMaxVotes(maxVotes);
         }
 
@@ -1493,8 +1496,8 @@ void RoomScene::updateTargetsEnablity(const Card *card)
         //bool weimuFailure = isCollateral && selected_targets.length() == 1; //Collateral-Victim is weimu owner?
         //=====================================
 
-        //bool enabled = (card == NULL) || ((weimuFailure || !Sanguosha->isProhibited(Self, player, card, selected_targets)) && maxVotes > 0);
-        bool enabled = (card == nullptr) || ((Sanguosha->isProhibited(Self, player, card, selected_targets) == nullptr) && maxVotes > 0);
+        //bool enabled = (card == NULL) || ((weimuFailure || !Sanguosha->isProhibited(operationPlayer, player, card, selected_targets)) && maxVotes > 0);
+        bool enabled = (card == nullptr) || ((Sanguosha->isProhibited(operationPlayer, player, card, selected_targets) == nullptr) && maxVotes > 0);
 
         QGraphicsItem *animationTarget = item->getMouseClickReceiver();
         if (enabled)
@@ -1509,6 +1512,7 @@ void RoomScene::updateTargetsEnablity(const Card *card)
 
 void RoomScene::updateSelectedTargets()
 {
+    const ClientPlayer *operationPlayer = ClientInstance->getOperationPlayer();
     PlayerCardContainer *item = qobject_cast<PlayerCardContainer *>(sender());
     if (item == nullptr)
         return;
@@ -1523,14 +1527,14 @@ void RoomScene::updateSelectedTargets()
             foreach (const Player *cp, selected_targets) {
                 QList<const Player *> tempPlayers = QList<const Player *>(selected_targets);
                 tempPlayers.removeAll(cp);
-                if (!card->targetFilter(tempPlayers, cp, Self) || (Sanguosha->isProhibited(Self, cp, card, selected_targets) != nullptr)) {
+                if (!card->targetFilter(tempPlayers, cp, operationPlayer) || (Sanguosha->isProhibited(operationPlayer, cp, card, selected_targets) != nullptr)) {
                     selected_targets.clear();
                     unselectAllTargets();
                     return;
                 }
             }
         }
-        ok_button->setEnabled(card->targetsFeasible(selected_targets, Self));
+        ok_button->setEnabled(card->targetsFeasible(selected_targets, operationPlayer));
     } else {
         selected_targets.clear();
     }
@@ -2573,7 +2577,8 @@ void RoomScene::onEnabledChange()
 
 void RoomScene::useCard(const Card *card)
 {
-    if (card->targetFixed(Self) || card->targetsFeasible(selected_targets, Self))
+    const ClientPlayer *operationPlayer = ClientInstance->getOperationPlayer();
+    if (card->targetFixed(operationPlayer) || card->targetsFeasible(selected_targets, operationPlayer))
         ClientInstance->onPlayerResponseCard(card, selected_targets);
     enableTargets(nullptr);
 }
@@ -2584,7 +2589,7 @@ void RoomScene::callViewAsSkill()
     if (card == nullptr)
         return;
 
-    if (card->isAvailable(Self)) {
+    if (card->isAvailable(ClientInstance->getOperationPlayer())) {
         // use card
         dashboard->stopPending();
         useCard(card);
@@ -2729,29 +2734,67 @@ void RoomScene::showPromptBox()
 
 void RoomScene::updateStatus(Client::Status oldStatus, Client::Status newStatus)
 {
+    // Auto-restore Control view when returning to NotActive after self-response
+    if (newStatus == Client::NotActive && !m_isPerspectiveSwitched
+        && !m_controlSuspendedTargetName.isEmpty()) {
+        QString target = m_controlSuspendedTargetName;
+        m_controlSuspendedTargetName.clear();
+        ClientInstance->setControlSuspended(false);
+        enterPerspectiveView(target, PerspectiveSourceControl, false);
+    }
+
     // Do not respond to server action requests while perspective input is locked
     if (m_perspectiveInputLocked)
         return;
 
+    const ClientPlayer *operationPlayer = ClientInstance->getOperationPlayer();
+
+    // In Control mode, skill buttons have been swapped to the target's skills
+    // via registerControlModeSkillButtons. The controlMode flag is still needed
+    // for flagPlayer selection in the Responding path below.
+    bool controlMode = m_isPerspectiveSwitched && m_perspectiveSource == PerspectiveSourceControl;
+
+    // Use ClientInstance->getRoomState() instead of Sanguosha->currentRoomState()
+    // because the latter requires registerRoom() which hasn't been called yet
+    // when updateStatus is triggered by early requests (e.g. S_COMMAND_CHOOSE_ROLE).
+    QString pattern = ClientInstance->getRoomState()->getCurrentCardUsePattern();
+    QRegExp rx("@@?([_A-Za-z]+)(\\d+)?!?");
+    CardUseStruct::CardUseReason reason = CardUseStruct::CARD_USE_REASON_UNKNOWN;
+    if ((newStatus & Client::ClientStatusBasicMask) == Client::Responding) {
+        if (newStatus == Client::RespondingUse)
+            reason = CardUseStruct::CARD_USE_REASON_RESPONSE_USE;
+        else if (newStatus == Client::Responding || rx.exactMatch(pattern))
+            reason = CardUseStruct::CARD_USE_REASON_RESPONSE;
+    } else if (newStatus == Client::Playing)
+        reason = CardUseStruct::CARD_USE_REASON_PLAY;
+
     foreach (QSanSkillButton *button, m_skillButtons) {
         Q_ASSERT(button != nullptr);
+
         const ViewAsSkill *vsSkill = button->getViewAsSkill();
         if (vsSkill != nullptr) {
-            QString pattern = Sanguosha->currentRoomState()->getCurrentCardUsePattern();
-            QRegExp rx("@@?([_A-Za-z]+)(\\d+)?!?");
-            CardUseStruct::CardUseReason reason = CardUseStruct::CARD_USE_REASON_UNKNOWN;
-            if ((newStatus & Client::ClientStatusBasicMask) == Client::Responding) {
-                if (newStatus == Client::RespondingUse)
-                    reason = CardUseStruct::CARD_USE_REASON_RESPONSE_USE;
-                else if (newStatus == Client::Responding || rx.exactMatch(pattern))
-                    reason = CardUseStruct::CARD_USE_REASON_RESPONSE;
-            } else if (newStatus == Client::Playing)
-                reason = CardUseStruct::CARD_USE_REASON_PLAY;
-            button->setEnabled(vsSkill->isAvailable(Self, reason, pattern) && !pattern.endsWith("!"));
+            // In control mode, equip ViewAsSkills on the target may fail the
+            // hasSkill gate in isAvailable because S_COMMAND_ATTACH_SKILL is
+            // only sent to the equip owner's client.  Set a temporary flag so
+            // the gate check passes for equip skills the target actually has.
+            bool addedTempFlag = false;
+            if (controlMode) {
+                const QString &skillName = vsSkill->objectName();
+                if (operationPlayer->hasEquipSkill(skillName)
+                    && !operationPlayer->hasSkill(skillName)
+                    && !operationPlayer->hasFlag("RoomScene_" + skillName + "TempUse")) {
+                    ClientInstance->getOperationPlayer()->setFlags("RoomScene_" + skillName + "TempUse");
+                    addedTempFlag = true;
+                }
+            }
+            button->setEnabled(vsSkill->isAvailable(operationPlayer, reason, pattern) && !pattern.endsWith("!"));
+            if (addedTempFlag) {
+                ClientInstance->getOperationPlayer()->setFlags("-RoomScene_" + vsSkill->objectName() + "TempUse");
+            }
         } else {
             const Skill *skill = button->getSkill();
             if (skill->getFrequency() == Skill::Wake) {
-                button->setEnabled(Self->getMark(skill->objectName()) > 0);
+                button->setEnabled(operationPlayer->getMark(skill->objectName()) > 0);
             } else
                 button->setEnabled(false);
         }
@@ -2819,20 +2862,43 @@ void RoomScene::updateStatus(Client::Status oldStatus, Client::Status newStatus)
                 if (newStatus == Client::RespondingUse)
                     reason = CardUseStruct::CARD_USE_REASON_RESPONSE_USE;
                 QString tempUseFlag = "RoomScene_" + skill_name + "TempUse";
-                if (!Self->hasFlag(tempUseFlag))
-                    Self->setFlags(tempUseFlag);
-                bool available = skill->isAvailable(Self, reason, pattern);
-                Self->setFlags("-" + tempUseFlag);
+                // In control mode operationPlayer is the target, so the flag
+                // must be set on the target for isAvailable's hasFlag check.
+                ClientPlayer *flagPlayer = (controlMode) ? ClientInstance->getOperationPlayer() : Self;
+                bool tempFlagAdded = false;
+                if (!operationPlayer->hasFlag(tempUseFlag)) {
+                    flagPlayer->setFlags(tempUseFlag);
+                    tempFlagAdded = true;
+                }
+                bool available = skill->isAvailable(operationPlayer, reason, pattern);
+                if (tempFlagAdded)
+                    flagPlayer->setFlags("-" + tempUseFlag);
                 if (!available) {
                     ClientInstance->onPlayerResponseCard(nullptr);
                     return;
                 }
-                if (Self->hasSkill(skill_name, true)) {
+                // Skill buttons now belong to the correct player (target in control mode),
+                // so auto-click works correctly for both normal and control modes.
+                // In control mode, equip skills may not be in acquired_skills
+                // on this client, so also check hasEquipSkill.
+                bool hasTheSkill = operationPlayer->hasSkill(skill_name, true)
+                    || (controlMode && operationPlayer->hasEquipSkill(skill_name));
+                if (hasTheSkill) {
                     foreach (QSanSkillButton *button, m_skillButtons) {
                         Q_ASSERT(button != nullptr);
                         const ViewAsSkill *vsSkill = button->getViewAsSkill();
-                        if (vsSkill != nullptr && vsSkill->objectName() == skill_name && vsSkill->isAvailable(Self, reason, pattern)) {
-                            button->click();
+                        if (vsSkill != nullptr && vsSkill->objectName() == skill_name) {
+                            // Set temp flag so isAvailable's hasSkill gate passes
+                            bool tempFlag = false;
+                            if (controlMode && operationPlayer->hasEquipSkill(skill_name)
+                                && !operationPlayer->hasSkill(skill_name)) {
+                                ClientInstance->getOperationPlayer()->setFlags("RoomScene_" + skill_name + "TempUse");
+                                tempFlag = true;
+                            }
+                            if (vsSkill->isAvailable(operationPlayer, reason, pattern))
+                                button->click();
+                            if (tempFlag)
+                                ClientInstance->getOperationPlayer()->setFlags("-RoomScene_" + skill_name + "TempUse");
                             break;
                         }
                     }
@@ -3028,23 +3094,26 @@ void RoomScene::onSkillActivated()
     }
 
     if ((skill != nullptr) && !skill->inherits("FilterSkill")) {
+        const ClientPlayer *operationPlayer = ClientInstance->getOperationPlayer();
         dashboard->startPending(skill);
         //ok_button->setEnabled(false);
         cancel_button->setEnabled(true);
 
         const Card *card = dashboard->pendingCard();
-        if ((card != nullptr) && card->targetFixed(Self) && card->isAvailable(Self) && !Self->hasFlag("Global_InstanceUse_Failed")) {
+        if ((card != nullptr) && card->targetFixed(operationPlayer) && card->isAvailable(operationPlayer) && !operationPlayer->hasFlag("Global_InstanceUse_Failed")) {
             bool instance_use = skill->inherits("ZeroCardViewAsSkill");
             if (!instance_use) {
                 QList<const Card *> cards;
-                cards << Self->getHandcards() << Self->getEquips();
+                cards << operationPlayer->getHandcards() << operationPlayer->getEquips();
 
                 foreach (const QString &name, dashboard->getPileExpanded()) {
-                    QList<int> pile = Self->getPile(name);
+                    QList<int> pile = operationPlayer->getPile(name);
                     foreach (int id, pile)
                         cards << Sanguosha->getCard(id);
                 }
 
+                // Swap Self to operationPlayer for viewFilter (synchronous, no event loop).
+                ScopedOperationPlayerSwap selfGuard;
                 foreach (const Card *c, cards) {
                     if (skill->viewFilter(QList<const Card *>(), c))
                         return;
@@ -5411,22 +5480,238 @@ void RoomScene::addlog(const QStringList &log)
     log_box->appendLog(log);
 }
 
-void RoomScene::onPerspectiveChanged(const QString &targetName, const QList<int> &handCardIds, const QVariantMap &piles)
+bool RoomScene::shouldDisplayPerspectiveSkill(const ClientPlayer *player, const Skill *skill) const
+{
+    if (player == nullptr || skill == nullptr)
+        return false;
+    if (!skill->isLordSkill())
+        return true;
+    // Lord skills are only shown when the player is lord and the game mode allows it
+    return player->getRole() == "lord"
+        && ServerInfo.GameMode != "03_1v2"
+        && ServerInfo.GameMode != "06_3v3"
+        && ServerInfo.GameMode != "06_XMode"
+        && ServerInfo.GameMode != "02_1v1"
+        && !Config.value("WithoutLordskill", false).toBool();
+}
+
+void RoomScene::saveControllerSkillButtons()
+{
+    m_savedControllerSkillButtons.clear();
+
+    // Build a set of current equip buttons so we can skip them
+    QSet<QSanSkillButton *> equipBtns;
+    for (int i = 0; i < 5; i++) {
+        QSanSkillButton *btn = dashboard->getEquipSkillButton(i);
+        if (btn != nullptr)
+            equipBtns.insert(btn);
+    }
+
+    // Determine which skills belong to head vs deputy for dock removal
+    QSet<QString> headSkillNames;
+    foreach (const Skill *skill, Self->getHeadSkillList())
+        headSkillNames.insert(skill->objectName());
+
+    // Remove non-equip buttons from docks, hide them, save references
+    QList<QSanSkillButton *> toSave;
+    foreach (QSanSkillButton *btn, m_skillButtons) {
+        if (!equipBtns.contains(btn))
+            toSave.append(btn);
+    }
+
+    foreach (QSanSkillButton *btn, toSave) {
+        const Skill *skill = btn->getSkill();
+        if (skill != nullptr) {
+            bool head = headSkillNames.contains(skill->objectName());
+            QSanInvokeSkillDock *dock = head ? dashboard->getSkillDock() : dashboard->getRightSkillDock();
+            QSanInvokeSkillButton *invokeBtn = qobject_cast<QSanInvokeSkillButton *>(btn);
+            if (dock != nullptr && invokeBtn != nullptr)
+                dock->removeSkillButton(invokeBtn);
+        }
+        btn->hide();
+        m_skillButtons.removeAll(btn);
+        m_savedControllerSkillButtons.append(btn);
+    }
+    dashboard->updateSkillButton();
+}
+
+void RoomScene::restoreControllerSkillButtons()
+{
+    // Determine head vs deputy for dock re-insertion
+    QSet<QString> headSkillNames;
+    foreach (const Skill *skill, Self->getHeadSkillList())
+        headSkillNames.insert(skill->objectName());
+
+    foreach (QSanSkillButton *btn, m_savedControllerSkillButtons) {
+        const Skill *skill = btn->getSkill();
+        if (skill != nullptr) {
+            bool head = headSkillNames.contains(skill->objectName());
+            QSanInvokeSkillDock *dock = head ? dashboard->getSkillDock() : dashboard->getRightSkillDock();
+            QSanInvokeSkillButton *invokeBtn = qobject_cast<QSanInvokeSkillButton *>(btn);
+            if (dock != nullptr && invokeBtn != nullptr)
+                dock->addSkillButton(invokeBtn);
+        }
+        btn->show();
+        if (!m_skillButtons.contains(btn))
+            m_skillButtons.append(btn);
+    }
+    m_savedControllerSkillButtons.clear();
+    dashboard->updateSkillButton();
+}
+
+void RoomScene::cleanupControlModeSkillButtons()
+{
+    // Build sets of buttons to keep: equip buttons and saved controller buttons
+    QSet<QSanSkillButton *> equipBtns;
+    for (int i = 0; i < 5; i++) {
+        QSanSkillButton *btn = dashboard->getEquipSkillButton(i);
+        if (btn != nullptr)
+            equipBtns.insert(btn);
+    }
+    QSet<QSanSkillButton *> savedSet = m_savedControllerSkillButtons.toSet();
+
+    // Collect temporary buttons (not equip, not saved controller) to delete
+    QList<QSanSkillButton *> toDelete;
+    foreach (QSanSkillButton *btn, m_skillButtons) {
+        if (!equipBtns.contains(btn) && !savedSet.contains(btn))
+            toDelete.append(btn);
+    }
+
+    foreach (QSanSkillButton *btn, toDelete) {
+        const Skill *skill = btn->getSkill();
+        if (skill != nullptr) {
+            // Remove from whichever dock it's in
+            dashboard->removeSkillButton(skill->objectName(), true);
+            dashboard->removeSkillButton(skill->objectName(), false);
+        }
+        m_skillButtons.removeAll(btn);
+        btn->deleteLater();
+    }
+    dashboard->updateSkillButton();
+}
+
+void RoomScene::registerControlModeSkillButtons(const ClientPlayer *target)
+{
+    if (target == nullptr)
+        return;
+
+    // Register head skills
+    foreach (const Skill *skill, target->getHeadSkillList()) {
+        if (!shouldDisplayPerspectiveSkill(target, skill))
+            continue;
+
+        QSanSkillButton *btn = dashboard->addSkillButton(skill->objectName(), true);
+        if (btn == nullptr)
+            continue;
+
+        if (btn->getViewAsSkill() != nullptr && m_replayControl == nullptr) {
+            connect(btn, SIGNAL(skill_activated()), dashboard, SLOT(skillButtonActivated()));
+            connect(btn, SIGNAL(skill_activated()), this, SLOT(onSkillActivated()));
+            connect(btn, SIGNAL(skill_deactivated()), dashboard, SLOT(skillButtonDeactivated()));
+            connect(btn, SIGNAL(skill_deactivated()), this, SLOT(onSkillDeactivated()));
+        }
+        // Skip dialog connections for temporary control-mode buttons
+        // to avoid cross-owner dialog state issues.
+        m_skillButtons.append(btn);
+    }
+
+    // Register deputy skills
+    foreach (const Skill *skill, target->getDeputySkillList()) {
+        if (!shouldDisplayPerspectiveSkill(target, skill))
+            continue;
+
+        QSanSkillButton *btn = dashboard->addSkillButton(skill->objectName(), false);
+        if (btn == nullptr)
+            continue;
+
+        if (btn->getViewAsSkill() != nullptr && m_replayControl == nullptr) {
+            connect(btn, SIGNAL(skill_activated()), dashboard, SLOT(skillButtonActivated()));
+            connect(btn, SIGNAL(skill_activated()), this, SLOT(onSkillActivated()));
+            connect(btn, SIGNAL(skill_deactivated()), dashboard, SLOT(skillButtonDeactivated()));
+            connect(btn, SIGNAL(skill_deactivated()), this, SLOT(onSkillDeactivated()));
+        }
+        m_skillButtons.append(btn);
+    }
+
+    // Also register equip skill buttons for the target
+    registerControlModeEquipButtons();
+}
+
+void RoomScene::cleanupControlModeEquipButtons()
+{
+    for (int i = 0; i < 5; i++) {
+        QSanSkillButton *eqBtn = dashboard->getEquipSkillButton(i);
+        if (eqBtn == nullptr)
+            continue;
+        m_skillButtons.removeAll(eqBtn);
+        eqBtn->deleteLater();
+    }
+}
+
+void RoomScene::registerControlModeEquipButtons()
+{
+    for (int i = 0; i < 5; i++) {
+        QSanSkillButton *eqBtn = dashboard->getEquipSkillButton(i);
+        if (eqBtn == nullptr)
+            continue;
+        const ViewAsSkill *vsSkill = eqBtn->getViewAsSkill();
+        if (vsSkill != nullptr) {
+            connect(eqBtn, SIGNAL(skill_activated()), this, SLOT(onSkillActivated()));
+            connect(eqBtn, SIGNAL(skill_deactivated()), this, SLOT(onSkillDeactivated()));
+        }
+        if (!m_skillButtons.contains(eqBtn))
+            m_skillButtons.append(eqBtn);
+    }
+}
+
+void RoomScene::onPerspectiveChanged(const QString &targetName, const QList<int> &handCardIds, const QVariantMap &piles, int source)
 {
     Q_UNUSED(handCardIds);
     Q_UNUSED(piles);
 
-    // Same target: incremental refresh to avoid exit+enter flicker
+    PerspectiveSource perspSource = static_cast<PerspectiveSource>(source);
+
+    // Same target: check if only source changed (e.g. Spectate → Control)
     if (m_isPerspectiveSwitched && targetName == m_perspectiveTargetName && !targetName.isEmpty()) {
+        bool sourceChanged = (m_perspectiveSource != perspSource);
+
+        if (sourceChanged)
+            m_perspectiveSource = perspSource;
+
         QString targetHuashenGen = dashboard->huashenGeneralName();
         QString targetHuashenSkill = dashboard->huashenSkillName();
         QString targetHuashenGen2 = dashboard->huashenGeneral2Name();
         QString targetHuashenSkill2 = dashboard->huashenSkill2Name();
 
+        // syncContainerFromPlayer creates new equip buttons (for non-Self).
+        // Always clean up old temporary ones first to avoid leaking them.
+        cleanupControlModeSkillButtons();
+        cleanupControlModeEquipButtons();
+
         dashboard->syncContainerFromPlayer();
+
+        if (m_perspectiveSource == PerspectiveSourceControl) {
+            ClientPlayer *target = ClientInstance->getPlayer(targetName);
+            registerControlModeSkillButtons(target);
+        } else {
+            registerControlModeEquipButtons();
+        }
 
         if (!targetHuashenGen.isEmpty() || !targetHuashenGen2.isEmpty())
             dashboard->startHuaShen(targetHuashenGen, targetHuashenSkill, targetHuashenGen2, targetHuashenSkill2);
+
+        // Apply input lock AFTER equip buttons are set up so that updateStatus
+        // (triggered by applyPerspectiveInputLock(false)) sees the correct buttons.
+        if (sourceChanged) {
+            bool lockInput = (perspSource != PerspectiveSourceControl);
+            applyPerspectiveInputLock(lockInput);
+        } else if (!m_perspectiveInputLocked) {
+            // Same source refresh: equip buttons were recreated but no
+            // applyPerspectiveInputLock call will trigger updateStatus.
+            // Manually re-evaluate so the new buttons get correct enabled state.
+            Client::Status status = ClientInstance->getStatus();
+            updateStatus(status, status);
+        }
 
         return;
     }
@@ -5437,7 +5722,8 @@ void RoomScene::onPerspectiveChanged(const QString &targetName, const QList<int>
     if (targetName.isEmpty())
         return;
 
-    enterPerspectiveView(targetName, PerspectiveSourceSpectate, true);
+    bool lockInput = (perspSource != PerspectiveSourceControl);
+    enterPerspectiveView(targetName, perspSource, lockInput);
 }
 
 void RoomScene::enterPerspectiveView(const QString &targetName, PerspectiveSource source, bool lockInput)
@@ -5458,6 +5744,10 @@ void RoomScene::enterPerspectiveView(const QString &targetName, PerspectiveSourc
     m_perspectiveSource = source;
     m_perspectiveProxyPhoto = hostPhoto;
 
+    // Lock input during the entire swap to prevent any updateStatus call
+    // from running while dashboard/photo players are in an intermediate state.
+    m_perspectiveInputLocked = true;
+
     QString targetHuashenGen = hostPhoto->huashenGeneralName();
     QString targetHuashenSkill = hostPhoto->huashenSkillName();
     QString targetHuashenGen2 = hostPhoto->huashenGeneral2Name();
@@ -5468,18 +5758,38 @@ void RoomScene::enterPerspectiveView(const QString &targetName, PerspectiveSourc
     QString selfHuashenGen2 = dashboard->huashenGeneral2Name();
     QString selfHuashenSkill2 = dashboard->huashenSkill2Name();
 
+    // Save controller's skill buttons before swapping dashboard player.
+    // In Control mode these will be replaced by the target's skill buttons.
+    if (source == PerspectiveSourceControl)
+        saveControllerSkillButtons();
+
     // Swap players: Photo shows Self, Dashboard shows perspective target
     name2photo.remove(targetName);
     hostPhoto->setPlayer(Self);
     hostPhoto->syncCardAreasFromPlayer();
-    if (Self->isAlive())
+    bool selfAlive = Self->isAlive();
+    if (selfAlive) {
         hostPhoto->revivePlayer();
-    else
+    } else {
         hostPhoto->killPlayer();
+    }
     name2photo[Self->objectName()] = hostPhoto;
+
+    // Fix role indicator on hostPhoto to show Self's actual role
+    if (isHegemonyGameMode(ServerInfo.GameMode))
+        hostPhoto->getHegemonyRoleComboBox()->fix(Self->getRole() == "careerist" ? "careerist" : Self->getRole());
+    else
+        hostPhoto->getRoleComboBox()->fix(Self->getRole());
 
     dashboard->setPlayer(target);
     dashboard->syncContainerFromPlayer();
+
+    // In Control mode, register the target's skill buttons (both dock and equip).
+    // In Spectate mode, only register equip buttons (skill buttons stay hidden/locked).
+    if (source == PerspectiveSourceControl)
+        registerControlModeSkillButtons(target);
+    else
+        registerControlModeEquipButtons();
 
     // Reorder photos so the perspective target's neighbors are correctly distributed around the Dashboard.
     // Move the target from its original position to Self's implicit position (between ring end and start),
@@ -5499,7 +5809,14 @@ void RoomScene::enterPerspectiveView(const QString &targetName, PerspectiveSourc
 
     refreshItem2PlayerMap();
     updateTable();
-    applyPerspectiveInputLock(lockInput);
+    if (lockInput) {
+        applyPerspectiveInputLock(true);
+    } else {
+        // For Control mode: skill buttons now belong to the target, so it's safe
+        // to unlock input. The server's first routed request will trigger updateStatus
+        // naturally when the callback sets the proper status (e.g. Playing).
+        m_perspectiveInputLocked = false;
+    }
     dashboard->revivePlayer();
     dashboard->syncRemovedVisualState();
 
@@ -5515,6 +5832,10 @@ void RoomScene::enterPerspectiveView(const QString &targetName, PerspectiveSourc
         dashboard->getHegemonyRoleComboBox()->fix(target->getRole() == "careerist" ? "careerist" : target->getRole());
     else
         dashboard->getRoleComboBox()->fix(target->getRole());
+
+    // Update lord backdrop to match the perspective target
+    setLordBackdrop(target->getGeneralName());
+
 }
 
 void RoomScene::exitPerspectiveView()
@@ -5561,8 +5882,25 @@ void RoomScene::exitPerspectiveView()
         name2photo[target->objectName()] = m_perspectiveProxyPhoto;
     }
 
+    // Remove temporary skill buttons (target's skills) created for the perspective.
+    // Must happen before cleanupControlModeEquipButtons since cleanupControlModeSkillButtons
+    // uses equip button identity to distinguish temporary vs saved buttons.
+    cleanupControlModeSkillButtons();
+
+    // Remove temporary equip skill buttons created for the perspective target.
+    // Applies to both Control and Spectate modes to prevent memory leaks.
+    cleanupControlModeEquipButtons();
+
     dashboard->setPlayer(Self);
     dashboard->syncContainerFromPlayer();
+
+    // Re-link Self's equip skill buttons.  syncContainerFromPlayer nulled
+    // _m_equipSkillBtns but the actual button objects still live in
+    // m_skillButtons (created via the normal addSkillButton flow).
+    dashboard->relinkEquipSkillButtonsFromList(m_skillButtons);
+
+    // Restore controller's saved skill buttons back to the docks
+    restoreControllerSkillButtons();
 
     if (m_perspectiveProxyPhoto != nullptr) {
         m_perspectiveProxyPhoto->stopHuaShen();
@@ -5584,9 +5922,25 @@ void RoomScene::exitPerspectiveView()
     refreshItem2PlayerMap();
     updateTable();
     applyPerspectiveInputLock(false);
-    dashboard->killPlayer();
-    dashboard->syncRemovedVisualState();
-    dashboard->setDeathColor();
+    if (!Self->isAlive()) {
+        dashboard->killPlayer();
+        dashboard->syncRemovedVisualState();
+        dashboard->setDeathColor();
+    } else {
+        // Control mode suspension: controller is alive, do not apply death visuals
+        dashboard->revivePlayer();
+        dashboard->syncRemovedVisualState();
+    }
+
+    // Restore dashboard role indicator to Self's actual role
+    if (isHegemonyGameMode(ServerInfo.GameMode))
+        dashboard->getHegemonyRoleComboBox()->fix(Self->getRole() == "careerist" ? "careerist" : Self->getRole());
+    else
+        dashboard->getRoleComboBox()->fix(Self->getRole());
+
+    // Restore lord backdrop to Self
+    setLordBackdrop(Self->getGeneralName());
+
 }
 
 const ClientPlayer *RoomScene::dashboardPlayer() const
@@ -5617,6 +5971,35 @@ void RoomScene::applyPerspectiveInputLock(bool locked)
         ok_button->setEnabled(false);
         cancel_button->setEnabled(false);
         discard_button->setEnabled(false);
+    } else if (m_controlSuspendedTargetName.isEmpty()) {
+        // On unlock, force refresh UI state so cards/skills become interactive.
+        // Skip refresh if Control is suspended (to avoid auto-restore race).
+        Client::Status status = ClientInstance->getStatus();
+        updateStatus(status, status);
     }
-    // On unlock, updateStatus normal flow restores widget states
+}
+
+void RoomScene::onRequestRouted(const QString &onBehalfOf)
+{
+    if (Self == nullptr)
+        return;
+
+    if (onBehalfOf == Self->objectName()) {
+        // Request is for self → temporarily exit Control view to show own hand
+        if (m_isPerspectiveSwitched && m_perspectiveSource == PerspectiveSourceControl) {
+            m_controlSuspendedTargetName = m_perspectiveTargetName;
+            // Suspend the Client-side control override so getOperationPlayer()
+            // returns Self while the controller handles their own request.
+            ClientInstance->setControlSuspended(true);
+            exitPerspectiveView();
+        }
+    } else {
+        // Request is for controlled player → ensure Control view is active
+        if (!m_isPerspectiveSwitched && !m_controlSuspendedTargetName.isEmpty()
+            && onBehalfOf == m_controlSuspendedTargetName) {
+            ClientInstance->setControlSuspended(false);
+            enterPerspectiveView(m_controlSuspendedTargetName, PerspectiveSourceControl, false);
+            m_controlSuspendedTargetName.clear();
+        }
+    }
 }

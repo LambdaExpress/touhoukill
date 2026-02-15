@@ -575,9 +575,9 @@ void QijiDialog::popup()
             if (object_name == "huaxiang") {
                 if (card->isKindOf("BasicCard")) {
                     QString name = card->objectName();
-                    if (name.contains("jink") && Self->getMaxHp() > 3)
+                    if (name.contains("jink") && OperationSelf()->getMaxHp() > 3)
                         continue;
-                    if (name.contains("peach") && Self->getMaxHp() > 2)
+                    if (name.contains("peach") && OperationSelf()->getMaxHp() > 2)
                         continue;
                     validPatterns << name;
                 }
@@ -585,7 +585,7 @@ void QijiDialog::popup()
                 if (card->isKindOf("BasicCard"))
                     validPatterns << card->objectName();
             } else if (object_name == "liuneng") {
-                QStringList wangXl = Self->property("liuneng").toString().split("+");
+                QStringList wangXl = OperationSelf()->property("liuneng").toString().split("+");
                 if (wangXl.contains(card->objectName()))
                     validPatterns << card->objectName();
             } else {
@@ -603,9 +603,9 @@ void QijiDialog::popup()
     const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
     bool play = (Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_PLAY);
 
-    const Player *user = Self;
+    const Player *user = OperationSelf();
     if (object_name == "chuangshi") { //check the card is Available for chuangshi target.
-        foreach (const Player *p, Self->getAliveSiblings()) {
+        foreach (const Player *p, OperationSelf()->getAliveSiblings()) {
             if (p->getMark("chuangshi_user") > 0) {
                 user = p;
                 break;
@@ -778,7 +778,7 @@ public:
         foreach (const Card *card, cards) {
             if ((card->isNDTrick() || card->isKindOf("BasicCard")) && !ban_list.contains(card->getPackage())) { //&& !ServerInfo.Extensions.contains("!" + card->getPackage())
                 QString p = card->objectName();
-                if (!checkedPatterns.contains(p) && (pattern != nullptr && pattern->match(Self, card)) && !Self->isCardLimited(card, method))
+                if (!checkedPatterns.contains(p) && (pattern != nullptr && pattern->match(OperationSelf(), card)) && !OperationSelf()->isCardLimited(card, method))
                     checkedPatterns << p;
             }
         }
