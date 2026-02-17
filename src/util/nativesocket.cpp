@@ -108,11 +108,11 @@ void NativeClientSocket::disconnectFromHost()
 
 void NativeClientSocket::send(const QString &message)
 {
-    socket->write(message.toLatin1());
+    socket->write(message.toUtf8());
     if (!message.endsWith("\n"))
         socket->write("\n");
 #ifndef QT_NO_DEBUG
-    printf("TX: %s\n", message.toLatin1().constData());
+    printf("TX: %s\n", message.toUtf8().constData());
 #endif
     socket->flush();
 }

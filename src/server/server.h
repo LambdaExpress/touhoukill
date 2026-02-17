@@ -174,6 +174,7 @@ private slots:
     void checkCurrentBtnIsRoleMode(bool v);
 };
 
+class CrossRoomSpectateManager;
 class ServerPlayer;
 
 class Server : public QObject
@@ -189,6 +190,10 @@ public:
     Room *createNewRoom();
     void signupPlayer(ServerPlayer *player);
 
+    Room *findRoomById(int roomId) const;
+    QList<Room *> getRooms() const;
+    CrossRoomSpectateManager *crossRoomSpectateManager() const;
+
 private:
     ServerSocket *server;
     Room *current;
@@ -196,6 +201,7 @@ private:
     QHash<QString, ServerPlayer *> players;
     QSet<QString> addresses;
     QMultiHash<QString, QString> name2objname;
+    CrossRoomSpectateManager *m_crossRoomSpectate;
 
 private:
     void getLack(ClientSocket *socket);

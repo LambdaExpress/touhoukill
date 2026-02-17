@@ -66,6 +66,13 @@ public:
     QString perspectiveTargetName() const { return m_perspectiveTargetName; }
     bool isPerspectiveActive() const { return !m_perspectiveTargetName.isEmpty(); }
 
+    // Cross-room spectate requests
+    void requestCrossRoomList();
+    void requestCrossRoomSpectate(int roomId, const QString &targetName);
+    void requestStopCrossRoomSpectate();
+    void requestCrossRoomPerspectiveSwitch(const QString &targetName);
+    bool isCrossRoomSpectating() const { return m_isCrossRoomSpectating; }
+
     void disconnectFromHost();
     void replyToServer(QSanProtocol::CommandType command, const QVariant &arg = QVariant());
     void requestServer(QSanProtocol::CommandType command, const QVariant &arg = QVariant());
@@ -130,6 +137,13 @@ public:
     void cardLimitation(const QVariant &limit);
     void disableShow(const QVariant &args);
     void perspectiveSync(const QVariant &arg);
+
+    // Cross-room spectate callbacks
+    void crossRoomList(const QVariant &arg);
+    void crossRoomSpectateSnapshot(const QVariant &arg);
+    void crossRoomSpectateEvent(const QVariant &arg);
+    void crossRoomSpectateEnded(const QVariant &arg);
+    void crossRoomSwitchTarget(const QVariant &arg);
     void setNullification(const QVariant &str);
     void enableSurrender(const QVariant &enabled);
     void exchangeKnownCards(const QVariant &players);
@@ -284,6 +298,20 @@ private:
     int m_lastPerspectiveSyncSerial;
     QMap<QString, bool> m_savedPileOpenState; // true if the pile was already open before spectate sync
 
+    // Cross-room spectate state
+    bool m_crossSpectateActive;
+    bool m_isCrossRoomSpectating;
+    QString m_crossSpectateSessionId;
+    QString m_crossSpectateTargetName;
+    int m_crossSpectateRoomId;
+    int m_crossSpectateSerial;
+
+    // Saved state for cross-room spectate (restored when spectate ends)
+    ClientPlayer *m_savedSelf;
+    QList<const ClientPlayer *> m_savedPlayers;
+    int m_savedAliveCount;
+    QList<ClientPlayer *> m_crossRoomVirtualPlayers;
+
     void updatePileNum();
     QString setPromptList(const QStringList &text);
     QString _processCardPattern(const QString &pattern);
@@ -357,6 +385,11 @@ signals:
     void move_cards_got(int moveId, QList<CardsMoveStruct> moves);
 
     void perspective_changed(const QString &targetName, const QList<int> &handCardIds, const QVariantMap &piles);
+
+    // Cross-room spectate signals
+    void cross_room_list_received(const QVariantList &rooms);
+    void cross_room_spectate_started(const QVariantMap &snapshotPayload);
+    void cross_room_spectate_ended(const QString &reason);
 
     void skill_attached(const QString &skill_name, bool from_left);
     void skill_detached(const QString &skill_name, bool head = true);

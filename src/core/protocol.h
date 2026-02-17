@@ -151,7 +151,15 @@ enum CommandType
     S_COMMAND_PRESHOW,
     S_COMMAND_DISABLE_SHOW,
     S_COMMAND_PERSPECTIVE_REQUEST, // Client -> Server: request to switch perspective (dead players only for spectate)
-    S_COMMAND_PERSPECTIVE_SYNC // Server -> Client: full visible state snapshot of the perspective target
+    S_COMMAND_PERSPECTIVE_SYNC, // Server -> Client: full visible state snapshot of the perspective target
+    S_COMMAND_CROSS_ROOM_LIST_REQUEST, // Client -> Server: request list of spectatable rooms
+    S_COMMAND_CROSS_ROOM_LIST, // Server -> Client: room list payload
+    S_COMMAND_CROSS_ROOM_SPECTATE_START, // Client -> Server: start cross-room spectate {roomId, target}
+    S_COMMAND_CROSS_ROOM_SPECTATE_STOP, // Client -> Server: stop cross-room spectate
+    S_COMMAND_CROSS_ROOM_SPECTATE_SNAPSHOT, // Server -> Client: initial full snapshot for cross-room spectate
+    S_COMMAND_CROSS_ROOM_SPECTATE_EVENT, // Server -> Client: incremental event for cross-room spectate
+    S_COMMAND_CROSS_ROOM_SPECTATE_ENDED, // Server -> Client: cross-room spectate session ended
+    S_COMMAND_CROSS_ROOM_SWITCH_TARGET // Client <-> Server: switch cross-room spectate perspective target
 };
 
 enum GameEventType

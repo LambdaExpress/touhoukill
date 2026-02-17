@@ -222,6 +222,7 @@ public:
     void setDisableShow(const QString &flags, const QString &reason);
     void removeDisableShow(const QString &reason);
     QStringList disableShow(bool head) const;
+    QStringList getDisableShowList() const;
     bool canShowGeneral(const QString &flags = QString()) const;
 
     void setSkillInvalidity(const Skill *skill, bool invalidity);
@@ -229,6 +230,7 @@ public:
 
     bool isSkillInvalid(const Skill *skill) const;
     bool isSkillInvalid(const QString &skill_name) const;
+    QStringList getSkillInvalidityList() const;
 
     virtual QString getGameMode() const = 0;
 
@@ -310,6 +312,8 @@ public:
     QList<const Skill *> getDeputySkillList(bool visible_only = true, bool include_acquired = false, bool include_equip = false) const;
 
     QSet<QString> getAcquiredSkills() const;
+    QSet<QString> getAcquiredHeadSkills() const;
+    QSet<QString> getAcquiredDeputySkills() const;
     QString getSkillDescription(bool yellow = true, const QString &flag = QString()) const;
 
     virtual bool isProhibited(const Player *to, const Card *card, const QList<const Player *> &others = QList<const Player *>()) const;
