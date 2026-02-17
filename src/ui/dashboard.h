@@ -76,6 +76,7 @@ public:
     void highlightEquip(const QString &skillName, bool highlight);
 
     void setTrust(bool trust);
+    void setSpectating(bool spectating);
     void killPlayer() override;
     void revivePlayer() override;
     virtual void setDeathColor();
@@ -256,6 +257,8 @@ protected:
 
     QGraphicsRectItem *trusting_item;
     QGraphicsSimpleTextItem *trusting_text;
+    QGraphicsRectItem *spectating_item;
+    QGraphicsSimpleTextItem *spectating_text;
 
     QSanInvokeSkillDock *_m_skillDock;
     QSanInvokeSkillDock *_m_rightSkillDock; //hegemony

@@ -78,6 +78,7 @@ public:
     }
     bool isFull() const;
     bool isFinished() const;
+    bool hasStarted() const;
     bool canPause(ServerPlayer *p) const;
     void tryPause();
 
@@ -257,8 +258,14 @@ public:
     bool notifyMoveCards(bool isLostPhase, QList<CardsMoveStruct> move, bool forceVisible, QList<ServerPlayer *> players = QList<ServerPlayer *>());
     bool notifyProperty(ServerPlayer *playerToNotify, const ServerPlayer *propertyOwner, const char *propertyName, const QString &value = QString());
     QList<ServerPlayer *> getPerspectiveViewersOf(ServerPlayer *target) const;
+    QVariant buildPerspectiveSyncData(const QString &targetObjectName) const;
 
     bool isDeadPlayerRevivable(const ServerPlayer *player) const;
+
+    // Cross-room spectate observer interface
+    void addCrossRoomObserver(const QString &targetObjectName);
+    void removeCrossRoomObserver(const QString &targetObjectName);
+    QVariantMap buildCrossRoomSnapshot(const QString &targetObjectName) const;
     bool notifyUpdateCard(ServerPlayer *player, int cardId, const Card *newCard);
     bool broadcastUpdateCard(const QList<ServerPlayer *> &players, int cardId, const Card *newCard);
     bool notifyResetCard(ServerPlayer *player, int cardId);
@@ -413,6 +420,10 @@ public:
     void trustCommand(ServerPlayer *player, const QVariant &arg);
     void pauseCommand(ServerPlayer *player, const QVariant &arg);
     void spectateCommand(ServerPlayer *player, const QVariant &arg);
+    void crossRoomListCommand(ServerPlayer *player, const QVariant &arg);
+    void crossRoomSpectateStartCommand(ServerPlayer *player, const QVariant &arg);
+    void crossRoomSpectateStopCommand(ServerPlayer *player, const QVariant &arg);
+    void crossRoomSwitchTargetCommand(ServerPlayer *player, const QVariant &arg);
     void processResponse(ServerPlayer *player, const QSanProtocol::Packet *arg);
     void addRobotCommand(ServerPlayer *player, const QVariant &arg);
     void fillRobotsCommand(ServerPlayer *player, const QVariant &arg);
@@ -591,6 +602,14 @@ private:
     ServerPlayer *getCommandProxy(ServerPlayer *player) const;
     ServerPlayer *getProxiedPlayer(ServerPlayer *proxy) const;
 
+    // Cross-room spectate observer ref counting (protected by m_crossRoomObserverMutex).
+    // m_crossRoomObserverCount is an atomic fast-path flag: doNotify/doBroadcastNotify
+    // check it lock-free on every call and only acquire the mutex when observers exist.
+    QAtomicInt m_crossRoomObserverCount; // total observer count (atomic, for fast-path check)
+    QMap<QString, int> m_crossRoomObserverRefCount; // targetObjectName -> ref count
+    mutable QMutex m_crossRoomObserverMutex;
+    bool m_roomTearingDownEmitted;
+
     static QString generatePlayerName();
     void prepareForStart();
     void assignGeneralsForPlayers(const QList<ServerPlayer *> &to_assign);
@@ -637,6 +656,11 @@ signals:
     void room_message(const QString &msg);
     void game_over(const QString &winner);
     void signalSetProperty(ServerPlayer *player, const char *property_name, const QVariant &value);
+
+    // Cross-room spectate tap signals (value-type parameters only for thread safety)
+    void crossRoomNotify(int roomId, const QString &recipientName, int command, const QVariant &arg);
+    void crossRoomBroadcast(int roomId, int command, const QVariant &arg);
+    void roomTearingDown(int roomId);
 };
 
 #endif

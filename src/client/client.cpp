@@ -18,9 +18,12 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
 using namespace std;
 using namespace QSanProtocol;
 using namespace JsonUtils;
+
 
 Client *ClientInstance = nullptr;
 
@@ -71,6 +74,11 @@ Client::Client(QObject *parent, const QString &filename)
     m_callbacks[S_COMMAND_CARD_LIMITATION] = &Client::cardLimitation;
     m_callbacks[S_COMMAND_DISABLE_SHOW] = &Client::disableShow;
     m_callbacks[S_COMMAND_PERSPECTIVE_SYNC] = &Client::perspectiveSync;
+    m_callbacks[S_COMMAND_CROSS_ROOM_LIST] = &Client::crossRoomList;
+    m_callbacks[S_COMMAND_CROSS_ROOM_SPECTATE_SNAPSHOT] = &Client::crossRoomSpectateSnapshot;
+    m_callbacks[S_COMMAND_CROSS_ROOM_SPECTATE_EVENT] = &Client::crossRoomSpectateEvent;
+    m_callbacks[S_COMMAND_CROSS_ROOM_SPECTATE_ENDED] = &Client::crossRoomSpectateEnded;
+    m_callbacks[S_COMMAND_CROSS_ROOM_SWITCH_TARGET] = &Client::crossRoomSwitchTarget;
     m_callbacks[S_COMMAND_NULLIFICATION_ASKED] = &Client::setNullification;
     m_callbacks[S_COMMAND_ENABLE_SURRENDER] = &Client::enableSurrender;
     m_callbacks[S_COMMAND_EXCHANGE_KNOWN_CARDS] = &Client::exchangeKnownCards;
@@ -138,6 +146,12 @@ Client::Client(QObject *parent, const QString &filename)
     m_noNullificationThisTime = false;
     m_noNullificationTrickName = ".";
     m_lastPerspectiveSyncSerial = 0;
+    m_crossSpectateActive = false;
+    m_isCrossRoomSpectating = false;
+    m_crossSpectateRoomId = 0;
+    m_crossSpectateSerial = 0;
+    m_savedSelf = nullptr;
+    m_savedAliveCount = -1;
 
     Self = new ClientPlayer(this);
     Self->setScreenName(Config.UserName);
@@ -189,13 +203,18 @@ void Client::updateCard(const QVariant &val)
         // reset card
         int cardId = val.toInt();
         Card *card = _m_roomState.getCard(cardId);
+        if (card == nullptr) {
+            return;
+        }
         if (!card->isModified())
             return;
         _m_roomState.resetCard(cardId);
     } else {
         // update card
         JsonArray args = val.value<JsonArray>();
-        Q_ASSERT(args.size() >= 5);
+        if (args.size() < 7) {
+            return;
+        }
         int cardId = args[0].toInt();
         Card::Suit suit = (Card::Suit)args[1].toInt();
         int number = args[2].toInt();
@@ -206,11 +225,20 @@ void Client::updateCard(const QVariant &val)
         JsonUtils::tryParse(args[6], flags);
 
         Card *card = Sanguosha->cloneCard(cardName, suit, number, flags);
+        if (card == nullptr) {
+            return;
+        }
         card->setId(cardId);
         card->setSkillName(skillName);
         card->setObjectName(objectName);
+        {
+            QObject *roomObj = Sanguosha->currentRoomObject();
+            Card *rawCard = roomObj ? getCard(cardId) : nullptr;
+        }
         WrappedCard *wrapped = Sanguosha->getWrappedCard(cardId);
-        Q_ASSERT(wrapped != nullptr);
+        if (wrapped == nullptr) {
+            return;
+        }
         wrapped->copyEverythingFrom(card);
     }
 }
@@ -412,7 +440,28 @@ void Client::processServerPacket(const char *cmd)
     Packet packet;
     if (packet.parse(cmd)) {
         if (packet.getPacketType() == S_TYPE_NOTIFICATION) {
-            Callback callback = m_callbacks[packet.getCommandType()];
+            CommandType command = packet.getCommandType();
+
+            // During cross-room spectate, Self/players have been swapped to virtual
+            // players mirroring the target room.  Source (waiting) room notifications
+            // such as startGame would corrupt this state, so we only allow cross-room
+            // spectate commands, player roster changes (routed to saved state by their
+            // handlers), and essential keep-alive commands through.
+            if (m_isCrossRoomSpectating) {
+                if (command != S_COMMAND_CROSS_ROOM_LIST
+                    && command != S_COMMAND_CROSS_ROOM_SPECTATE_SNAPSHOT
+                    && command != S_COMMAND_CROSS_ROOM_SPECTATE_EVENT
+                    && command != S_COMMAND_CROSS_ROOM_SPECTATE_ENDED
+                    && command != S_COMMAND_CROSS_ROOM_SWITCH_TARGET
+                    && command != S_COMMAND_ADD_PLAYER
+                    && command != S_COMMAND_REMOVE_PLAYER
+                    && command != S_COMMAND_HEARTBEAT
+                    && command != S_COMMAND_SPEAK) {
+                    return; // silently drop source-room notification
+                }
+            }
+
+            Callback callback = m_callbacks[command];
             if (callback != nullptr) {
                 (this->*callback)(packet.getMessageBody());
             }
@@ -447,6 +496,12 @@ bool Client::processServerRequest(const Packet &packet)
         countdown.max = ServerInfo.getCommandTimeout(command, S_CLIENT_INSTANCE, rate);
         setCountdown(countdown);
     }
+
+    // Ignore interactive requests while mirroring another room's game state.
+    // The waiting room's server may still send requests (e.g. chat), but we must
+    // not enter any interactive callback that would alter the spectate view.
+    if (m_isCrossRoomSpectating)
+        return true;
 
     Callback callback = m_interactions[command];
     if (callback == nullptr)
@@ -483,8 +538,16 @@ void Client::addPlayer(const QVariant &player_info)
     player->setScreenName(screen_name);
     player->setProperty("avatar", avatar);
 
-    players << player;
-    alive_count++;
+    if (m_isCrossRoomSpectating) {
+        // Player joined our original room while we are spectating another room.
+        // Track them in the saved state so they are present when spectate ends.
+        m_savedPlayers << player;
+        if (m_savedAliveCount >= 0)
+            m_savedAliveCount++;
+    } else {
+        players << player;
+        alive_count++;
+    }
     emit player_added(player);
 }
 
@@ -506,9 +569,16 @@ void Client::removePlayer(const QVariant &player_name)
     ClientPlayer *player = findChild<ClientPlayer *>(name);
     if (player != nullptr) {
         player->setParent(nullptr);
-        alive_count--;
+        if (m_isCrossRoomSpectating) {
+            // Player left our original room while we are spectating another room.
+            // Update saved state so the departure is reflected when spectate ends.
+            if (m_savedPlayers.removeOne(player) && m_savedAliveCount > 0)
+                m_savedAliveCount--;
+        } else {
+            alive_count--;
+            players.removeOne(player);
+        }
         emit player_removed(name);
-        players.removeOne(player);
         connect(this, &Client::destroyed, player, &ClientPlayer::deleteLater);
     }
 }
@@ -555,9 +625,13 @@ void Client::getCards(const QVariant &arg)
         move.to = getPlayer(move.to_player_name);
         Player::Place dstPlace = move.to_place;
 
-        if (dstPlace == Player::PlaceSpecial)
-            ((ClientPlayer *)move.to)->changePile(move.to_pile_name, true, move.card_ids);
-        else {
+        if (dstPlace == Player::PlaceSpecial) {
+            ClientPlayer *toPlayer = qobject_cast<ClientPlayer *>(move.to);
+            if (toPlayer == nullptr) {
+                continue;
+            }
+            toPlayer->changePile(move.to_pile_name, true, move.card_ids);
+        } else {
             foreach (int card_id, move.card_ids)
                 _getSingleCard(card_id, move); // DDHEJ->DDHEJ, DDH/EJ->EJ
         }
@@ -595,9 +669,13 @@ void Client::loseCards(const QVariant &arg)
         move.from = getPlayer(move.from_player_name);
         move.to = getPlayer(move.to_player_name);
         Player::Place srcPlace = move.from_place;
-        if (srcPlace == Player::PlaceSpecial)
-            ((ClientPlayer *)move.from)->changePile(move.from_pile_name, false, move.card_ids);
-        else {
+        if (srcPlace == Player::PlaceSpecial) {
+            ClientPlayer *fromPlayer = qobject_cast<ClientPlayer *>(move.from);
+            if (fromPlayer == nullptr) {
+                continue;
+            }
+            fromPlayer->changePile(move.from_pile_name, false, move.card_ids);
+        } else {
             foreach (int card_id, move.card_ids)
                 _loseSingleCard(card_id, move); // DDHEJ->DDHEJ, DDH/EJ->EJ
         }
@@ -982,6 +1060,9 @@ void Client::exchangeKnownCards(const QVariant &players)
         return;
     ClientPlayer *a = getPlayer(args[0].toString());
     ClientPlayer *b = getPlayer(args[1].toString());
+    if (a == nullptr || b == nullptr) {
+        return;
+    }
     QList<int> a_known;
     QList<int> b_known;
     foreach (const Card *card, a->getHandcards())
@@ -1440,6 +1521,436 @@ void Client::perspectiveSync(const QVariant &arg)
     emit perspective_changed(targetName, handCardIds, pilesMap);
 }
 
+// ---------------------------------------------------------------------------
+// Cross-room spectate
+// ---------------------------------------------------------------------------
+
+void Client::requestCrossRoomList()
+{
+    notifyServer(S_COMMAND_CROSS_ROOM_LIST_REQUEST, QVariant());
+}
+
+void Client::requestCrossRoomSpectate(int roomId, const QString &targetName)
+{
+    JsonArray body;
+    body << roomId << targetName;
+    notifyServer(S_COMMAND_CROSS_ROOM_SPECTATE_START, QVariant(body));
+}
+
+void Client::requestCrossRoomPerspectiveSwitch(const QString &targetName)
+{
+    if (!m_isCrossRoomSpectating || targetName.isEmpty())
+        return;
+    notifyServer(S_COMMAND_CROSS_ROOM_SWITCH_TARGET, targetName);
+}
+
+void Client::requestStopCrossRoomSpectate()
+{
+    notifyServer(S_COMMAND_CROSS_ROOM_SPECTATE_STOP, QVariant());
+
+    // Perform client-side cleanup immediately without waiting for server response.
+    // If the server later sends S_COMMAND_CROSS_ROOM_SPECTATE_ENDED, the repeated
+    // call is safe: m_isCrossRoomSpectating will already be false, so state
+    // restoration is skipped and only a benign log line is emitted.
+    JsonObject endPayload;
+    endPayload["reason"] = QStringLiteral("VIEWER_REQUESTED");
+    endPayload["sessionId"] = m_crossSpectateSessionId;
+    crossRoomSpectateEnded(QVariant(endPayload));
+}
+
+void Client::crossRoomSwitchTarget(const QVariant &arg)
+{
+    JsonArray payload = arg.value<JsonArray>();
+    if (payload.size() < 6) {
+        return;
+    }
+
+    QString sessionId = payload[0].toString();
+    int serial = payload[1].toInt();
+    QString targetName = payload[2].toString();
+
+    if (!m_isCrossRoomSpectating) {
+        return;
+    }
+
+    if (sessionId != m_crossSpectateSessionId) {
+        return;
+    }
+
+    if (serial <= m_crossSpectateSerial) {
+        return;
+    }
+
+    m_crossSpectateSerial = serial;
+    m_crossSpectateTargetName = targetName;
+
+    // Ensure room registration before card operations in perspectiveSync.
+    // crossRoomSpectateSnapshot registered the room, but if it was unregistered
+    // (e.g. by a gameOver path), card pool access would crash.
+    Sanguosha->registerRoom(this);
+
+    // Reuse perspectiveSync by constructing a compatible payload:
+    // perspectiveSync expects [serial, targetName, handCards, pilesObj, modifiedCards]
+    JsonArray perspectivePayload;
+    perspectivePayload << (m_lastPerspectiveSyncSerial + 1);
+    perspectivePayload << payload[2]; // targetName
+    perspectivePayload << payload[3]; // handCards
+    perspectivePayload << payload[4]; // pilesObj
+    perspectivePayload << payload[5]; // modifiedCards
+    perspectiveSync(QVariant(perspectivePayload));
+}
+
+void Client::crossRoomList(const QVariant &arg)
+{
+    QVariantList rooms = arg.value<QVariantList>();
+    emit cross_room_list_received(rooms);
+}
+
+void Client::crossRoomSpectateSnapshot(const QVariant &arg)
+{
+    if (m_isCrossRoomSpectating) {
+        return;
+    }
+
+    JsonObject payload = arg.value<JsonObject>();
+    QVariantMap snapshot = payload.value("snapshot").toMap();
+    QVariantList snapshotPlayers = snapshot.value("players").toList();
+    if (snapshotPlayers.isEmpty()) {
+        return;
+    }
+
+    // Ensure the Client is registered as the room object for the current thread.
+    // After game_over, unregisterRoom() is called, leaving currentRoomObject() == NULL.
+    // Card operations (getWrappedCard, updateCard, etc.) depend on this registration.
+    Sanguosha->registerRoom(this);
+
+    // Ensure the card pool is populated. If the spectator never started a game
+    // (or the game ended and RoomState was not re-initialized), m_cards is empty
+    // and all getCard/getWrappedCard calls will return NULL.
+    _m_roomState.reset();
+
+    QString targetName = payload.value("targetName").toString();
+    if (targetName.isEmpty())
+        targetName = snapshot.value("targetName").toString();
+
+    // Save current waiting room state
+    m_savedSelf = Self;
+    m_savedPlayers = players;
+    m_savedAliveCount = alive_count;
+    m_crossRoomVirtualPlayers.clear();
+
+    // Create virtual ClientPlayer objects from the snapshot
+    ClientPlayer *targetPlayer = nullptr;
+    QList<ClientPlayer *> seatOrdered;
+
+    foreach (const QVariant &playerVar, snapshotPlayers) {
+        QVariantMap pObj = playerVar.toMap();
+        QString objectName = pObj.value("objectName").toString();
+        if (objectName.isEmpty())
+            continue;
+
+        ClientPlayer *vp = new ClientPlayer(this);
+        vp->setObjectName(objectName);
+        vp->setScreenName(pObj.value("screenName").toString());
+        vp->setGeneralName(pObj.value("generalName").toString());
+        vp->setGeneral2Name(pObj.value("general2Name").toString());
+        vp->setKingdom(pObj.value("kingdom").toString());
+        vp->setRole(pObj.value("role").toString());
+        vp->setHp(pObj.value("hp").toInt());
+        vp->setMaxHp(pObj.value("maxHp").toInt());
+        vp->setAlive(pObj.value("alive", true).toBool());
+        vp->setSeat(pObj.value("seat").toInt());
+        vp->setInitialSeat(pObj.value("seat").toInt());
+        vp->setPhase(static_cast<Player::Phase>(pObj.value("phase").toInt()));
+        vp->setFaceUp(pObj.value("faceUp", true).toBool());
+        vp->setChained(pObj.value("chained", false).toBool());
+        vp->setHandcardNum(pObj.value("handcardNum").toInt());
+        vp->setRemoved(pObj.value("removed", false).toBool());
+        vp->setShownRole(pObj.value("roleShown", false).toBool());
+        vp->setGeneralShowed(pObj.value("generalShowed", false).toBool());
+        vp->setGeneral2Showed(pObj.value("general2Showed", false).toBool());
+        if (pObj.contains("renHp"))
+            vp->setRenHp(pObj.value("renHp").toInt());
+        if (pObj.contains("lingHp"))
+            vp->setLingHp(pObj.value("lingHp").toInt());
+        if (pObj.contains("chaoren"))
+            vp->setChaoren(pObj.value("chaoren").toInt());
+
+        // Equips
+        QVariantList equips = pObj.value("equips").toList();
+        foreach (const QVariant &equipVar, equips) {
+            WrappedCard *equip = Sanguosha->getWrappedCard(equipVar.toInt());
+            if (equip != nullptr)
+                vp->setEquip(equip);
+        }
+
+        // Delayed trick (judge area)
+        QVariantList judgeArea = pObj.value("judgeArea").toList();
+        foreach (const QVariant &judgeVar, judgeArea) {
+            WrappedCard *card = Sanguosha->getWrappedCard(judgeVar.toInt());
+            if (card != nullptr)
+                vp->addDelayedTrick(card);
+        }
+
+        // Shown handcards & broken equips
+        QList<int> shownHandcards;
+        JsonUtils::tryParse(pObj.value("shownHandcards"), shownHandcards);
+        vp->setShownHandcards(shownHandcards);
+
+        QList<int> brokenEquips;
+        JsonUtils::tryParse(pObj.value("brokenEquips"), brokenEquips);
+        vp->setBrokenEquips(brokenEquips);
+
+        // Piles
+        QVariantMap playerPiles = pObj.value("piles").toMap();
+        for (auto it = playerPiles.constBegin(); it != playerPiles.constEnd(); ++it) {
+            QList<int> pileIds;
+            JsonUtils::tryParse(it.value(), pileIds);
+            vp->setPile(it.key(), pileIds);
+        }
+
+        // Pile visibility
+        QVariantMap pileOpenObj = pObj.value("pileOpen").toMap();
+        for (auto it = pileOpenObj.constBegin(); it != pileOpenObj.constEnd(); ++it) {
+            QStringList openPlayers;
+            JsonUtils::tryParse(it.value(), openPlayers);
+            foreach (const QString &viewerName, openPlayers)
+                vp->setPileOpen(it.key(), viewerName);
+        }
+
+        // Marks (all non-zero marks)
+        QVariantMap marks = pObj.value("marks").toMap();
+        for (auto it = marks.constBegin(); it != marks.constEnd(); ++it)
+            vp->setMark(it.key(), it.value().toInt());
+
+        // Acquired skills (head / deputy separated)
+        QStringList acquiredHeadSkills;
+        if (JsonUtils::tryParse(pObj.value("acquiredHeadSkills"), acquiredHeadSkills)) {
+            foreach (const QString &skillName, acquiredHeadSkills)
+                vp->acquireSkill(skillName, true);
+        }
+        QStringList acquiredDeputySkills;
+        if (JsonUtils::tryParse(pObj.value("acquiredDeputySkills"), acquiredDeputySkills)) {
+            foreach (const QString &skillName, acquiredDeputySkills)
+                vp->acquireSkill(skillName, false);
+        }
+
+        // Hidden generals (hegemony)
+        QStringList hiddenGenerals;
+        if (JsonUtils::tryParse(pObj.value("hiddenGenerals"), hiddenGenerals))
+            vp->setHiddenGenerals(hiddenGenerals);
+        QString shownHiddenGeneral = pObj.value("shownHiddenGeneral").toString();
+        if (!shownHiddenGeneral.isEmpty())
+            vp->setShownHiddenGeneral(shownHiddenGeneral);
+
+        // Skill invalidity
+        QStringList skillInvalidList;
+        if (JsonUtils::tryParse(pObj.value("skillInvalid"), skillInvalidList)) {
+            foreach (const QString &invalidSkill, skillInvalidList)
+                vp->setSkillInvalidity(invalidSkill, true);
+        }
+
+        // Disable-show (format: "flags,reason")
+        QStringList disableShowList;
+        if (JsonUtils::tryParse(pObj.value("disableShow"), disableShowList)) {
+            foreach (const QString &entry, disableShowList) {
+                int sep = entry.indexOf(',');
+                if (sep > 0)
+                    vp->setDisableShow(entry.left(sep), entry.mid(sep + 1));
+            }
+        }
+
+        // Flags
+        QStringList flagList;
+        if (JsonUtils::tryParse(pObj.value("flags"), flagList)) {
+            foreach (const QString &flag, flagList)
+                vp->setFlags(flag);
+        }
+
+        m_crossRoomVirtualPlayers << vp;
+        seatOrdered << vp;
+
+        if (objectName == targetName)
+            targetPlayer = vp;
+    }
+
+    if (m_crossRoomVirtualPlayers.isEmpty()) {
+        return;
+    }
+
+    // Sort by seat and set next-player chain
+    std::sort(seatOrdered.begin(), seatOrdered.end(), [](const ClientPlayer *a, const ClientPlayer *b) {
+        return a->getSeat() < b->getSeat();
+    });
+    for (int i = 0; i < seatOrdered.length(); ++i) {
+        ClientPlayer *current = seatOrdered.at(i);
+        ClientPlayer *next = seatOrdered.at((i + 1) % seatOrdered.length());
+        if (current == nullptr || next == nullptr) {
+            continue;
+        }
+        current->setNext(next->objectName());
+    }
+
+    // Apply modified card info (suit/number/name overrides for transformed cards)
+    QVariantList modCards = snapshot.value("modifiedCards").toList();
+    for (int _ci = 0; _ci < modCards.size(); ++_ci) {
+        updateCard(modCards.at(_ci));
+    }
+
+    if (targetPlayer == nullptr)
+        targetPlayer = m_crossRoomVirtualPlayers.first();
+
+    // Set target player's hand cards
+    QList<int> targetHandCards;
+    JsonUtils::tryParse(snapshot.value("handCards"), targetHandCards);
+    targetPlayer->setCards(targetHandCards);
+    targetPlayer->setHandcardNum(targetHandCards.length());
+
+    // Piles are now loaded per-player in the loop above (step6 removed).
+
+    // Replace the player list with virtual players
+    players.clear();
+    foreach (ClientPlayer *vp, m_crossRoomVirtualPlayers)
+        players << vp;
+
+    Self = targetPlayer;
+    alive_count = 0;
+    foreach (const ClientPlayer *p, players) {
+        if (p->isAlive())
+            alive_count++;
+    }
+
+    // Update session tracking
+    m_crossSpectateSessionId = payload.value("sessionId").toString();
+    m_crossSpectateRoomId = payload.value("targetRoomId").toInt();
+    m_crossSpectateTargetName = targetName;
+    m_crossSpectateSerial = 0;
+    m_crossSpectateActive = true;
+    m_isCrossRoomSpectating = true;
+
+    QStringList activeNames;
+    foreach (const ClientPlayer *p, players)
+        if (p != nullptr) activeNames << p->objectName();
+
+    // Signal RoomScene to reconfigure the visual layout.
+    // Pass the full payload so the scene can extract roomId and targetName.
+    emit cross_room_spectate_started(payload);
+}
+
+void Client::crossRoomSpectateEvent(const QVariant &arg)
+{
+    JsonArray eventPayload = arg.value<JsonArray>();
+    if (eventPayload.size() < 4) {
+        return;
+    }
+
+    QString sessionId = eventPayload[0].toString();
+    int serial = eventPayload[1].toInt();
+    int command = eventPayload[2].toInt();
+    QVariant payload = eventPayload[3];
+
+    if (!m_isCrossRoomSpectating) {
+        return;
+    }
+
+    // Discard stale events from a different or expired session
+    if (sessionId != m_crossSpectateSessionId) {
+        return;
+    }
+
+    // Discard out-of-order events
+    if (serial <= m_crossSpectateSerial) {
+        return;
+    }
+
+    CommandType commandType = static_cast<CommandType>(command);
+
+    // Never dispatch interactive commands during cross-room spectate
+    if (m_interactions.contains(commandType)) {
+        return;
+    }
+
+    // Blacklist commands that would corrupt connection or player-list state.
+    // The server-side manager should not forward these, but guard defensively.
+    switch (commandType) {
+    case S_COMMAND_GAME_OVER:
+    case S_COMMAND_GAME_START:
+    case S_COMMAND_ADD_PLAYER:
+    case S_COMMAND_REMOVE_PLAYER:
+    case S_COMMAND_ARRANGE_SEATS:
+    case S_COMMAND_SETUP:
+    case S_COMMAND_CHECK_VERSION:
+    case S_COMMAND_WARN:
+        return;
+    default:
+        break;
+    }
+
+    Callback callback = m_callbacks.value(commandType, nullptr);
+    if (callback == nullptr) {
+        return;
+    }
+
+    m_crossSpectateSerial = serial;
+
+    // Ensure room registration before dispatching — same reason as in crossRoomSpectateSnapshot.
+    Sanguosha->registerRoom(this);
+
+    (this->*callback)(payload);
+}
+
+void Client::crossRoomSpectateEnded(const QVariant &arg)
+{
+    JsonObject payload = arg.value<JsonObject>();
+    QString reason = payload.value("reason").toString();
+    QString sessionId = payload.value("sessionId").toString();
+
+    // Ignore stale ended notifications from a different session
+    if (!sessionId.isEmpty() && !m_crossSpectateSessionId.isEmpty() && sessionId != m_crossSpectateSessionId) {
+        return;
+    }
+
+    // Collect virtual players for deferred deletion
+    QList<ClientPlayer *> staleVirtualPlayers = m_crossRoomVirtualPlayers;
+    m_crossRoomVirtualPlayers.clear();
+
+    // Restore saved waiting room state
+    if (m_isCrossRoomSpectating) {
+        players = m_savedPlayers;
+        if (m_savedSelf != nullptr)
+            Self = m_savedSelf;
+        if (m_savedAliveCount >= 0)
+            alive_count = m_savedAliveCount;
+
+        // Reset perspective sync state that was polluted by crossRoomSwitchTarget
+        // reusing perspectiveSync(). Without this, subsequent in-room perspective
+        // syncs would be rejected as stale due to the artificially incremented serial.
+        // Guarded by m_isCrossRoomSpectating to prevent delayed ended packets from
+        // corrupting in-room spectate state after cross-room spectate has already ended.
+        m_lastPerspectiveSyncSerial = 0;
+        m_perspectiveTargetName.clear();
+        m_savedPileOpenState.clear();
+    }
+
+    m_savedPlayers.clear();
+    m_savedSelf = nullptr;
+    m_savedAliveCount = -1;
+
+    m_crossSpectateActive = false;
+    m_isCrossRoomSpectating = false;
+    m_crossSpectateSessionId.clear();
+    m_crossSpectateTargetName.clear();
+    m_crossSpectateRoomId = 0;
+    m_crossSpectateSerial = 0;
+
+    emit cross_room_spectate_ended(reason);
+
+    // Delete virtual players after signal handlers have finished restoring state
+    foreach (ClientPlayer *vp, staleVirtualPlayers)
+        vp->deleteLater();
+
+}
+
 void Client::speakToServer(const QString &text)
 {
     if (text.isEmpty())
@@ -1475,10 +1986,32 @@ int Client::alivePlayerCount() const
 
 ClientPlayer *Client::getPlayer(const QString &name)
 {
-    if (name == Self->objectName() || name == QSanProtocol::S_PLAYER_SELF_REFERENCE_ID)
+    // Guard: Self null dereference
+    if (name == QSanProtocol::S_PLAYER_SELF_REFERENCE_ID)
         return Self;
-    else
-        return findChild<ClientPlayer *>(name);
+    if (Self != nullptr && name == Self->objectName())
+        return Self;
+
+    // During cross-room spectate, both original and virtual ClientPlayer children
+    // coexist under Client. findChild may return the WRONG one if objectNames collide.
+    // Prefer lookup from the active players list first.
+    ClientPlayer *fromList = nullptr;
+    foreach (const ClientPlayer *p, players) {
+        if (p != nullptr && p->objectName() == name) {
+            fromList = const_cast<ClientPlayer *>(p);
+            break;
+        }
+    }
+
+    ClientPlayer *fromChild = findChild<ClientPlayer *>(name);
+
+    if (m_isCrossRoomSpectating) {
+        // Prefer the player from the active list to avoid stale-object crashes
+        return fromList != nullptr ? fromList : fromChild;
+    }
+
+    // Prefer active players list to avoid stale virtual children pending deleteLater()
+    return fromList != nullptr ? fromList : fromChild;
 }
 
 bool Client::save(const QString &filename) const
@@ -1699,6 +2232,10 @@ void Client::killPlayer(const QVariant &player_name)
 
     alive_count--;
     ClientPlayer *player = getPlayer(name);
+    if (player == nullptr) {
+        alive_count++; // rollback: player not found, count was decremented prematurely
+        return;
+    }
     if (player == Self) {
         if (isHegemonyGameMode(ServerInfo.GameMode)) {
             foreach (const Skill *skill, Self->getHeadSkillList(true, true))
@@ -1712,7 +2249,7 @@ void Client::killPlayer(const QVariant &player_name)
     }
     player->detachAllSkills();
 
-    if (!Self->hasFlag("marshalling")) {
+    if (Self != nullptr && !Self->hasFlag("marshalling")) {
         QString general_name = player->getGeneralName();
         QString last_word = Sanguosha->translate(QString("~%1").arg(general_name));
         if (last_word.startsWith("~")) {
@@ -1924,6 +2461,9 @@ void Client::setMark(const QVariant &mark_var)
     int value = mark_str[2].toInt();
 
     ClientPlayer *player = getPlayer(who);
+    if (player == nullptr) {
+        return;
+    }
     player->setMark(mark, value);
 
     // for all the skills has a ViewAsSkill Effect { RoomScene::detachSkill(const QString &) }
@@ -1934,7 +2474,7 @@ void Client::setMark(const QVariant &mark_var)
 
         QString lost_mark = "ViewAsSkill_" + skill_name + "Lost";
 
-        if (!Self->hasSkill(skill_name, true) && Self->getMark(lost_mark) > 0) {
+        if (Self != nullptr && !Self->hasSkill(skill_name, true) && Self->getMark(lost_mark) > 0) {
             Self->setMark(lost_mark, 0);
             emit skill_detached(skill_name);
         }
@@ -2003,6 +2543,10 @@ void Client::takeAG(const QVariant &take_var)
         emit ag_taken(nullptr, card_id, move_cards);
     } else {
         ClientPlayer *taker = getPlayer(take[0].toString());
+        if (taker == nullptr) {
+            emit ag_taken(nullptr, card_id, move_cards);
+            return;
+        }
         if (move_cards)
             taker->addCard(card, Player::PlaceHand);
         emit ag_taken(taker, card_id, move_cards);

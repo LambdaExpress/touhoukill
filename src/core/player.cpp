@@ -807,6 +807,11 @@ void Player::setSkillInvalidity(const QString &skill_name, bool invalidity)
         skill_invalid.removeAll(skill_name);
 }
 
+QStringList Player::getSkillInvalidityList() const
+{
+    return skill_invalid;
+}
+
 bool Player::isSkillInvalid(const Skill *skill) const
 {
     if (skill == nullptr)
@@ -1581,6 +1586,16 @@ QSet<QString> Player::getAcquiredSkills() const
     return acquired_skills + acquired_skills2;
 }
 
+QSet<QString> Player::getAcquiredHeadSkills() const
+{
+    return acquired_skills;
+}
+
+QSet<QString> Player::getAcquiredDeputySkills() const
+{
+    return acquired_skills2;
+}
+
 QString Player::getSkillDescription(bool yellow, const QString &flag) const
 {
     QString description = QString();
@@ -2217,6 +2232,11 @@ QStringList Player::disableShow(bool head) const
     }
 
     return r;
+}
+
+QStringList Player::getDisableShowList() const
+{
+    return disable_show;
 }
 
 bool Player::canShowGeneral(const QString &flags) const

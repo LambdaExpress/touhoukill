@@ -269,8 +269,18 @@ void PlayerCardContainer::updateAvatar()
             else
                 _m_layout->m_avatarNameFont.paintText(_m_avatarNameItem, _m_layout->m_avatarNameArea, Qt::AlignLeft | Qt::AlignJustify, name);
         } else {
+            // Avatar-only state (e.g. waiting room before game start).
+            // Clear residual name/kingdom visuals that may linger from a
+            // previous state such as cross-room spectate.
+            _clearPixmap(_m_kingdomColorMaskIcon);
+            _clearPixmap(_m_dashboardKingdomColorMaskIcon);
+            _clearPixmap(_m_kingdomIcon);
             _paintPixmap(_m_handCardBg, _m_layout->m_handCardArea, _getPixmap(QSanRoomSkin::S_SKIN_KEY_HANDCARDNUM, QString(QSanRoomSkin::S_SKIN_KEY_DEFAULT_SECOND)),
                          _getAvatarParent());
+            if (ServerInfo.Enable2ndGeneral && getPlayer() == Self)
+                _m_layout->m_avatarNameFont.paintText(_m_avatarNameItem, _m_layout->m_headAvatarNameArea, Qt::AlignLeft | Qt::AlignJustify, QString());
+            else
+                _m_layout->m_avatarNameFont.paintText(_m_avatarNameItem, _m_layout->m_avatarNameArea, Qt::AlignLeft | Qt::AlignJustify, QString());
         }
     } else {
         QGraphicsPixmapItem *avatarIconTmp = _m_avatarIcon;
@@ -281,6 +291,10 @@ void PlayerCardContainer::updateAvatar()
         _clearPixmap(_m_kingdomIcon);
         _paintPixmap(_m_handCardBg, _m_layout->m_handCardArea, _getPixmap(QSanRoomSkin::S_SKIN_KEY_HANDCARDNUM, QString(QSanRoomSkin::S_SKIN_KEY_DEFAULT_SECOND)),
                      _getAvatarParent());
+        if (ServerInfo.Enable2ndGeneral && getPlayer() == Self)
+            _m_layout->m_avatarNameFont.paintText(_m_avatarNameItem, _m_layout->m_headAvatarNameArea, Qt::AlignLeft | Qt::AlignJustify, QString());
+        else
+            _m_layout->m_avatarNameFont.paintText(_m_avatarNameItem, _m_layout->m_avatarNameArea, Qt::AlignLeft | Qt::AlignJustify, QString());
         _m_avatarArea->setToolTip(QString());
     }
     _m_avatarIcon->show();
@@ -376,8 +390,16 @@ void PlayerCardContainer::updatePhase()
 void PlayerCardContainer::updateHp()
 {
     Q_ASSERT(_m_hpBox && _m_saveMeIcon);
-    if (m_player == nullptr)
+    if (m_player == nullptr) {
+        _m_hpBox->setHp(0);
+        _m_hpBox->setMaxHp(0);
+        _m_hpBox->update();
+        _m_sub_hpBox->setHp(0);
+        _m_sub_hpBox->setMaxHp(0);
+        _m_sub_hpBox->update();
+        _m_saveMeIcon->setVisible(false);
         return;
+    }
     if (!m_player->hasSkill("banling")) {
         _m_hpBox->setHp(m_player->getHp(), m_player->dyingThreshold());
         _m_hpBox->setMaxHp(m_player->getMaxHp());
@@ -764,6 +786,11 @@ void PlayerCardContainer::setPlayer(ClientPlayer *player)
         _m_markItem->setDocument(textDoc);
         connect(textDoc, SIGNAL(contentsChanged()), this, SLOT(updateMarks()));
         connect(player, &ClientPlayer::brokenEquips_changed, this, &PlayerCardContainer::updateBrokenEquips);
+    } else {
+        // Clear the mark document to avoid a dangling pointer when the old
+        // player is deleted (e.g. virtual players after cross-room spectate).
+        Q_ASSERT(_m_markItem);
+        _m_markItem->setDocument(new QTextDocument(_m_markItem));
     }
     updateAvatar();
     refresh();
@@ -902,9 +929,10 @@ QList<CardItem *> PlayerCardContainer::removeDelayedTricks(const QList<int> &car
     QList<CardItem *> result;
     foreach (int card_id, cardIds) {
         CardItem *item = CardItem::FindItem(_m_judgeCards, card_id);
-        Q_ASSERT(item != nullptr);
-        if (item == nullptr)
+        if (item == nullptr) {
+            qWarning("PlayerCardContainer::removeDelayedTricks: card id %d not found in _m_judgeCards", card_id);
             continue;
+        }
         int index = _m_judgeCards.indexOf(item);
         QRect start = _m_layout->m_delayedTrickFirstRegion;
         QPoint step = _m_layout->m_delayedTrickStep;
@@ -913,9 +941,19 @@ QList<CardItem *> PlayerCardContainer::removeDelayedTricks(const QList<int> &car
         item->setPos(start.center());
         _m_judgeCards.removeAt(index);
         //delete _m_judgeIcons.takeAt(index);
+        if (index < 0 || index >= _m_judgeIcons.size()) {
+            qWarning("PlayerCardContainer::removeDelayedTricks: icon index %d out of range (icons=%d) for card id %d",
+                     index, _m_judgeIcons.size(), card_id);
+            result.append(item);
+            continue;
+        }
         QGraphicsPixmapItem *icon = _m_judgeIcons.takeAt(index);
-        icon->setOpacity(0.0);
-        delete icon;
+        if (icon != nullptr) {
+            icon->setOpacity(0.0);
+            delete icon;
+        } else {
+            qWarning("PlayerCardContainer::removeDelayedTricks: icon is null at index %d for card id %d", index, card_id);
+        }
         result.append(item);
     }
     updateDelayedTricks();
@@ -926,6 +964,8 @@ void PlayerCardContainer::updateDelayedTricks()
 {
     for (int i = 0; i < _m_judgeIcons.size(); i++) {
         QGraphicsPixmapItem *item = _m_judgeIcons[i];
+        if (item == nullptr)
+            continue;
         QRect start = _m_layout->m_delayedTrickFirstRegion;
         QPoint step = _m_layout->m_delayedTrickStep;
         start.translate(step * i);
@@ -944,11 +984,15 @@ void PlayerCardContainer::addDelayedTricks(QList<CardItem *> &tricks)
         trick->setHomeOpacity(0.0);
         trick->setHomePos(start.center());
         const Card *card = Sanguosha->getEngineCard(trick->getCard()->getEffectiveId());
-        QString toolTip = QString("<font color=#FFFF33><b>%1 [</b><img src='image/system/log/%2.png' height = 12/><b>%3]</b></font>")
-                              .arg(Sanguosha->translate(card->objectName()))
-                              .arg(card->getSuitString())
-                              .arg(card->getNumberString());
-        item->setToolTip(toolTip);
+        if (card != nullptr) {
+            QString toolTip = QString("<font color=#FFFF33><b>%1 [</b><img src='image/system/log/%2.png' height = 12/><b>%3]</b></font>")
+                                  .arg(Sanguosha->translate(card->objectName()))
+                                  .arg(card->getSuitString())
+                                  .arg(card->getNumberString());
+            item->setToolTip(toolTip);
+        } else {
+            qWarning("PlayerCardContainer::addDelayedTricks: engine card is null for effective id %d", trick->getCard()->getEffectiveId());
+        }
         _m_judgeCards.append(trick);
         _m_judgeIcons.append(item);
     }
@@ -1483,9 +1527,10 @@ void PlayerCardContainer::killPlayer()
 void PlayerCardContainer::revivePlayer()
 {
     _m_votesGot = 0;
-    _m_groupMain->setGraphicsEffect(nullptr);
-    Q_ASSERT(_m_deathIcon);
-    _m_deathIcon->hide();
+    if (_m_groupMain != nullptr)
+        _m_groupMain->setGraphicsEffect(nullptr);
+    if (_m_deathIcon != nullptr)
+        _m_deathIcon->hide();
     refresh();
 }
 

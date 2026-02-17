@@ -193,6 +193,21 @@ void Dashboard::_createMiddle()
 
     trusting_item->hide();
     trusting_text->hide();
+
+    spectating_item = new QGraphicsRectItem(this);
+    spectating_text = new QGraphicsSimpleTextItem(tr("Spectating ..."), this);
+
+    QBrush spectating_brush(G_DASHBOARD_LAYOUT.m_trustEffectColor);
+    spectating_item->setBrush(spectating_brush);
+    spectating_item->setOpacity(0.36);
+    spectating_item->setZValue(1002.2);
+
+    spectating_text->setFont(Config.BigFont);
+    spectating_text->setBrush(Qt::white);
+    spectating_text->setZValue(1002.3);
+
+    spectating_item->hide();
+    spectating_text->hide();
 }
 
 void Dashboard::_adjustComponentZValues(bool killed)
@@ -314,6 +329,11 @@ void Dashboard::_updateFrames()
     trusting_item->setRect(rect2);
     trusting_item->setPos(0, 0);
     trusting_text->setPos((rect2.width() - Config.BigFont.pixelSize() * 4.5) / 2, (rect2.height() - Config.BigFont.pixelSize()) / 2);
+    spectating_item->setRect(rect2);
+    spectating_item->setPos(0, 0);
+    spectating_text->setPos(
+        (rect2.width() - spectating_text->boundingRect().width()) / 2,
+        (rect2.height() - spectating_text->boundingRect().height()) / 2);
     _m_rightFrame->setX(_m_width - rwidth);
     Q_ASSERT(button_widget);
     button_widget->setX(rect.width() - getButtonWidgetWidth());
@@ -324,6 +344,12 @@ void Dashboard::setTrust(bool trust)
 {
     trusting_item->setVisible(trust);
     trusting_text->setVisible(trust);
+}
+
+void Dashboard::setSpectating(bool spectating)
+{
+    spectating_item->setVisible(spectating);
+    spectating_text->setVisible(spectating);
 }
 
 void Dashboard::killPlayer()
@@ -356,8 +382,8 @@ void Dashboard::revivePlayer()
 {
     _m_votesGot = 0;
     setGraphicsEffect(nullptr);
-    Q_ASSERT(_m_deathIcon);
-    _m_deathIcon->hide();
+    if (_m_deathIcon != nullptr)
+        _m_deathIcon->hide();
     refresh();
 }
 
@@ -1016,7 +1042,9 @@ QList<CardItem *> Dashboard::removeCardItems(const QList<int> &card_ids, Player:
         card->setAcceptedMouseButtons(nullptr);
     }
 
-    Q_ASSERT(result.size() == card_ids.size());
+    if (result.size() != card_ids.size())
+        qWarning("Dashboard::removeCardItems: result size %d != requested %d (place=%d)",
+                 result.size(), card_ids.size(), static_cast<int>(place));
     if (place == Player::PlaceHand)
         adjustCards();
     else if (result.size() > 1 || place == Player::PlaceSpecial) {

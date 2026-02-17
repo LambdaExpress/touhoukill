@@ -382,6 +382,20 @@ void Photo::playBattleArrayAnimations()
 
 void Photo::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 {
+    // Cross-room spectate: allow perspective switching between virtual players
+    if (ClientInstance->isCrossRoomSpectating() && m_player != nullptr) {
+        if (m_player->isAlive() && m_player != Self) {
+            ClientInstance->requestCrossRoomPerspectiveSwitch(m_player->objectName());
+            return;
+        }
+        if (m_player == Self && RoomSceneInstance->isPerspectiveSwitched()) {
+            // Switch back to original target (Self in cross-room context)
+            ClientInstance->requestCrossRoomPerspectiveSwitch(Self->objectName());
+            return;
+        }
+        return; // Consume event during cross-room spectate
+    }
+
     if (Self != nullptr && m_player != nullptr && !Self->isAlive()) {
         if (m_player->isAlive()) {
             ClientInstance->requestPerspectiveSwitch(m_player->objectName());

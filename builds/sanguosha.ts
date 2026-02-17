@@ -920,6 +920,10 @@
         <translation>托管中 ...</translation>
     </message>
     <message>
+        <source>Spectating ...</source>
+        <translation>正在观战中...</translation>
+    </message>
+    <message>
         <location filename="../src/ui/dashboard.cpp" line="1092"/>
         <source>Sort handcards</source>
         <translation>整理手牌</translation>
@@ -2733,6 +2737,64 @@
         <location filename="../src/ui/roomscene.cpp" line="3725"/>
         <source>Dead</source>
         <translation>阵亡</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/roomscene.cpp" line="407"/>
+        <source>Spectate Other Rooms</source>
+        <translation>观战其他房间</translation>
+    </message>
+</context>
+<context>
+    <name>CrossRoomListDialog</name>
+    <message>
+        <location filename="../src/dialog/crossroomlistdialog.cpp" line="14"/>
+        <source>Cross-room Spectate</source>
+        <translation>跨房间观战</translation>
+    </message>
+    <message>
+        <location filename="../src/dialog/crossroomlistdialog.cpp" line="20"/>
+        <source>Room ID</source>
+        <translation>房间号</translation>
+    </message>
+    <message>
+        <location filename="../src/dialog/crossroomlistdialog.cpp" line="20"/>
+        <source>Mode</source>
+        <translation>模式</translation>
+    </message>
+    <message>
+        <location filename="../src/dialog/crossroomlistdialog.cpp" line="20"/>
+        <source>Players</source>
+        <translation>玩家数</translation>
+    </message>
+    <message>
+        <location filename="../src/dialog/crossroomlistdialog.cpp" line="31"/>
+        <source>Select a player to spectate:</source>
+        <translation>选择要观战的玩家：</translation>
+    </message>
+    <message>
+        <location filename="../src/dialog/crossroomlistdialog.cpp" line="35"/>
+        <source>Player</source>
+        <translation>玩家</translation>
+    </message>
+    <message>
+        <location filename="../src/dialog/crossroomlistdialog.cpp" line="35"/>
+        <source>Screen Name</source>
+        <translation>昵称</translation>
+    </message>
+    <message>
+        <location filename="../src/dialog/crossroomlistdialog.cpp" line="35"/>
+        <source>General</source>
+        <translation>武将</translation>
+    </message>
+    <message>
+        <location filename="../src/dialog/crossroomlistdialog.cpp" line="44"/>
+        <source>Spectate</source>
+        <translation>观战</translation>
+    </message>
+    <message>
+        <location filename="../src/dialog/crossroomlistdialog.cpp" line="45"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
     </message>
 </context>
 <context>

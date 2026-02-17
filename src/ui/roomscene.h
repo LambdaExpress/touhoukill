@@ -19,6 +19,8 @@ class CardContainer;
 class GuanxingBox;
 class QSanButton;
 class QGroupBox;
+class QLabel;
+class QPushButton;
 struct RoomLayout;
 class BubbleChatBox;
 class ChooseGeneralBox;
@@ -34,6 +36,7 @@ class PlayerCardBox;
 #include <QHBoxLayout>
 #include <QMainWindow>
 #include <QMutex>
+#include <QPointer>
 #include <QSpinBox>
 #include <QStack>
 #include <QTableWidget>
@@ -275,6 +278,13 @@ public slots:
     void anyunSelectSkill(); //for anyun
     void addlog(const QStringList &l); //for client test
     void doSkinChange(const QString &generalName, int skinIndex);
+
+    // Cross-room spectate UI slots
+    void showCrossRoomListDialog(const QVariantList &rooms);
+    void onCrossRoomSpectateRequested(int roomId, const QString &targetObjectName);
+    void onCrossRoomSpectateStarted(const QVariantMap &snapshotPayload);
+    void onCrossRoomSpectateEnded(const QString &reason);
+
     inline QPointF tableCenterPos()
     {
         return m_tableCenterPos;
@@ -310,9 +320,11 @@ private:
     const ClientPlayer *dashboardPlayer() const;
     void refreshItem2PlayerMap();
     void applyPerspectiveInputLock(bool locked);
-    QMap<int, QList<QList<CardItem *>>> _m_cardsMoveStash;
+    void clearPendingMoveStash();
+    QMap<int, QList<QList<QPointer<CardItem>>>> _m_cardsMoveStash;
     Button *add_robot;
     Button *fill_robots;
+    Button *spectate_other_rooms;
     Button *return_to_main_menu;
     QList<Photo *> photos;
     QMap<QString, Photo *> name2photo;
@@ -331,6 +343,17 @@ private:
     CardItem *pindian_to_card;
     QGraphicsItem *control_panel;
     QMap<PlayerCardContainer *, const ClientPlayer *> item2player;
+
+    // Cross-room spectate scene state (saved when entering, restored when leaving)
+    bool m_crossRoomSceneActive = false;
+    QMap<QString, Photo *> m_savedName2photo;
+    QList<Photo *> m_savedPhotosOrder;
+    QHash<Photo *, const ClientPlayer *> m_savedPhotoPlayers;
+    QHash<Photo *, bool> m_savedPhotoVisibility;
+    QList<Photo *> m_crossRoomAddedPhotos;
+    const ClientPlayer *m_savedDashboardPlayer = nullptr;
+    QString m_savedLordName;
+    bool m_savedGameStarted = false;
     QDialog *m_choiceDialog; // Dialog for choosing generals, suits, card/equip, or kingdoms
 
     QGraphicsRectItem *pausing_item;

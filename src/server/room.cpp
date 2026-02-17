@@ -1,6 +1,7 @@
 #include "room.h"
 #include "ai.h"
 #include "audio.h"
+#include "crossroomspectatemanager.h"
 #include "engine.h"
 #include "gamerule.h"
 #include "generalselector.h"
@@ -55,6 +56,7 @@ Room::Room(QObject *parent, const QString &mode)
     , provider(nullptr)
     , m_fillAGWho(nullptr)
     , m_perspectiveSyncSerial(0)
+    , m_roomTearingDownEmitted(false)
 {
     static int s_global_room_id = 0;
     _m_Id = s_global_room_id++;
@@ -77,6 +79,10 @@ Room::Room(QObject *parent, const QString &mode)
 
 Room::~Room()
 {
+    if (!m_roomTearingDownEmitted) {
+        m_roomTearingDownEmitted = true;
+        emit roomTearingDown(_m_Id);
+    }
     lua_close(L); // it cause a huge memory leak if we don't do this when quit
 }
 
@@ -107,6 +113,10 @@ void Room::initCallbacks()
     m_callbacks[S_COMMAND_NETWORK_DELAY_TEST] = &Room::networkDelayTestCommand;
     m_callbacks[S_COMMAND_PRESHOW] = &Room::processRequestPreshow;
     m_callbacks[S_COMMAND_PERSPECTIVE_REQUEST] = &Room::spectateCommand;
+    m_callbacks[S_COMMAND_CROSS_ROOM_LIST_REQUEST] = &Room::crossRoomListCommand;
+    m_callbacks[S_COMMAND_CROSS_ROOM_SPECTATE_START] = &Room::crossRoomSpectateStartCommand;
+    m_callbacks[S_COMMAND_CROSS_ROOM_SPECTATE_STOP] = &Room::crossRoomSpectateStopCommand;
+    m_callbacks[S_COMMAND_CROSS_ROOM_SWITCH_TARGET] = &Room::crossRoomSwitchTargetCommand;
 }
 
 ServerPlayer *Room::getCurrent() const
@@ -561,6 +571,13 @@ void Room::gameOver(const QString &winner, bool isSurrender)
     }
 
     game_finished = true;
+
+    // Notify cross-room spectate manager before broadcasting game over
+    if (!m_roomTearingDownEmitted) {
+        m_roomTearingDownEmitted = true;
+        emit roomTearingDown(_m_Id);
+    }
+
     saveWinnerTable(winner, isSurrender);
 
     //defaultHeroSkin();
@@ -922,6 +939,14 @@ bool Room::doNotify(ServerPlayer *player, QSanProtocol::CommandType command, con
     Packet packet(S_SRC_ROOM | S_TYPE_NOTIFICATION | S_DEST_CLIENT, command);
     packet.setMessageBody(arg);
     player->invoke(&packet);
+
+    // Cross-room spectate tap: only fire when this recipient is being watched.
+    // Atomic load is lock-free; mutex is only acquired when observers exist.
+    if (m_crossRoomObserverCount.loadAcquire() > 0) {
+        QMutexLocker locker(&m_crossRoomObserverMutex);
+        if (m_crossRoomObserverRefCount.contains(player->objectName()))
+            emit crossRoomNotify(_m_Id, player->objectName(), static_cast<int>(command), arg);
+    }
     return true;
 }
 
@@ -934,7 +959,20 @@ bool Room::doBroadcastNotify(const QList<ServerPlayer *> &players, QSanProtocol:
 
 bool Room::doBroadcastNotify(QSanProtocol::CommandType command, const QVariant &arg)
 {
-    return doBroadcastNotify(m_players, command, arg);
+    // Send to all players directly (bypassing doNotify's per-player tap) so that
+    // cross-room forwarding happens exactly once via crossRoomBroadcast below,
+    // avoiding duplicate events in the spectate stream.
+    Packet packet(S_SRC_ROOM | S_TYPE_NOTIFICATION | S_DEST_CLIENT, command);
+    packet.setMessageBody(arg);
+    foreach (ServerPlayer *player, m_players)
+        player->invoke(&packet);
+
+    // Cross-room spectate tap: forward broadcast to all cross-room observers of this room.
+    // Atomic load is lock-free; no mutex needed since we only check existence, not iterate.
+    if (m_crossRoomObserverCount.loadAcquire() > 0)
+        emit crossRoomBroadcast(_m_Id, static_cast<int>(command), arg);
+
+    return true;
 }
 
 // the following functions for Lua
@@ -3196,6 +3234,12 @@ void Room::toggleReadyCommand(ServerPlayer * /*unused*/, const QVariant & /*unus
 {
     if (!game_started2 && isFull()) {
         game_started2 = true;
+
+        // Stop any cross-room spectate sessions for players in this room
+        Server *server = qobject_cast<Server *>(parent());
+        if (server != nullptr && server->crossRoomSpectateManager() != nullptr)
+            server->crossRoomSpectateManager()->stopSessionsBySourceRoom(_m_Id, "SOURCE_ROOM_STARTING");
+
         thread = new RoomThread(this);
         thread->start();
     }
@@ -5272,8 +5316,20 @@ bool Room::notifyMoveCards(bool isLostPhase, QList<CardsMoveStruct> cards_moves,
         moveId = --_m_lastMovementId;
     Q_ASSERT(_m_lastMovementId >= 0);
     foreach (ServerPlayer *player, players) {
-        if (player->isOffline())
-            continue;
+        bool offline = player->isOffline();
+        bool hasCrossRoomObservers = false;
+
+        // For offline players, only proceed if they have cross-room observers;
+        // otherwise there is no recipient for the notification.
+        if (offline) {
+            if (m_crossRoomObserverCount.loadAcquire() > 0) {
+                QMutexLocker locker(&m_crossRoomObserverMutex);
+                hasCrossRoomObservers = m_crossRoomObserverRefCount.contains(player->objectName());
+            }
+            if (!hasCrossRoomObservers)
+                continue;
+        }
+
         JsonArray arg;
         arg << moveId;
         for (int i = 0; i < cards_moves.size(); i++) {
@@ -5312,7 +5368,15 @@ bool Room::notifyMoveCards(bool isLostPhase, QList<CardsMoveStruct> cards_moves,
 
             arg << cards_moves[i].toVariant();
         }
-        doNotify(player, isLostPhase ? S_COMMAND_LOSE_CARD : S_COMMAND_GET_CARD, arg);
+
+        if (!offline) {
+            doNotify(player, isLostPhase ? S_COMMAND_LOSE_CARD : S_COMMAND_GET_CARD, arg);
+        } else {
+            // Player is offline but has cross-room observers — emit signal directly,
+            // bypassing the unnecessary invoke() -> unicast() -> sendMessage() chain.
+            QSanProtocol::CommandType command = isLostPhase ? S_COMMAND_LOSE_CARD : S_COMMAND_GET_CARD;
+            emit crossRoomNotify(_m_Id, player->objectName(), static_cast<int>(command), QVariant(arg));
+        }
     }
     return true;
 }
@@ -5363,19 +5427,20 @@ Room::PerspectiveSource Room::getPerspectiveSource(ServerPlayer *viewer) const
     return m_perspectiveViewers.value(viewer).source;
 }
 
-void Room::sendPerspectiveSync(ServerPlayer *viewer, ServerPlayer *target)
+QVariant Room::buildPerspectiveSyncData(const QString &targetObjectName) const
 {
-    m_perspectiveSyncSerial++;
+    JsonArray data;
+    ServerPlayer *target = findPlayerByObjectName(targetObjectName);
+    if (target == nullptr)
+        return QVariant(data);
 
-    JsonArray arg;
-    arg << m_perspectiveSyncSerial;
-    arg << target->objectName();
-    arg << JsonUtils::toJsonArray(target->handCards());
+    data << target->objectName();
+    data << JsonUtils::toJsonArray(target->handCards());
 
     JsonObject pilesObj;
     foreach (const QString &pileName, target->getPileNames())
         pilesObj[pileName] = JsonUtils::toJsonArray(target->getPile(pileName));
-    arg << QVariant(pilesObj);
+    data << QVariant(pilesObj);
 
     // Modified card info, reusing notifyUpdateCard's serialization format
     JsonArray modifiedCards;
@@ -5394,7 +5459,28 @@ void Room::sendPerspectiveSync(ServerPlayer *viewer, ServerPlayer *target)
         foreach (int cardId, target->getPile(pileName))
             appendModified(cardId);
     }
-    arg << QVariant(modifiedCards);
+    data << QVariant(modifiedCards);
+
+    return QVariant(data);
+}
+
+void Room::sendPerspectiveSync(ServerPlayer *viewer, ServerPlayer *target)
+{
+    if (viewer == nullptr || target == nullptr)
+        return;
+
+    m_perspectiveSyncSerial++;
+
+    JsonArray syncData = buildPerspectiveSyncData(target->objectName()).value<JsonArray>();
+    if (syncData.size() < 4)
+        return;
+
+    JsonArray arg;
+    arg << m_perspectiveSyncSerial;
+    arg << syncData.at(0);
+    arg << syncData.at(1);
+    arg << syncData.at(2);
+    arg << syncData.at(3);
 
     notifyProperty(viewer, target, "chaoren");
     doNotify(viewer, S_COMMAND_PERSPECTIVE_SYNC, arg);
@@ -5466,6 +5552,207 @@ ServerPlayer *Room::getProxiedPlayer(ServerPlayer *proxy) const
     // Future: reverse lookup of getCommandProxy.
     Q_UNUSED(proxy);
     return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// Cross-room spectate support
+// ---------------------------------------------------------------------------
+
+bool Room::hasStarted() const
+{
+    return game_started;
+}
+
+void Room::crossRoomListCommand(ServerPlayer *player, const QVariant &arg)
+{
+    Q_UNUSED(arg);
+    Server *server = qobject_cast<Server *>(parent());
+    if (server != nullptr && server->crossRoomSpectateManager() != nullptr)
+        server->crossRoomSpectateManager()->handleCrossRoomCommand(player, S_COMMAND_CROSS_ROOM_LIST_REQUEST, QVariant());
+}
+
+void Room::crossRoomSpectateStartCommand(ServerPlayer *player, const QVariant &arg)
+{
+    Server *server = qobject_cast<Server *>(parent());
+    if (server != nullptr && server->crossRoomSpectateManager() != nullptr)
+        server->crossRoomSpectateManager()->handleCrossRoomCommand(player, S_COMMAND_CROSS_ROOM_SPECTATE_START, arg);
+}
+
+void Room::crossRoomSpectateStopCommand(ServerPlayer *player, const QVariant &arg)
+{
+    Q_UNUSED(arg);
+    Server *server = qobject_cast<Server *>(parent());
+    if (server != nullptr && server->crossRoomSpectateManager() != nullptr)
+        server->crossRoomSpectateManager()->handleCrossRoomCommand(player, S_COMMAND_CROSS_ROOM_SPECTATE_STOP, QVariant());
+}
+
+void Room::crossRoomSwitchTargetCommand(ServerPlayer *player, const QVariant &arg)
+{
+    Server *server = qobject_cast<Server *>(parent());
+    if (server != nullptr && server->crossRoomSpectateManager() != nullptr)
+        server->crossRoomSpectateManager()->handleCrossRoomCommand(player, S_COMMAND_CROSS_ROOM_SWITCH_TARGET, arg);
+}
+
+void Room::addCrossRoomObserver(const QString &targetObjectName)
+{
+    QMutexLocker locker(&m_crossRoomObserverMutex);
+    m_crossRoomObserverRefCount[targetObjectName]++;
+    m_crossRoomObserverCount.fetchAndAddRelease(1);
+}
+
+void Room::removeCrossRoomObserver(const QString &targetObjectName)
+{
+    QMutexLocker locker(&m_crossRoomObserverMutex);
+    auto it = m_crossRoomObserverRefCount.find(targetObjectName);
+    if (it == m_crossRoomObserverRefCount.end())
+        return;
+    it.value()--;
+    m_crossRoomObserverCount.fetchAndAddRelease(-1);
+    if (it.value() <= 0)
+        m_crossRoomObserverRefCount.erase(it);
+}
+
+QVariantMap Room::buildCrossRoomSnapshot(const QString &targetObjectName) const
+{
+    JsonObject snapshot;
+
+    // Room metadata
+    snapshot["roomId"] = _m_Id;
+    snapshot["mode"] = mode;
+
+    // All players' public properties
+    JsonArray playersArray;
+    foreach (ServerPlayer *p, m_players) {
+        JsonObject pObj;
+        pObj["objectName"] = p->objectName();
+        pObj["screenName"] = p->screenName();
+        pObj["generalName"] = p->getGeneralName();
+        pObj["general2Name"] = p->getGeneral2Name();
+        pObj["kingdom"] = p->getKingdom();
+        pObj["role"] = p->getRole();
+        pObj["roleShown"] = p->hasShownRole();
+        pObj["hp"] = p->getHp();
+        pObj["maxHp"] = p->getMaxHp();
+        pObj["renHp"] = p->getRenHp();
+        pObj["lingHp"] = p->getLingHp();
+        pObj["chaoren"] = p->getChaoren();
+        pObj["alive"] = p->isAlive();
+        pObj["removed"] = p->isRemoved();
+        pObj["seat"] = p->getSeat();
+        pObj["phase"] = static_cast<int>(p->getPhase());
+        pObj["faceUp"] = p->faceUp();
+        pObj["chained"] = p->isChained();
+        pObj["handcardNum"] = p->getHandcardNum();
+        pObj["generalShowed"] = p->hasShownGeneral();
+        pObj["general2Showed"] = p->hasShownGeneral2();
+
+        // Equips
+        JsonArray equips;
+        if (p->getWeapon() != nullptr) equips << p->getWeapon()->getId();
+        if (p->getArmor() != nullptr) equips << p->getArmor()->getId();
+        if (p->getDefensiveHorse() != nullptr) equips << p->getDefensiveHorse()->getId();
+        if (p->getOffensiveHorse() != nullptr) equips << p->getOffensiveHorse()->getId();
+        if (p->getTreasure() != nullptr) equips << p->getTreasure()->getId();
+        pObj["equips"] = QVariant(equips);
+
+        // Delayed trick (judge area)
+        pObj["judgeArea"] = JsonUtils::toJsonArray(p->getJudgingAreaID());
+
+        // Shown handcards & broken equips
+        pObj["shownHandcards"] = JsonUtils::toJsonArray(p->getShownHandcards());
+        pObj["brokenEquips"] = JsonUtils::toJsonArray(p->getBrokenEquips());
+
+        // Piles (all players, not just target)
+        JsonObject playerPilesObj;
+        foreach (const QString &pileName, p->getPileNames())
+            playerPilesObj[pileName] = JsonUtils::toJsonArray(p->getPile(pileName));
+        pObj["piles"] = QVariant(playerPilesObj);
+
+        // Pile visibility
+        JsonObject pileOpenObj;
+        foreach (const QString &pileName, p->getPileNames()) {
+            QStringList openPlayers;
+            foreach (ServerPlayer *viewer, m_players) {
+                if (p->pileOpen(pileName, viewer->objectName()))
+                    openPlayers << viewer->objectName();
+            }
+            if (!openPlayers.isEmpty())
+                pileOpenObj[pileName] = JsonUtils::toJsonArray(openPlayers);
+        }
+        pObj["pileOpen"] = QVariant(pileOpenObj);
+
+        // Marks (all non-zero marks, not just @-prefixed)
+        JsonObject marks;
+        QMap<QString, int> markMap = p->getMarkMap();
+        for (auto it = markMap.constBegin(); it != markMap.constEnd(); ++it) {
+            if (it.value() != 0)
+                marks[it.key()] = it.value();
+        }
+        pObj["marks"] = QVariant(marks);
+
+        // Acquired skills (head / deputy separated)
+        QStringList acquiredHeadSkills = p->getAcquiredHeadSkills().toList();
+        QStringList acquiredDeputySkills = p->getAcquiredDeputySkills().toList();
+        pObj["acquiredHeadSkills"] = JsonUtils::toJsonArray(acquiredHeadSkills);
+        pObj["acquiredDeputySkills"] = JsonUtils::toJsonArray(acquiredDeputySkills);
+
+        // Hidden generals (hegemony)
+        pObj["hiddenGenerals"] = JsonUtils::toJsonArray(p->getHiddenGenerals());
+        pObj["shownHiddenGeneral"] = p->getShownHiddenGeneral();
+
+        // Skill invalidity & disable-show
+        pObj["skillInvalid"] = JsonUtils::toJsonArray(p->getSkillInvalidityList());
+        pObj["disableShow"] = JsonUtils::toJsonArray(p->getDisableShowList());
+
+        // Flags
+        pObj["flags"] = JsonUtils::toJsonArray(p->getFlagList());
+
+        playersArray << QVariant(pObj);
+    }
+    snapshot["players"] = QVariant(playersArray);
+
+    // Target player's private info (hand cards, modified cards)
+    ServerPlayer *target = findPlayerByObjectName(targetObjectName);
+    if (target != nullptr) {
+        snapshot["targetName"] = targetObjectName;
+        snapshot["handCards"] = JsonUtils::toJsonArray(target->handCards());
+
+        // Modified card info for all visible cards (same format as sendPerspectiveSync)
+        JsonArray modifiedCards;
+        QSet<int> seenCardIds;
+        auto appendModified = [&](int cardId) {
+            if (cardId < 0 || seenCardIds.contains(cardId))
+                return;
+            seenCardIds.insert(cardId);
+            Card *card = getCard(cardId);
+            if (card != nullptr && card->isModified()) {
+                JsonArray cardInfo;
+                cardInfo << cardId << card->getSuit() << card->getNumber()
+                         << card->getClassName() << card->getSkillName()
+                         << card->objectName() << JsonUtils::toJsonArray(card->getFlags());
+                modifiedCards << QVariant(cardInfo);
+            }
+        };
+        // Target's hand cards and piles
+        foreach (int cardId, target->handCards())
+            appendModified(cardId);
+        foreach (const QString &pileName, target->getPileNames()) {
+            foreach (int cardId, target->getPile(pileName))
+                appendModified(cardId);
+        }
+        // All players' equips and judge area cards
+        foreach (ServerPlayer *p, m_players) {
+            foreach (const Card *equip, p->getEquips()) {
+                if (equip != nullptr)
+                    appendModified(equip->getEffectiveId());
+            }
+            foreach (int cardId, p->getJudgingAreaID())
+                appendModified(cardId);
+        }
+        snapshot["modifiedCards"] = QVariant(modifiedCards);
+    }
+
+    return snapshot;
 }
 
 void Room::notifySkillInvoked(ServerPlayer *player, const QString &skill_name)

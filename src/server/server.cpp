@@ -1,6 +1,7 @@
 #include "server.h"
 #include "SkinBank.h"
 #include "choosegeneraldialog.h"
+#include "crossroomspectatemanager.h"
 #include "engine.h"
 #include "nativesocket.h"
 #include "protocol.h"
@@ -1032,6 +1033,8 @@ Server::Server(QObject *parent)
     server = new NativeServerSocket;
     server->setParent(this);
 
+    m_crossRoomSpectate = new CrossRoomSpectateManager(this);
+
     //synchronize ServerInfo on the server side to avoid ambiguous usage of Config and ServerInfo
     ServerInfo.parse(Sanguosha->getSetupString());
 
@@ -1076,6 +1079,17 @@ Room *Server::createNewRoom()
 
     connect(current, SIGNAL(room_message(QString)), this, SIGNAL(server_message(QString)));
     connect(current, SIGNAL(game_over(QString)), this, SLOT(gameOver()));
+
+    // Cross-room spectate tap signals (Qt::QueuedConnection for thread safety)
+    connect(current, &Room::crossRoomNotify,
+            m_crossRoomSpectate, &CrossRoomSpectateManager::onTargetNotify,
+            Qt::QueuedConnection);
+    connect(current, &Room::crossRoomBroadcast,
+            m_crossRoomSpectate, &CrossRoomSpectateManager::onBroadcastNotify,
+            Qt::QueuedConnection);
+    connect(current, &Room::roomTearingDown,
+            m_crossRoomSpectate, &CrossRoomSpectateManager::onRoomTeardown,
+            Qt::QueuedConnection);
 
     return current;
 }
@@ -1292,4 +1306,23 @@ void Server::gameOver()
         name2objname.remove(player->screenName(), player->objectName());
         players.remove(player->objectName());
     }
+}
+
+Room *Server::findRoomById(int roomId) const
+{
+    foreach (Room *room, rooms) {
+        if (room->getId() == roomId)
+            return room;
+    }
+    return nullptr;
+}
+
+QList<Room *> Server::getRooms() const
+{
+    return rooms.toList();
+}
+
+CrossRoomSpectateManager *Server::crossRoomSpectateManager() const
+{
+    return m_crossRoomSpectate;
 }

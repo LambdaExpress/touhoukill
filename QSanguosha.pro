@@ -50,6 +50,7 @@ SOURCES += \
     src/dialog/choosegeneraldialog.cpp \
     src/dialog/configdialog.cpp \
     src/dialog/connectiondialog.cpp \
+    src/dialog/crossroomlistdialog.cpp \
     src/dialog/distanceviewdialog.cpp \
     src/dialog/generaloverview.cpp \
     src/dialog/updatedialog.cpp \
@@ -83,6 +84,7 @@ SOURCES += \
     src/package/hegemonyGeneral.cpp \
     src/package/washout.cpp \
     src/server/ai.cpp \
+    src/server/crossroomspectatemanager.cpp \
     src/server/gamerule.cpp \
     src/server/generalselector.cpp \
     src/server/room.cpp \
@@ -160,6 +162,7 @@ HEADERS += \
     src/dialog/choosegeneraldialog.h \
     src/dialog/configdialog.h \
     src/dialog/connectiondialog.h \
+    src/dialog/crossroomlistdialog.h \
     src/dialog/distanceviewdialog.h \
     src/dialog/generaloverview.h \
     src/dialog/updatedialog.h \
@@ -193,6 +196,7 @@ HEADERS += \
     src/package/hegemonyGeneral.h \
     src/package/washout.h \
     src/server/ai.h \
+    src/server/crossroomspectatemanager.h \
     src/server/gamerule.h \
     src/server/generalselector.h \
     src/server/room.h \
