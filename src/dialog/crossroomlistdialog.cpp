@@ -1,4 +1,5 @@
 #include "crossroomlistdialog.h"
+#include "engine.h"
 
 #include <QAbstractItemView>
 #include <QHBoxLayout>
@@ -31,8 +32,8 @@ CrossRoomListDialog::CrossRoomListDialog(QWidget *parent)
     QLabel *playerLabel = new QLabel(tr("Select a player to spectate:"), this);
 
     m_playerTable = new QTableWidget(this);
-    m_playerTable->setColumnCount(3);
-    m_playerTable->setHorizontalHeaderLabels(QStringList() << tr("Player") << tr("Screen Name") << tr("General"));
+    m_playerTable->setColumnCount(2);
+    m_playerTable->setHorizontalHeaderLabels(QStringList() << tr("Screen Name") << tr("General"));
     m_playerTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_playerTable->setSelectionMode(QAbstractItemView::SingleSelection);
     m_playerTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -78,7 +79,7 @@ void CrossRoomListDialog::setRoomList(const QVariantList &rooms)
         idItem->setData(Qt::UserRole + 1, room.value("players"));
 
         m_roomTable->setItem(i, 0, idItem);
-        m_roomTable->setItem(i, 1, new QTableWidgetItem(room.value("mode").toString()));
+        m_roomTable->setItem(i, 1, new QTableWidgetItem(Sanguosha->getModeName(room.value("mode").toString())));
         m_roomTable->setItem(i, 2, new QTableWidgetItem(QString::number(room.value("playerCount").toInt())));
     }
 
@@ -126,9 +127,10 @@ void CrossRoomListDialog::updatePlayerTable(const QVariantList &players)
 
     for (int i = 0; i < players.size(); ++i) {
         QVariantMap p = players.at(i).toMap();
-        m_playerTable->setItem(i, 0, new QTableWidgetItem(p.value("objectName").toString()));
-        m_playerTable->setItem(i, 1, new QTableWidgetItem(p.value("screenName").toString()));
-        m_playerTable->setItem(i, 2, new QTableWidgetItem(p.value("generalName").toString()));
+        QTableWidgetItem *screenNameItem = new QTableWidgetItem(p.value("screenName").toString());
+        screenNameItem->setData(Qt::UserRole, p.value("objectName").toString());
+        m_playerTable->setItem(i, 0, screenNameItem);
+        m_playerTable->setItem(i, 1, new QTableWidgetItem(Sanguosha->translate(p.value("generalName").toString())));
     }
 
     if (m_playerTable->rowCount() > 0)
@@ -156,5 +158,5 @@ int CrossRoomListDialog::currentRoomId() const
 QString CrossRoomListDialog::currentTargetObjectName() const
 {
     QTableWidgetItem *item = m_playerTable->item(m_playerTable->currentRow(), 0);
-    return (item != nullptr) ? item->text() : QString();
+    return (item != nullptr) ? item->data(Qt::UserRole).toString() : QString();
 }

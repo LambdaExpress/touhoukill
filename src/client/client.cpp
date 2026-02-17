@@ -1865,9 +1865,16 @@ void Client::crossRoomSpectateEvent(const QVariant &arg)
 
     CommandType commandType = static_cast<CommandType>(command);
 
-    // Never dispatch interactive commands during cross-room spectate
+    // Never dispatch interactive commands during cross-room spectate,
+    // except commands that also have safe notification callbacks.
     if (m_interactions.contains(commandType)) {
-        return;
+        switch (commandType) {
+        case S_COMMAND_SHOW_CARD:
+        case S_COMMAND_INVOKE_SKILL:
+            break;
+        default:
+            return;
+        }
     }
 
     // Blacklist commands that would corrupt connection or player-list state.
@@ -2659,6 +2666,8 @@ void Client::showCard(const QVariant &show_str)
     int card_id = show[1].toInt();
 
     ClientPlayer *player = getPlayer(player_name);
+    if (player == nullptr)
+        return;
     if (player != Self)
         player->addKnownHandCard(Sanguosha->getCard(card_id));
 
