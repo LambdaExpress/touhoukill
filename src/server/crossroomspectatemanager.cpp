@@ -89,16 +89,14 @@ void CrossRoomSpectateManager::handleStartRequest(ServerPlayer *player, const QV
     if (targetPlayer == nullptr || !targetPlayer->isAlive())
         return;
 
-    // Register observer ref count on the target room
-    targetRoom->addCrossRoomObserver(targetObjectName);
-
-    // Build the initial snapshot while we still have access to the target room.
+    // Build the snapshot BEFORE registering the observer to avoid double-counting:
+    // if we register first, state changes between registration and snapshot read would
+    // be both captured in the snapshot (absolute values) and forwarded as delta events.
     // NOTE: This is a cross-thread read — the target room's game thread may be modifying
-    // state concurrently. This is a known limitation: the snapshot is best-effort, and any
-    // slight inconsistencies will be corrected by the incremental event stream that follows.
-    // A fully safe alternative (BlockingQueuedConnection to the target RoomThread) is not
-    // feasible because RoomThread runs a game loop, not a Qt event loop.
+    // state concurrently. The tiny window between snapshot and registration may lose events,
+    // but this is preferable to double-counting which causes persistent state drift.
     QVariantMap snapshot = targetRoom->buildCrossRoomSnapshot(targetObjectName);
+    targetRoom->addCrossRoomObserver(targetObjectName);
 
     // Create session
     QString sessionId = QUuid::createUuid().toString();
