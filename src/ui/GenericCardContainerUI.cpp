@@ -684,7 +684,7 @@ void PlayerCardContainer::repaintAll()
         m_changeSecondaryHeroSkinBtn->setPos(_m_layout->m_changeSecondaryHeroSkinBtnPos);
     }
 
-    if (_m_seatItem != nullptr) {
+    if (_m_seatItem != nullptr && m_player != nullptr) {
         _paintPixmap(_m_seatItem, _m_layout->m_seatIconRegion, _getPixmap(QSanRoomSkin::S_SKIN_KEY_SEAT_NUMBER, QString::number(m_player->getInitialSeat())), _getAvatarParent());
         if (ServerInfo.Enable2ndGeneral && getPlayer() == Self)
             _paintPixmap(_m_seatItem, _m_layout->m_seatIconRegionDouble, _getPixmap(QSanRoomSkin::S_SKIN_KEY_SEAT_NUMBER, QString::number(m_player->getInitialSeat())),

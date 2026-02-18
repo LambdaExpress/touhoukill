@@ -1265,9 +1265,11 @@ void RoomScene::updateTable()
     } else if (ServerInfo.GameMode == "04_2v2" && game_started && dp_seat != nullptr) {
         seatToRegion = happy2v2SeatIndex[(dp_seat->getSeat() - 1) % 2];
         pkMode = true;
-    } else {
+    } else if (!photos.isEmpty()) {
         seatToRegion = regularSeatIndex[photos.length() - 1];
     }
+    if (seatToRegion == nullptr)
+        return;
     QList<Photo *> photosInRegion[C_NUM_REGIONS];
     int n = photos.length();
     for (int i = 0; i < n; i++) {
@@ -5759,11 +5761,26 @@ void RoomScene::onCrossRoomSpectateEnded(const QString &reason)
     if (m_crossRoomSceneActive) {
         dashboard->setSpectating(false);
         clearPendingMoveStash();
+        // Hide all game overlay widgets that may have been shown during spectate
         m_tablePile->clear();
-        if (pileContainer->isVisible())
+        if (pileContainer->isVisible()) {
             pileContainer->clear();
+            pileContainer->hide();
+        }
+        if (card_container->isVisible()) {
+            card_container->clear();
+            card_container->hide();
+        }
+        prompt_box->setOpacity(0);
+        pindian_box->setOpacity(0);
+        guanxing_box->clear();
         clearPerspectiveSensitiveAnimations();
         applyPerspectiveInputLock(false);
+
+        // Stop residual HuaShen animation on the proxy photo that
+        // exitPerspectiveView() would have cleaned up.
+        if (m_isPerspectiveSwitched && m_perspectiveProxyPhoto != nullptr)
+            m_perspectiveProxyPhoto->stopHuaShen();
 
         // Remove dynamically created Photos
         foreach (Photo *photo, m_crossRoomAddedPhotos) {
