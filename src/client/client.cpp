@@ -1952,9 +1952,12 @@ void Client::crossRoomSpectateEnded(const QVariant &arg)
 
     emit cross_room_spectate_ended(reason);
 
-    // Delete virtual players after signal handlers have finished restoring state
-    foreach (ClientPlayer *vp, staleVirtualPlayers)
-        vp->deleteLater();
+    // Delete virtual players immediately — all signal connections were already
+    // disconnected by setPlayer() in the onCrossRoomSpectateEnded handler.
+    // Using deleteLater() would leave stale objects alive if the next spectate
+    // cycle starts before the event loop flushes deferred deletes, causing UAF
+    // when _m_roomState.reset() destroys the WrappedCards they still reference.
+    qDeleteAll(staleVirtualPlayers);
 
 }
 
