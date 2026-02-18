@@ -5762,7 +5762,7 @@ void RoomScene::onCrossRoomSpectateEnded(const QString &reason)
         dashboard->setSpectating(false);
         clearPendingMoveStash();
         // Hide all game overlay widgets that may have been shown during spectate
-        m_tablePile->clear();
+        m_tablePile->clear(false);
         if (pileContainer->isVisible()) {
             pileContainer->clear();
             pileContainer->hide();
