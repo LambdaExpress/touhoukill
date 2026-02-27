@@ -57,6 +57,7 @@ private:
     QVariantList buildRoomListPayload() const;
     void sendToViewer(ServerPlayer *viewer, QSanProtocol::CommandType command, const QVariant &arg);
     void removeSession(const QString &viewerObjectName, const QString &reason);
+    void autoSwitchDeadTarget(const QString &deadPlayerName, int roomId);
 
     Server *m_server;
 
