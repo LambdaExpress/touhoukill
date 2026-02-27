@@ -296,6 +296,13 @@ void CrossRoomSpectateManager::onBroadcastNotify(int roomId, int command, const 
     // Clean up stale sessions (viewer disconnected / destroyed)
     foreach (const QString &viewerName, staleViewers)
         removeSession(viewerName, "VIEWER_DISCONNECTED");
+
+    // Auto-switch viewers whose spectate target was killed
+    if (command == S_COMMAND_KILL_PLAYER) {
+        QString deadPlayerName = arg.toString();
+        if (!deadPlayerName.isEmpty())
+            autoSwitchDeadTarget(deadPlayerName, roomId);
+    }
 }
 
 void CrossRoomSpectateManager::onRoomTeardown(int roomId)
@@ -353,6 +360,108 @@ void CrossRoomSpectateManager::removeSession(const QString &viewerObjectName, co
         endPayload["reason"] = reason;
         sendToViewer(viewer, S_COMMAND_CROSS_ROOM_SPECTATE_ENDED, QVariant(endPayload));
     }
+}
+
+void CrossRoomSpectateManager::autoSwitchDeadTarget(const QString &deadPlayerName, int roomId)
+{
+    // Collect viewers whose target matches the dead player
+    QList<QString> affectedViewers;
+    {
+        QReadLocker locker(&m_lock);
+        QList<QString> viewers = m_viewersByTargetRoom.values(roomId);
+        foreach (const QString &viewerName, viewers) {
+            auto it = m_sessionsByViewer.constFind(viewerName);
+            if (it != m_sessionsByViewer.constEnd() && it.value().targetObjectName == deadPlayerName)
+                affectedViewers << viewerName;
+        }
+    }
+
+    if (affectedViewers.isEmpty())
+        return;
+
+    // Find the target room and pick the next alive player
+    Room *targetRoom = m_server->findRoomById(roomId);
+    if (targetRoom == nullptr) {
+        foreach (const QString &viewerName, affectedViewers)
+            removeSession(viewerName, "ALL_TARGETS_DEAD");
+        return;
+    }
+
+    // Cross-thread best-effort read: getAlivePlayers() returns a COW snapshot of
+    // m_alivePlayers which is mutated by RoomThread.  Extract objectNames immediately
+    // so we never dereference ServerPlayer* pointers outside this narrow window.
+    QStringList aliveNames;
+    foreach (ServerPlayer *p, targetRoom->getAlivePlayers())
+        aliveNames << p->objectName();
+
+    QString newTargetName;
+    foreach (const QString &name, aliveNames) {
+        if (name != deadPlayerName) {
+            newTargetName = name;
+            break;
+        }
+    }
+
+    if (newTargetName.isEmpty()) {
+        foreach (const QString &viewerName, affectedViewers)
+            removeSession(viewerName, "ALL_TARGETS_DEAD");
+        return;
+    }
+
+    // Build sync data outside any lock (cross-thread best-effort read)
+    QVariant syncDataVar = targetRoom->buildPerspectiveSyncData(newTargetName);
+    JsonArray syncData = syncDataVar.value<JsonArray>();
+    if (syncData.size() < 4) {
+        foreach (const QString &viewerName, affectedViewers)
+            removeSession(viewerName, "ALL_TARGETS_DEAD");
+        return;
+    }
+
+    // Switch each affected viewer to the new target.
+    // Observer ref-count updates are deferred until after the lock is released
+    // to avoid acquiring Room::m_crossRoomObserverMutex while holding m_lock.
+    int switchedCount = 0;
+    QList<QString> staleViewers;
+    {
+        QWriteLocker locker(&m_lock);
+        foreach (const QString &viewerName, affectedViewers) {
+            auto it = m_sessionsByViewer.find(viewerName);
+            if (it == m_sessionsByViewer.end())
+                continue;
+
+            Session &session = it.value();
+            if (session.targetObjectName != deadPlayerName)
+                continue;
+
+            ServerPlayer *viewer = session.viewer.data();
+            if (viewer == nullptr) {
+                staleViewers << viewerName;
+                continue;
+            }
+
+            session.targetObjectName = newTargetName;
+            session.serial++;
+            ++switchedCount;
+
+            JsonArray payload;
+            payload << session.sessionId;
+            payload << session.serial;
+            payload << syncData.at(0);
+            payload << syncData.at(1);
+            payload << syncData.at(2);
+            payload << syncData.at(3);
+            sendToViewer(viewer, S_COMMAND_CROSS_ROOM_SWITCH_TARGET, QVariant(payload));
+        }
+    }
+
+    // Batch-update observer ref counts outside the manager lock
+    for (int i = 0; i < switchedCount; ++i) {
+        targetRoom->addCrossRoomObserver(newTargetName);
+        targetRoom->removeCrossRoomObserver(deadPlayerName);
+    }
+
+    foreach (const QString &viewerName, staleViewers)
+        removeSession(viewerName, "VIEWER_DISCONNECTED");
 }
 
 QVariantList CrossRoomSpectateManager::buildRoomListPayload() const

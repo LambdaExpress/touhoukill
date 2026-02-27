@@ -5774,6 +5774,8 @@ void RoomScene::onCrossRoomSpectateEnded(const QString &reason)
         prompt_box->setOpacity(0);
         pindian_box->setOpacity(0);
         guanxing_box->clear();
+        if (guanxing_box->isVisible())
+            guanxing_box->hide();
         clearPerspectiveSensitiveAnimations();
         applyPerspectiveInputLock(false);
 
@@ -5864,7 +5866,6 @@ void RoomScene::onCrossRoomSpectateEnded(const QString &reason)
         game_started = m_savedGameStarted;
         refreshItem2PlayerMap();
         updateTable();
-        item2player.clear();
 
         // Restore the original lord BGM/backdrop from before cross-room spectate.
         ClientInstance->lord_name = m_savedLordName;
@@ -5916,6 +5917,9 @@ void RoomScene::onCrossRoomSpectateEnded(const QString &reason)
                         .arg(Config.TextEditColor.name())
                         .arg(tr("Cross-room spectate ended"))
                         .arg(displayReason));
+    log_box->append(QString("<font color='%1'>%2</font>")
+                        .arg(Config.TextEditColor.name())
+                        .arg("════════════════════════════════"));
 }
 
 void RoomScene::onPerspectiveChanged(const QString &targetName, const QList<int> &handCardIds, const QVariantMap &piles)

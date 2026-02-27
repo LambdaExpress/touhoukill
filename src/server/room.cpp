@@ -982,8 +982,16 @@ bool Room::doNotify(ServerPlayer *player, int command, const char *arg)
     Packet packet(S_SRC_ROOM | S_TYPE_NOTIFICATION | S_DEST_CLIENT, (QSanProtocol::CommandType)command);
     JsonDocument doc = JsonDocument::fromJson(arg);
     if (doc.isValid()) {
-        packet.setMessageBody(doc.toVariant());
+        QVariant body = doc.toVariant();
+        packet.setMessageBody(body);
         player->invoke(&packet);
+
+        // Cross-room spectate tap: forward to observers watching this player.
+        if (m_crossRoomObserverCount.loadAcquire() > 0) {
+            QMutexLocker locker(&m_crossRoomObserverMutex);
+            if (m_crossRoomObserverRefCount.contains(player->objectName()))
+                emit crossRoomNotify(_m_Id, player->objectName(), command, body);
+        }
     } else {
         output(QString("Fail to parse the Json Value %1").arg(arg));
     }
@@ -992,14 +1000,51 @@ bool Room::doNotify(ServerPlayer *player, int command, const char *arg)
 
 bool Room::doBroadcastNotify(const QList<ServerPlayer *> &players, int command, const char *arg)
 {
+    // Parse JSON once instead of N times via doNotify, and emit per-player
+    // cross-room taps only for observed recipients (same semantics as doNotify
+    // but avoids redundant parsing overhead).
+    Packet packet(S_SRC_ROOM | S_TYPE_NOTIFICATION | S_DEST_CLIENT, (QSanProtocol::CommandType)command);
+    JsonDocument doc = JsonDocument::fromJson(arg);
+    if (!doc.isValid()) {
+        output(QString("Fail to parse the Json Value %1").arg(arg));
+        return true;
+    }
+    QVariant body = doc.toVariant();
+    packet.setMessageBody(body);
     foreach (ServerPlayer *player, players)
-        doNotify(player, command, arg);
+        player->invoke(&packet);
+
+    // Cross-room spectate tap: forward to observers of each recipient in the subset.
+    if (m_crossRoomObserverCount.loadAcquire() > 0) {
+        QMutexLocker locker(&m_crossRoomObserverMutex);
+        foreach (ServerPlayer *player, players) {
+            if (m_crossRoomObserverRefCount.contains(player->objectName()))
+                emit crossRoomNotify(_m_Id, player->objectName(), command, body);
+        }
+    }
     return true;
 }
 
 bool Room::doBroadcastNotify(int command, const char *arg)
 {
-    return doBroadcastNotify(m_players, command, arg);
+    // Send to all players directly (bypassing doNotify's per-player tap) so that
+    // cross-room forwarding happens exactly once via crossRoomBroadcast below.
+    Packet packet(S_SRC_ROOM | S_TYPE_NOTIFICATION | S_DEST_CLIENT, (QSanProtocol::CommandType)command);
+    JsonDocument doc = JsonDocument::fromJson(arg);
+    if (!doc.isValid()) {
+        output(QString("Fail to parse the Json Value %1").arg(arg));
+        return true;
+    }
+    QVariant body = doc.toVariant();
+    packet.setMessageBody(body);
+    foreach (ServerPlayer *player, m_players)
+        player->invoke(&packet);
+
+    // Cross-room spectate tap: forward broadcast to all cross-room observers of this room.
+    if (m_crossRoomObserverCount.loadAcquire() > 0)
+        emit crossRoomBroadcast(_m_Id, command, body);
+
+    return true;
 }
 
 void Room::broadcastInvoke(const char *method, const QString &arg, ServerPlayer *except)
