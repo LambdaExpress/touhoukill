@@ -84,6 +84,7 @@ private:
 
 signals:
     void clicked();
+    void clicked_mouse_outside();
     void enable_changed();
 };
 

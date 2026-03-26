@@ -1,13 +1,14 @@
 #include "room.h"
 #include "ai.h"
 #include "audio.h"
-#include "crossroomspectatemanager.h"
 #include "engine.h"
 #include "gamerule.h"
 #include "generalselector.h"
 #include "lua.hpp"
 #include "server.h"
 #include "settings.h"
+#include "spectatehub.h"
+#include "spectateprojection.h"
 #include "standard.h"
 #include "structs.h"
 #include "washout.h"
@@ -56,6 +57,7 @@ Room::Room(QObject *parent, const QString &mode)
     , provider(nullptr)
     , m_fillAGWho(nullptr)
     , m_perspectiveSyncSerial(0)
+    , m_spectateProjection(nullptr)
     , m_roomTearingDownEmitted(false)
 {
     static int s_global_room_id = 0;
@@ -78,6 +80,10 @@ Room::Room(QObject *parent, const QString &mode)
     connect(this, SIGNAL(signalSetProperty(ServerPlayer *, const char *, QVariant)), this, SLOT(slotSetProperty(ServerPlayer *, const char *, QVariant)), Qt::BlockingQueuedConnection);
 
     m_generalSelector = new GeneralSelector(this);
+    m_spectateProjection = new SpectateProjection(this);
+    connect(m_spectateProjection, &SpectateProjection::advanced, this, [this](int eventSeq) {
+        emit spectateProjectionAdvanced(_m_Id, eventSeq);
+    });
 }
 
 Room::~Room()
@@ -116,10 +122,11 @@ void Room::initCallbacks()
     m_callbacks[S_COMMAND_NETWORK_DELAY_TEST] = &Room::networkDelayTestCommand;
     m_callbacks[S_COMMAND_PRESHOW] = &Room::processRequestPreshow;
     m_callbacks[S_COMMAND_PERSPECTIVE_REQUEST] = &Room::spectateCommand;
-    m_callbacks[S_COMMAND_CROSS_ROOM_LIST_REQUEST] = &Room::crossRoomListCommand;
-    m_callbacks[S_COMMAND_CROSS_ROOM_SPECTATE_START] = &Room::crossRoomSpectateStartCommand;
-    m_callbacks[S_COMMAND_CROSS_ROOM_SPECTATE_STOP] = &Room::crossRoomSpectateStopCommand;
-    m_callbacks[S_COMMAND_CROSS_ROOM_SWITCH_TARGET] = &Room::crossRoomSwitchTargetCommand;
+    m_callbacks[S_COMMAND_SPECTATE_LIST_REQUEST] = &Room::crossRoomListCommand;
+    m_callbacks[S_COMMAND_SPECTATE_START] = &Room::crossRoomSpectateStartCommand;
+    m_callbacks[S_COMMAND_SPECTATE_STOP] = &Room::crossRoomSpectateStopCommand;
+    m_callbacks[S_COMMAND_SPECTATE_SWITCH_TARGET] = &Room::crossRoomSwitchTargetCommand;
+    m_callbacks[S_COMMAND_SPECTATE_RESYNC_REQUEST] = &Room::crossRoomSpectateResyncCommand;
 }
 
 ServerPlayer *Room::getCurrent() const
@@ -144,6 +151,7 @@ bool Room::notifyUpdateCard(ServerPlayer *player, int cardId, const Card *newCar
     QString className = newCard->getClassName();
     val << cardId << newCard->getSuit() << newCard->getNumber() << className << newCard->getSkillName() << newCard->objectName() << JsonUtils::toJsonArray(newCard->getFlags());
     doNotify(player, S_COMMAND_UPDATE_CARD, val);
+    captureSpectateEvent(S_COMMAND_UPDATE_CARD, QVariant(val), player->objectName());
     return true;
 }
 
@@ -157,6 +165,7 @@ bool Room::broadcastUpdateCard(const QList<ServerPlayer *> &players, int cardId,
 bool Room::notifyResetCard(ServerPlayer *player, int cardId)
 {
     doNotify(player, S_COMMAND_UPDATE_CARD, cardId);
+    captureSpectateEvent(S_COMMAND_UPDATE_CARD, QVariant(cardId), player->objectName());
     return true;
 }
 
@@ -514,6 +523,7 @@ void Room::sendJudgeResult(const JudgeStruct *judge)
     JsonArray arg;
     arg << QSanProtocol::S_GAME_EVENT_JUDGE_RESULT << judge->card->getEffectiveId() << judge->isEffected() << judge->who->objectName() << judge->reason;
     doBroadcastNotify(QSanProtocol::S_COMMAND_LOG_EVENT, arg);
+    captureSpectateEvent(QSanProtocol::S_COMMAND_LOG_EVENT, QVariant(arg));
 }
 
 QList<int> Room::getNCards(int n, bool update_pile_number, bool bottom)
@@ -942,14 +952,6 @@ bool Room::doNotify(ServerPlayer *player, QSanProtocol::CommandType command, con
     Packet packet(S_SRC_ROOM | S_TYPE_NOTIFICATION | S_DEST_CLIENT, command);
     packet.setMessageBody(arg);
     player->invoke(&packet);
-
-    // Cross-room spectate tap: only fire when this recipient is being watched.
-    // Atomic load is lock-free; mutex is only acquired when observers exist.
-    if (m_crossRoomObserverCount.loadAcquire() > 0) {
-        QMutexLocker locker(&m_crossRoomObserverMutex);
-        if (m_crossRoomObserverRefCount.contains(player->objectName()))
-            emit crossRoomNotify(_m_Id, player->objectName(), static_cast<int>(command), arg);
-    }
     return true;
 }
 
@@ -962,19 +964,10 @@ bool Room::doBroadcastNotify(const QList<ServerPlayer *> &players, QSanProtocol:
 
 bool Room::doBroadcastNotify(QSanProtocol::CommandType command, const QVariant &arg)
 {
-    // Send to all players directly (bypassing doNotify's per-player tap) so that
-    // cross-room forwarding happens exactly once via crossRoomBroadcast below,
-    // avoiding duplicate events in the spectate stream.
     Packet packet(S_SRC_ROOM | S_TYPE_NOTIFICATION | S_DEST_CLIENT, command);
     packet.setMessageBody(arg);
     foreach (ServerPlayer *player, m_players)
         player->invoke(&packet);
-
-    // Cross-room spectate tap: forward broadcast to all cross-room observers of this room.
-    // Atomic load is lock-free; no mutex needed since we only check existence, not iterate.
-    if (m_crossRoomObserverCount.loadAcquire() > 0)
-        emit crossRoomBroadcast(_m_Id, static_cast<int>(command), arg);
-
     return true;
 }
 
@@ -988,13 +981,6 @@ bool Room::doNotify(ServerPlayer *player, int command, const char *arg)
         QVariant body = doc.toVariant();
         packet.setMessageBody(body);
         player->invoke(&packet);
-
-        // Cross-room spectate tap: forward to observers watching this player.
-        if (m_crossRoomObserverCount.loadAcquire() > 0) {
-            QMutexLocker locker(&m_crossRoomObserverMutex);
-            if (m_crossRoomObserverRefCount.contains(player->objectName()))
-                emit crossRoomNotify(_m_Id, player->objectName(), command, body);
-        }
     } else {
         output(QString("Fail to parse the Json Value %1").arg(arg));
     }
@@ -1003,9 +989,6 @@ bool Room::doNotify(ServerPlayer *player, int command, const char *arg)
 
 bool Room::doBroadcastNotify(const QList<ServerPlayer *> &players, int command, const char *arg)
 {
-    // Parse JSON once instead of N times via doNotify, and emit per-player
-    // cross-room taps only for observed recipients (same semantics as doNotify
-    // but avoids redundant parsing overhead).
     Packet packet(S_SRC_ROOM | S_TYPE_NOTIFICATION | S_DEST_CLIENT, (QSanProtocol::CommandType)command);
     JsonDocument doc = JsonDocument::fromJson(arg);
     if (!doc.isValid()) {
@@ -1016,22 +999,11 @@ bool Room::doBroadcastNotify(const QList<ServerPlayer *> &players, int command, 
     packet.setMessageBody(body);
     foreach (ServerPlayer *player, players)
         player->invoke(&packet);
-
-    // Cross-room spectate tap: forward to observers of each recipient in the subset.
-    if (m_crossRoomObserverCount.loadAcquire() > 0) {
-        QMutexLocker locker(&m_crossRoomObserverMutex);
-        foreach (ServerPlayer *player, players) {
-            if (m_crossRoomObserverRefCount.contains(player->objectName()))
-                emit crossRoomNotify(_m_Id, player->objectName(), command, body);
-        }
-    }
     return true;
 }
 
 bool Room::doBroadcastNotify(int command, const char *arg)
 {
-    // Send to all players directly (bypassing doNotify's per-player tap) so that
-    // cross-room forwarding happens exactly once via crossRoomBroadcast below.
     Packet packet(S_SRC_ROOM | S_TYPE_NOTIFICATION | S_DEST_CLIENT, (QSanProtocol::CommandType)command);
     JsonDocument doc = JsonDocument::fromJson(arg);
     if (!doc.isValid()) {
@@ -1042,11 +1014,6 @@ bool Room::doBroadcastNotify(int command, const char *arg)
     packet.setMessageBody(body);
     foreach (ServerPlayer *player, m_players)
         player->invoke(&packet);
-
-    // Cross-room spectate tap: forward broadcast to all cross-room observers of this room.
-    if (m_crossRoomObserverCount.loadAcquire() > 0)
-        emit crossRoomBroadcast(_m_Id, command, body);
-
     return true;
 }
 
@@ -2395,6 +2362,7 @@ void Room::setPlayerMark(ServerPlayer *player, const QString &mark, int value)
     arg << mark;
     arg << value;
     doBroadcastNotify(S_COMMAND_SET_MARK, arg);
+    captureSpectateEvent(S_COMMAND_SET_MARK, QVariant(arg));
 }
 
 void Room::addPlayerMark(ServerPlayer *player, const QString &mark, int add_num)
@@ -3274,10 +3242,10 @@ void Room::toggleReadyCommand(ServerPlayer * /*unused*/, const QVariant & /*unus
     if (!game_started2 && isFull()) {
         game_started2 = true;
 
-        // Stop any cross-room spectate sessions for players in this room
+        // Stop any spectate sessions for players in this room
         Server *server = qobject_cast<Server *>(parent());
-        if (server != nullptr && server->crossRoomSpectateManager() != nullptr)
-            server->crossRoomSpectateManager()->stopSessionsBySourceRoom(_m_Id, "SOURCE_ROOM_STARTING");
+        if (server != nullptr && server->spectateHub() != nullptr)
+            server->spectateHub()->stopSessionsBySourceRoom(_m_Id, "SOURCE_ROOM_STARTING");
 
         thread = new RoomThread(this);
         thread->start();
@@ -3315,6 +3283,8 @@ void Room::signup(ServerPlayer *player, const QString &screen_name, const QStrin
         }
     } else
         toggleReadyCommand(player, QString());
+
+    captureSpectateState();
 }
 
 void Room::assignGeneralsForPlayers(const QList<ServerPlayer *> &to_assign)
@@ -4650,6 +4620,7 @@ void Room::marshal(ServerPlayer *player)
 
 void Room::startGame()
 {
+    captureSpectateState();
     m_alivePlayers = m_players;
     for (int i = 0; i < player_count - 1; i++)
         m_players.at(i)->setNext(m_players.at(i + 1));
@@ -4721,6 +4692,7 @@ void Room::startGame()
     doBroadcastNotify(S_COMMAND_GAME_START, lord_info);
 
     game_started = true;
+    captureSpectateState();
 
     Server *server = qobject_cast<Server *>(parent());
     foreach (ServerPlayer *player, m_players) {
@@ -4754,7 +4726,10 @@ bool Room::notifyProperty(ServerPlayer *playerToNotify, const ServerPlayer *prop
         arg << propertyOwner->objectName();
     arg << propertyName;
     arg << real_value;
-    return doNotify(playerToNotify, S_COMMAND_SET_PROPERTY, arg);
+    bool notified = doNotify(playerToNotify, S_COMMAND_SET_PROPERTY, arg);
+    if (playerToNotify != nullptr)
+        captureSpectateEvent(S_COMMAND_SET_PROPERTY, QVariant(arg), playerToNotify->objectName());
+    return notified;
 }
 
 bool Room::broadcastProperty(ServerPlayer *player, const char *property_name, const QString &value)
@@ -4767,7 +4742,9 @@ bool Room::broadcastProperty(ServerPlayer *player, const char *property_name, co
 
     JsonArray arg;
     arg << player->objectName() << property_name << real_value;
-    return doBroadcastNotify(S_COMMAND_SET_PROPERTY, arg);
+    bool notified = doBroadcastNotify(S_COMMAND_SET_PROPERTY, arg);
+    captureSpectateEvent(S_COMMAND_SET_PROPERTY, QVariant(arg));
+    return notified;
 }
 
 void Room::drawCards(ServerPlayer *player, int n, const QString &reason)
@@ -5356,18 +5333,6 @@ bool Room::notifyMoveCards(bool isLostPhase, QList<CardsMoveStruct> cards_moves,
     Q_ASSERT(_m_lastMovementId >= 0);
     foreach (ServerPlayer *player, players) {
         bool offline = player->isOffline();
-        bool hasCrossRoomObservers = false;
-
-        // For offline players, only proceed if they have cross-room observers;
-        // otherwise there is no recipient for the notification.
-        if (offline) {
-            if (m_crossRoomObserverCount.loadAcquire() > 0) {
-                QMutexLocker locker(&m_crossRoomObserverMutex);
-                hasCrossRoomObservers = m_crossRoomObserverRefCount.contains(player->objectName());
-            }
-            if (!hasCrossRoomObservers)
-                continue;
-        }
 
         JsonArray arg;
         arg << moveId;
@@ -5410,12 +5375,9 @@ bool Room::notifyMoveCards(bool isLostPhase, QList<CardsMoveStruct> cards_moves,
 
         if (!offline) {
             doNotify(player, isLostPhase ? S_COMMAND_LOSE_CARD : S_COMMAND_GET_CARD, arg);
-        } else {
-            // Player is offline but has cross-room observers — emit signal directly,
-            // bypassing the unnecessary invoke() -> unicast() -> sendMessage() chain.
-            QSanProtocol::CommandType command = isLostPhase ? S_COMMAND_LOSE_CARD : S_COMMAND_GET_CARD;
-            emit crossRoomNotify(_m_Id, player->objectName(), static_cast<int>(command), QVariant(arg));
         }
+
+        captureSpectateEvent(isLostPhase ? S_COMMAND_LOSE_CARD : S_COMMAND_GET_CARD, QVariant(arg), player->objectName());
     }
     return true;
 }
@@ -5594,7 +5556,7 @@ ServerPlayer *Room::getProxiedPlayer(ServerPlayer *proxy) const
 }
 
 // ---------------------------------------------------------------------------
-// Cross-room spectate support
+// Spectate support
 // ---------------------------------------------------------------------------
 
 bool Room::hasStarted() const
@@ -5606,192 +5568,105 @@ void Room::crossRoomListCommand(ServerPlayer *player, const QVariant &arg)
 {
     Q_UNUSED(arg);
     Server *server = qobject_cast<Server *>(parent());
-    if (server != nullptr && server->crossRoomSpectateManager() != nullptr)
-        server->crossRoomSpectateManager()->handleCrossRoomCommand(player, S_COMMAND_CROSS_ROOM_LIST_REQUEST, QVariant());
+    if (server != nullptr && server->spectateHub() != nullptr)
+        server->spectateHub()->handleCommand(player, S_COMMAND_SPECTATE_LIST_REQUEST, QVariant());
 }
 
 void Room::crossRoomSpectateStartCommand(ServerPlayer *player, const QVariant &arg)
 {
     Server *server = qobject_cast<Server *>(parent());
-    if (server != nullptr && server->crossRoomSpectateManager() != nullptr)
-        server->crossRoomSpectateManager()->handleCrossRoomCommand(player, S_COMMAND_CROSS_ROOM_SPECTATE_START, arg);
+    if (server != nullptr && server->spectateHub() != nullptr)
+        server->spectateHub()->handleCommand(player, S_COMMAND_SPECTATE_START, arg);
 }
 
 void Room::crossRoomSpectateStopCommand(ServerPlayer *player, const QVariant &arg)
 {
     Q_UNUSED(arg);
     Server *server = qobject_cast<Server *>(parent());
-    if (server != nullptr && server->crossRoomSpectateManager() != nullptr)
-        server->crossRoomSpectateManager()->handleCrossRoomCommand(player, S_COMMAND_CROSS_ROOM_SPECTATE_STOP, QVariant());
+    if (server != nullptr && server->spectateHub() != nullptr)
+        server->spectateHub()->handleCommand(player, S_COMMAND_SPECTATE_STOP, QVariant());
 }
 
 void Room::crossRoomSwitchTargetCommand(ServerPlayer *player, const QVariant &arg)
 {
     Server *server = qobject_cast<Server *>(parent());
-    if (server != nullptr && server->crossRoomSpectateManager() != nullptr)
-        server->crossRoomSpectateManager()->handleCrossRoomCommand(player, S_COMMAND_CROSS_ROOM_SWITCH_TARGET, arg);
+    if (server != nullptr && server->spectateHub() != nullptr)
+        server->spectateHub()->handleCommand(player, S_COMMAND_SPECTATE_SWITCH_TARGET, arg);
 }
 
-void Room::addCrossRoomObserver(const QString &targetObjectName)
+void Room::crossRoomSpectateResyncCommand(ServerPlayer *player, const QVariant &arg)
 {
-    QMutexLocker locker(&m_crossRoomObserverMutex);
-    m_crossRoomObserverRefCount[targetObjectName]++;
-    m_crossRoomObserverCount.fetchAndAddRelease(1);
+    Server *server = qobject_cast<Server *>(parent());
+    if (server != nullptr && server->spectateHub() != nullptr)
+        server->spectateHub()->handleCommand(player, S_COMMAND_SPECTATE_RESYNC_REQUEST, arg);
 }
 
-void Room::removeCrossRoomObserver(const QString &targetObjectName)
+void Room::captureSpectateState()
 {
-    QMutexLocker locker(&m_crossRoomObserverMutex);
-    auto it = m_crossRoomObserverRefCount.find(targetObjectName);
-    if (it == m_crossRoomObserverRefCount.end())
-        return;
-    it.value()--;
-    m_crossRoomObserverCount.fetchAndAddRelease(-1);
-    if (it.value() <= 0)
-        m_crossRoomObserverRefCount.erase(it);
+    if (m_spectateProjection != nullptr)
+        m_spectateProjection->captureState(this);
 }
 
-QVariantMap Room::buildCrossRoomSnapshot(const QString &targetObjectName) const
+void Room::captureSpectateEvent(CommandType command, const QVariant &payload, const QString &recipientName)
 {
-    JsonObject snapshot;
+    if (m_spectateProjection != nullptr)
+        m_spectateProjection->captureEvent(this, command, payload, recipientName);
+}
 
-    // Room metadata
-    snapshot["roomId"] = _m_Id;
-    snapshot["mode"] = mode;
+QVariantMap Room::buildSpectateSnapshot(const QString &targetObjectName) const
+{
+    if (m_spectateProjection == nullptr)
+        return QVariantMap();
+    return m_spectateProjection->buildSnapshot(targetObjectName);
+}
 
-    // All players' public properties
-    JsonArray playersArray;
-    foreach (ServerPlayer *p, m_players) {
-        JsonObject pObj;
-        pObj["objectName"] = p->objectName();
-        pObj["screenName"] = p->screenName();
-        pObj["generalName"] = p->getGeneralName();
-        pObj["general2Name"] = p->getGeneral2Name();
-        pObj["kingdom"] = p->getKingdom();
-        pObj["role"] = p->getRole();
-        pObj["roleShown"] = p->hasShownRole();
-        pObj["hp"] = p->getHp();
-        pObj["maxHp"] = p->getMaxHp();
-        pObj["renHp"] = p->getRenHp();
-        pObj["lingHp"] = p->getLingHp();
-        pObj["chaoren"] = p->getChaoren();
-        pObj["alive"] = p->isAlive();
-        pObj["removed"] = p->isRemoved();
-        pObj["seat"] = p->getSeat();
-        pObj["phase"] = static_cast<int>(p->getPhase());
-        pObj["faceUp"] = p->faceUp();
-        pObj["chained"] = p->isChained();
-        pObj["handcardNum"] = p->getHandcardNum();
-        pObj["generalShowed"] = p->hasShownGeneral();
-        pObj["general2Showed"] = p->hasShownGeneral2();
+QVariantMap Room::buildSpectatePrivateState(const QString &targetObjectName) const
+{
+    if (m_spectateProjection == nullptr)
+        return QVariantMap();
+    return m_spectateProjection->buildPrivateState(targetObjectName);
+}
 
-        // Equips
-        JsonArray equips;
-        if (p->getWeapon() != nullptr) equips << p->getWeapon()->getId();
-        if (p->getArmor() != nullptr) equips << p->getArmor()->getId();
-        if (p->getDefensiveHorse() != nullptr) equips << p->getDefensiveHorse()->getId();
-        if (p->getOffensiveHorse() != nullptr) equips << p->getOffensiveHorse()->getId();
-        if (p->getTreasure() != nullptr) equips << p->getTreasure()->getId();
-        pObj["equips"] = QVariant(equips);
+QVariantMap Room::buildSpectateRoomEntry() const
+{
+    if (m_spectateProjection == nullptr)
+        return QVariantMap();
+    return m_spectateProjection->buildRoomEntry();
+}
 
-        // Delayed trick (judge area)
-        pObj["judgeArea"] = JsonUtils::toJsonArray(p->getJudgingAreaID());
+QVariantList Room::spectateEventsAfter(int lastSeq, const QString &targetObjectName, bool *overflow) const
+{
+    if (m_spectateProjection == nullptr)
+        return QVariantList();
+    return m_spectateProjection->eventsAfter(lastSeq, targetObjectName, overflow);
+}
 
-        // Shown handcards & broken equips
-        pObj["shownHandcards"] = JsonUtils::toJsonArray(p->getShownHandcards());
-        pObj["brokenEquips"] = JsonUtils::toJsonArray(p->getBrokenEquips());
+int Room::lastSpectateEventSeq() const
+{
+    if (m_spectateProjection == nullptr)
+        return 0;
+    return m_spectateProjection->lastEventSeq();
+}
 
-        // Piles (all players, not just target)
-        JsonObject playerPilesObj;
-        foreach (const QString &pileName, p->getPileNames())
-            playerPilesObj[pileName] = JsonUtils::toJsonArray(p->getPile(pileName));
-        pObj["piles"] = QVariant(playerPilesObj);
+int Room::currentSpectateSnapshotVersion() const
+{
+    if (m_spectateProjection == nullptr)
+        return 0;
+    return m_spectateProjection->snapshotVersion();
+}
 
-        // Pile visibility
-        JsonObject pileOpenObj;
-        foreach (const QString &pileName, p->getPileNames()) {
-            QStringList openPlayers;
-            foreach (ServerPlayer *viewer, m_players) {
-                if (p->pileOpen(pileName, viewer->objectName()))
-                    openPlayers << viewer->objectName();
-            }
-            if (!openPlayers.isEmpty())
-                pileOpenObj[pileName] = JsonUtils::toJsonArray(openPlayers);
-        }
-        pObj["pileOpen"] = QVariant(pileOpenObj);
+bool Room::isSpectateAlive(const QString &targetObjectName) const
+{
+    if (m_spectateProjection == nullptr)
+        return false;
+    return m_spectateProjection->isAlive(targetObjectName);
+}
 
-        // Marks (all non-zero marks, not just @-prefixed)
-        JsonObject marks;
-        QMap<QString, int> markMap = p->getMarkMap();
-        for (auto it = markMap.constBegin(); it != markMap.constEnd(); ++it) {
-            if (it.value() != 0)
-                marks[it.key()] = it.value();
-        }
-        pObj["marks"] = QVariant(marks);
-
-        // Acquired skills (head / deputy separated)
-        QStringList acquiredHeadSkills = p->getAcquiredHeadSkills().toList();
-        QStringList acquiredDeputySkills = p->getAcquiredDeputySkills().toList();
-        pObj["acquiredHeadSkills"] = JsonUtils::toJsonArray(acquiredHeadSkills);
-        pObj["acquiredDeputySkills"] = JsonUtils::toJsonArray(acquiredDeputySkills);
-
-        // Hidden generals (hegemony)
-        pObj["hiddenGenerals"] = JsonUtils::toJsonArray(p->getHiddenGenerals());
-        pObj["shownHiddenGeneral"] = p->getShownHiddenGeneral();
-
-        // Skill invalidity & disable-show
-        pObj["skillInvalid"] = JsonUtils::toJsonArray(p->getSkillInvalidityList());
-        pObj["disableShow"] = JsonUtils::toJsonArray(p->getDisableShowList());
-
-        // Flags
-        pObj["flags"] = JsonUtils::toJsonArray(p->getFlagList());
-
-        playersArray << QVariant(pObj);
-    }
-    snapshot["players"] = QVariant(playersArray);
-
-    // Target player's private info (hand cards, modified cards)
-    ServerPlayer *target = findPlayerByObjectName(targetObjectName);
-    if (target != nullptr) {
-        snapshot["targetName"] = targetObjectName;
-        snapshot["handCards"] = JsonUtils::toJsonArray(target->handCards());
-
-        // Modified card info for all visible cards (same format as sendPerspectiveSync)
-        JsonArray modifiedCards;
-        QSet<int> seenCardIds;
-        auto appendModified = [&](int cardId) {
-            if (cardId < 0 || seenCardIds.contains(cardId))
-                return;
-            seenCardIds.insert(cardId);
-            Card *card = getCard(cardId);
-            if (card != nullptr && card->isModified()) {
-                JsonArray cardInfo;
-                cardInfo << cardId << card->getSuit() << card->getNumber()
-                         << card->getClassName() << card->getSkillName()
-                         << card->objectName() << JsonUtils::toJsonArray(card->getFlags());
-                modifiedCards << QVariant(cardInfo);
-            }
-        };
-        // Target's hand cards and piles
-        foreach (int cardId, target->handCards())
-            appendModified(cardId);
-        foreach (const QString &pileName, target->getPileNames()) {
-            foreach (int cardId, target->getPile(pileName))
-                appendModified(cardId);
-        }
-        // All players' equips and judge area cards
-        foreach (ServerPlayer *p, m_players) {
-            foreach (const Card *equip, p->getEquips()) {
-                if (equip != nullptr)
-                    appendModified(equip->getEffectiveId());
-            }
-            foreach (int cardId, p->getJudgingAreaID())
-                appendModified(cardId);
-        }
-        snapshot["modifiedCards"] = QVariant(modifiedCards);
-    }
-
-    return snapshot;
+QString Room::nextSpectateAliveTarget(const QString &targetObjectName) const
+{
+    if (m_spectateProjection == nullptr)
+        return QString();
+    return m_spectateProjection->nextAliveTarget(targetObjectName);
 }
 
 void Room::notifySkillInvoked(ServerPlayer *player, const QString &skill_name)
@@ -5801,6 +5676,7 @@ void Room::notifySkillInvoked(ServerPlayer *player, const QString &skill_name)
     args << player->objectName();
     args << skill_name;
     doBroadcastNotify(QSanProtocol::S_COMMAND_LOG_EVENT, args);
+    captureSpectateEvent(QSanProtocol::S_COMMAND_LOG_EVENT, QVariant(args));
 }
 
 void Room::broadcastSkillInvoke(const QString &skill_name, const QString &category)
@@ -5811,6 +5687,7 @@ void Room::broadcastSkillInvoke(const QString &skill_name, const QString &catego
     args << category;
     args << -1;
     doBroadcastNotify(QSanProtocol::S_COMMAND_LOG_EVENT, args);
+    captureSpectateEvent(QSanProtocol::S_COMMAND_LOG_EVENT, QVariant(args));
 }
 
 void Room::broadcastSkillInvoke(const QString &skill_name)
@@ -5821,6 +5698,7 @@ void Room::broadcastSkillInvoke(const QString &skill_name)
     args << true;
     args << -1;
     doBroadcastNotify(QSanProtocol::S_COMMAND_LOG_EVENT, args);
+    captureSpectateEvent(QSanProtocol::S_COMMAND_LOG_EVENT, QVariant(args));
 }
 
 void Room::broadcastSkillInvoke(const QString &skill_name, int type)
@@ -5831,6 +5709,7 @@ void Room::broadcastSkillInvoke(const QString &skill_name, int type)
     args << true;
     args << type;
     doBroadcastNotify(QSanProtocol::S_COMMAND_LOG_EVENT, args);
+    captureSpectateEvent(QSanProtocol::S_COMMAND_LOG_EVENT, QVariant(args));
 }
 
 void Room::broadcastSkillInvoke(const QString &skill_name, bool isMale, int type)
@@ -5841,6 +5720,7 @@ void Room::broadcastSkillInvoke(const QString &skill_name, bool isMale, int type
     args << isMale;
     args << type;
     doBroadcastNotify(QSanProtocol::S_COMMAND_LOG_EVENT, args);
+    captureSpectateEvent(QSanProtocol::S_COMMAND_LOG_EVENT, QVariant(args));
 }
 
 void Room::doLightbox(const QString &lightboxName, int duration)
@@ -5860,6 +5740,7 @@ void Room::doAnimate(QSanProtocol::AnimateType type, const QString &arg1, const 
     arg << arg1;
     arg << arg2;
     doBroadcastNotify(players, S_COMMAND_ANIMATE, arg);
+    captureSpectateEvent(S_COMMAND_ANIMATE, QVariant(arg));
 }
 
 void Room::doBattleArrayAnimate(ServerPlayer *player, ServerPlayer *target)
@@ -6129,6 +6010,7 @@ void Room::setEmotion(ServerPlayer *target, const QString &emotion)
     arg << target->objectName();
     arg << (emotion.isEmpty() ? QString(".") : emotion);
     doBroadcastNotify(S_COMMAND_SET_EMOTION, arg);
+    captureSpectateEvent(S_COMMAND_SET_EMOTION, QVariant(arg));
 }
 
 void Room::activate(ServerPlayer *player, CardUseStruct &card_use)
@@ -7270,6 +7152,7 @@ void Room::sendLog(const LogMessage &log)
         return;
 
     doBroadcastNotify(QSanProtocol::S_COMMAND_LOG_SKILL, log.toJsonValue());
+    captureSpectateEvent(QSanProtocol::S_COMMAND_LOG_SKILL, log.toJsonValue());
 }
 
 void Room::showCard(ServerPlayer *player, int card_id, ServerPlayer *only_viewer)
@@ -7293,6 +7176,7 @@ void Room::showCard(ServerPlayer *player, int card_id, ServerPlayer *only_viewer
         else
             notifyResetCard(only_viewer, card_id);
         doBroadcastNotify(players, S_COMMAND_SHOW_CARD, show_arg);
+        captureSpectateEvent(S_COMMAND_SHOW_CARD, QVariant(show_arg), player->objectName());
     } else {
         if (card_id > 0)
             Sanguosha->getCard(card_id)->setFlags("visible");
@@ -7301,6 +7185,7 @@ void Room::showCard(ServerPlayer *player, int card_id, ServerPlayer *only_viewer
         else
             broadcastResetCard(getOtherPlayers(player), card_id);
         doBroadcastNotify(S_COMMAND_SHOW_CARD, show_arg);
+        captureSpectateEvent(S_COMMAND_SHOW_CARD, QVariant(show_arg));
     }
 }
 
@@ -7348,6 +7233,7 @@ void Room::showAllCards(ServerPlayer *player, ServerPlayer *to)
         thread->trigger(ChoiceMade, this, decisionData);
 
         doNotify(to, S_COMMAND_SHOW_ALL_CARDS, gongxinArgs);
+        captureSpectateEvent(S_COMMAND_SHOW_ALL_CARDS, QVariant(gongxinArgs), player->objectName());
     } else {
         LogMessage log;
         log.type = "$ShowAllCards";
@@ -7358,6 +7244,7 @@ void Room::showAllCards(ServerPlayer *player, ServerPlayer *to)
         sendLog(log);
 
         doBroadcastNotify(S_COMMAND_SHOW_ALL_CARDS, gongxinArgs);
+        captureSpectateEvent(S_COMMAND_SHOW_ALL_CARDS, QVariant(gongxinArgs));
     }
 }
 

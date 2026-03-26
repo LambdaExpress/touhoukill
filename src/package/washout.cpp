@@ -747,7 +747,6 @@ void SpringBreath::takeEffect(ServerPlayer *target) const
 void SpringBreath::onNullified(ServerPlayer *target) const
 {
     Room *room = target->getRoom();
-    RoomThread *thread = room->getThread();
 
     bool targetConfirmed = false;
     do {
@@ -758,7 +757,7 @@ void SpringBreath::onNullified(ServerPlayer *target) const
             if (target->containsTrick(objectName()))
                 break;
 
-            const ProhibitSkill *skill = room->isProhibited(nullptr, target, this);
+            const ProhibitSkill *skill = room->isProhibited(target, target, this);
             if (skill != nullptr) {
                 LogMessage log;
                 log.type = "#SkillAvoid";
@@ -773,19 +772,7 @@ void SpringBreath::onNullified(ServerPlayer *target) const
 
             CardMoveReason reason(CardMoveReason::S_REASON_TRANSFER, target->objectName(), QString(), getSkillName(), QString());
             room->moveCardTo(this, target, target, Player::PlaceDelayedTrick, reason, true);
-
-            CardUseStruct use;
-            use.from = nullptr;
-            use.to << target;
-            use.card = this;
-            QVariant data = QVariant::fromValue(use);
-            thread->trigger(TargetConfirming, room, data);
-            CardUseStruct new_use = data.value<CardUseStruct>();
-            if (new_use.to.isEmpty())
-                break;
-
             targetConfirmed = true;
-            thread->trigger(TargetConfirmed, room, data);
         }
     } while (false);
 

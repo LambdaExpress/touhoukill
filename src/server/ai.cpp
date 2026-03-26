@@ -166,7 +166,6 @@ TrustAI::TrustAI(ServerPlayer *player)
     : AI(player)
 {
     response_skill = new ResponseSkill;
-    response_skill->setParent(this);
 }
 
 TrustAI::~TrustAI()

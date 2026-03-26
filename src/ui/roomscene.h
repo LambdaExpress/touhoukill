@@ -27,6 +27,7 @@ class ChooseGeneralBox;
 class ChooseOptionsBox;
 class ChooseTriggerOrderBox;
 class PlayerCardBox;
+class SpectateScene;
 
 #include <QCommandLinkButton>
 #include <QDialog>
@@ -170,6 +171,7 @@ protected:
 class RoomScene : public QGraphicsScene
 {
     Q_OBJECT
+    friend class SpectateScene;
 
 public:
     // Perspective source types for UI layer
@@ -179,10 +181,10 @@ public:
         PerspectiveSourceSpectate
     };
 
-    explicit RoomScene(QMainWindow *main_window);
+    explicit RoomScene(QMainWindow *main_window, Client *client = nullptr, bool isSpectateScene = false);
     ~RoomScene() override;
     void changeTextEditBackground();
-    void adjustItems();
+    virtual void adjustItems();
     void showIndicator(const QString &from, const QString &to);
     void showPromptBox();
     static void FillPlayerNames(QComboBox *ComboBox, bool add_none);
@@ -282,8 +284,6 @@ public slots:
     // Cross-room spectate UI slots
     void showCrossRoomListDialog(const QVariantList &rooms);
     void onCrossRoomSpectateRequested(int roomId, const QString &targetObjectName);
-    void onCrossRoomSpectateStarted(const QVariantMap &snapshotPayload);
-    void onCrossRoomSpectateEnded(const QString &reason);
 
     inline QPointF tableCenterPos()
     {
@@ -328,6 +328,8 @@ private:
     Button *return_to_main_menu;
     QList<Photo *> photos;
     QMap<QString, Photo *> name2photo;
+    Client *m_client;
+    bool m_isSpectateScene;
     Dashboard *dashboard;
     TablePile *m_tablePile;
     QMainWindow *main_window;
@@ -344,16 +346,6 @@ private:
     QGraphicsItem *control_panel;
     QMap<PlayerCardContainer *, const ClientPlayer *> item2player;
 
-    // Cross-room spectate scene state (saved when entering, restored when leaving)
-    bool m_crossRoomSceneActive = false;
-    QMap<QString, Photo *> m_savedName2photo;
-    QList<Photo *> m_savedPhotosOrder;
-    QHash<Photo *, const ClientPlayer *> m_savedPhotoPlayers;
-    QHash<Photo *, bool> m_savedPhotoVisibility;
-    QList<Photo *> m_crossRoomAddedPhotos;
-    const ClientPlayer *m_savedDashboardPlayer = nullptr;
-    QString m_savedLordName;
-    bool m_savedGameStarted = false;
     QDialog *m_choiceDialog; // Dialog for choosing generals, suits, card/equip, or kingdoms
 
     QGraphicsRectItem *pausing_item;

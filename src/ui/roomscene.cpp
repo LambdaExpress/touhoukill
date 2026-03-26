@@ -68,11 +68,14 @@ void RoomScene::resetPiles()
     // @todo: fix this...
 }
 
-RoomScene::RoomScene(QMainWindow *main_window)
+RoomScene::RoomScene(QMainWindow *main_window, Client *client, bool isSpectateScene)
     : m_skillButtonSank(false)
     , game_started(false)
+    , m_client(client != nullptr ? client : ClientInstance)
+    , m_isSpectateScene(isSpectateScene)
     , main_window(main_window)
 {
+    Client *ClientInstance = m_client;
     m_choiceDialog = nullptr;
     RoomSceneInstance = this;
     _m_last_front_item = nullptr;
@@ -161,9 +164,8 @@ RoomScene::RoomScene(QMainWindow *main_window)
     connect(ClientInstance, SIGNAL(player_killed(QString)), this, SLOT(killPlayer(QString)));
     connect(ClientInstance, SIGNAL(player_revived(QString)), this, SLOT(revivePlayer(QString)));
     connect(ClientInstance, &Client::perspective_changed, this, &RoomScene::onPerspectiveChanged);
-    connect(ClientInstance, &Client::cross_room_list_received, this, &RoomScene::showCrossRoomListDialog);
-    connect(ClientInstance, &Client::cross_room_spectate_started, this, &RoomScene::onCrossRoomSpectateStarted);
-    connect(ClientInstance, &Client::cross_room_spectate_ended, this, &RoomScene::onCrossRoomSpectateEnded);
+    if (!m_isSpectateScene)
+        connect(ClientInstance, &Client::cross_room_list_received, this, &RoomScene::showCrossRoomListDialog);
     connect(ClientInstance, SIGNAL(dashboard_death(QString)), this, SLOT(setDashboardShadow(QString)));
     connect(ClientInstance, SIGNAL(card_shown(QString, int)), this, SLOT(showCard(QString, int)));
     connect(ClientInstance, SIGNAL(gongxin(QList<int>, bool, QList<int>, QList<int>)), this, SLOT(doGongxin(QList<int>, bool, QList<int>, QList<int>)));
@@ -306,6 +308,7 @@ RoomScene::RoomScene(QMainWindow *main_window)
 
     // log box
     log_box = new ClientLogBox;
+    log_box->setClient(ClientInstance);
     log_box->setTextColor(Config.TextEditColor);
     log_box->setObjectName("log_box");
 
@@ -384,13 +387,15 @@ RoomScene::RoomScene(QMainWindow *main_window)
         connect(Self, SIGNAL(owner_changed(bool)), this, SLOT(showOwnerButtons(bool)));
     }
 
-    spectate_other_rooms = new Button(tr("Spectate Other Rooms"));
-    spectate_other_rooms->setParentItem(control_panel);
-    spectate_other_rooms->setTransform(
-        QTransform::fromTranslate(-spectate_other_rooms->boundingRect().width() / 2, -spectate_other_rooms->boundingRect().height() / 2), true);
-    spectate_other_rooms->setPos(0, -spectate_other_rooms->boundingRect().height() * 2 - 20);
-    spectate_other_rooms->show();
-    connect(spectate_other_rooms, &Button::clicked, ClientInstance, &Client::requestCrossRoomList);
+    if (!m_isSpectateScene) {
+        spectate_other_rooms = new Button(tr("Spectate Other Rooms"));
+        spectate_other_rooms->setParentItem(control_panel);
+        spectate_other_rooms->setTransform(
+            QTransform::fromTranslate(-spectate_other_rooms->boundingRect().width() / 2, -spectate_other_rooms->boundingRect().height() / 2), true);
+        spectate_other_rooms->setPos(0, -spectate_other_rooms->boundingRect().height() * 2 - 20);
+        spectate_other_rooms->show();
+        connect(spectate_other_rooms, &Button::clicked, ClientInstance, &Client::requestCrossRoomList);
+    }
 
     return_to_main_menu = new Button(tr("Return to main menu"));
     return_to_main_menu->setParentItem(control_panel);
@@ -430,6 +435,8 @@ RoomScene::RoomScene(QMainWindow *main_window)
     pindian_from_card = nullptr;
     pindian_to_card = nullptr;
 }
+
+#define ClientInstance (m_client)
 
 RoomScene::~RoomScene()
 {
@@ -870,6 +877,7 @@ void ReplayerControlBar::paint(QPainter * /*painter*/, const QStyleOptionGraphic
 
 ReplayerControlBar::ReplayerControlBar(Dashboard *dashboard)
 {
+#undef ClientInstance
     QSanButton *play = nullptr;
     QSanButton *uniform = nullptr;
     QSanButton *slow_down = nullptr;
@@ -912,6 +920,7 @@ ReplayerControlBar::ReplayerControlBar(Dashboard *dashboard)
     setPos(S_BUTTON_GAP, -S_BUTTON_GAP - S_BUTTON_HEIGHT);
 
     duration_str = FormatTime(replayer->getDuration());
+#define ClientInstance (m_client)
 }
 
 QString ReplayerControlBar::FormatTime(int secs)
@@ -1305,22 +1314,6 @@ void RoomScene::updateTable()
 
 void RoomScene::addPlayer(ClientPlayer *player)
 {
-    if (m_crossRoomSceneActive) {
-        // Player joined our original room during cross-room spectate.
-        // Update saved state so they appear when spectate ends.
-        for (Photo *photo : m_savedPhotosOrder) {
-            if (m_savedPhotoPlayers.value(photo, nullptr) == nullptr) {
-                m_savedPhotoPlayers[photo] = player;
-                m_savedPhotoVisibility[photo] = true;
-                m_savedName2photo[player->objectName()] = photo;
-                return;
-            }
-        }
-        qWarning("RoomScene::addPlayer: no empty Photo in saved state for player %s",
-                 qPrintable(player->objectName()));
-        return;
-    }
-
     for (int i = 0; i < photos.length(); i++) {
         Photo *photo = photos[i];
         if (photo->getPlayer() == nullptr) {
@@ -1337,17 +1330,6 @@ void RoomScene::addPlayer(ClientPlayer *player)
 
 void RoomScene::removePlayer(const QString &player_name)
 {
-    if (m_crossRoomSceneActive) {
-        // Player left our original room during cross-room spectate.
-        // Update saved state so the departure is reflected when spectate ends.
-        Photo *photo = m_savedName2photo.value(player_name, nullptr);
-        if (photo != nullptr) {
-            m_savedPhotoPlayers[photo] = nullptr;
-            m_savedName2photo.remove(player_name);
-        }
-        return;
-    }
-
     Photo *photo = name2photo.value(player_name, nullptr);
     if (photo != nullptr) {
         photo->setPlayer(nullptr);
@@ -1611,12 +1593,6 @@ void RoomScene::keyReleaseEvent(QKeyEvent *event)
         return;
     if (chat_edit->hasFocus())
         return;
-    // Allow Escape to exit cross-room spectate even when input is locked
-    if (m_crossRoomSceneActive && event->key() == Qt::Key_Escape) {
-        ClientInstance->requestStopCrossRoomSpectate();
-        return;
-    }
-
     if (m_perspectiveInputLocked)
         return;
 
@@ -1827,6 +1803,8 @@ void RoomScene::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 
                     submenu->addSeparator();
                     foreach (const Card *card, known) {
+                        if (card == nullptr)
+                            continue;
                         const Card *engine_card = Sanguosha->getEngineCard(card->getId());
                         submenu->addAction(G_ROOM_SKIN.getCardSuitPixmap(engine_card->getSuit()), engine_card->getFullName());
                     }
@@ -3161,7 +3139,11 @@ void RoomScene::onSkillActivated()
             bool instance_use = skill->inherits("ZeroCardViewAsSkill");
             if (!instance_use) {
                 QList<const Card *> cards;
-                cards << Self->getHandcards() << Self->getEquips();
+                foreach (const Card *handCard, Self->getHandcards()) {
+                    if (handCard != nullptr)
+                        cards << handCard;
+                }
+                cards << Self->getEquips();
 
                 foreach (const QString &name, dashboard->getPileExpanded()) {
                     QList<int> pile = Self->getPile(name);
@@ -3621,6 +3603,7 @@ ScriptExecutor::ScriptExecutor(QWidget *parent)
 
 void ScriptExecutor::doScript()
 {
+#undef ClientInstance
     QTextEdit *box = findChild<QTextEdit *>("scriptBox");
     if (box == nullptr)
         return;
@@ -3631,6 +3614,7 @@ void ScriptExecutor::doScript()
     script = data.toBase64();
 
     ClientInstance->requestCheatRunScript(script);
+#define ClientInstance (m_client)
 }
 
 DeathNoteDialog::DeathNoteDialog(QWidget *parent)
@@ -3661,8 +3645,10 @@ DeathNoteDialog::DeathNoteDialog(QWidget *parent)
 
 void DeathNoteDialog::accept()
 {
+#undef ClientInstance
     QDialog::accept();
     ClientInstance->requestCheatKill(killer->itemData(killer->currentIndex()).toString(), victim->itemData(victim->currentIndex()).toString());
+#define ClientInstance (m_client)
 }
 
 DamageMakerDialog::DamageMakerDialog(QWidget *parent)
@@ -3716,6 +3702,7 @@ void DamageMakerDialog::disableSource()
 
 void RoomScene::FillPlayerNames(QComboBox *ComboBox, bool add_none)
 {
+#undef ClientInstance
     if (add_none)
         ComboBox->addItem(tr("None"), ".");
     ComboBox->setIconSize(G_COMMON_LAYOUT.m_tinyAvatarSize);
@@ -3726,14 +3713,17 @@ void RoomScene::FillPlayerNames(QComboBox *ComboBox, bool add_none)
         QPixmap pixmap = G_ROOM_SKIN.getGeneralPixmap(player->getGeneralName(), QSanRoomSkin::S_GENERAL_ICON_SIZE_TINY, false);
         ComboBox->addItem(QIcon(pixmap), QString("%1 [%2]").arg(general_name).arg(player->screenName()), player->objectName());
     }
+#define ClientInstance (m_client)
 }
 
 void DamageMakerDialog::accept()
 {
+#undef ClientInstance
     QDialog::accept();
 
     ClientInstance->requestCheatDamage(damage_source->itemData(damage_source->currentIndex()).toString(), damage_target->itemData(damage_target->currentIndex()).toString(),
                                        (DamageStruct::Nature)damage_nature->itemData(damage_nature->currentIndex()).toInt(), damage_point->value());
+#define ClientInstance (m_client)
 }
 
 void RoomScene::makeDamage()
@@ -4211,6 +4201,8 @@ void RoomScene::showPlayerCards()
         } else {
             QList<const Card *> cards;
             foreach (const Card *card, player->getHandcards()) {
+                if (card == nullptr)
+                    continue;
                 const Card *engine_card = Sanguosha->getEngineCard(card->getId());
                 if (engine_card != nullptr)
                     cards << engine_card;
@@ -4234,7 +4226,6 @@ void RoomScene::showPile(const QList<int> &card_ids, const QString &name, const 
         QList<CardItem *> generals;
         foreach (QString arg, huashens) {
             CardItem *item = new CardItem(arg);
-            addItem(item);
             item->setParentItem(pileContainer);
             generals.append(item);
         }
@@ -5607,341 +5598,6 @@ void RoomScene::onCrossRoomSpectateRequested(int roomId, const QString &targetOb
     ClientInstance->requestCrossRoomSpectate(roomId, targetObjectName);
 }
 
-void RoomScene::onCrossRoomSpectateStarted(const QVariantMap &snapshotPayload)
-{
-    QVariantMap snapshot = snapshotPayload.contains("snapshot") ? snapshotPayload.value("snapshot").toMap() : snapshotPayload;
-    QString targetName = snapshotPayload.value("targetName", snapshot.value("targetName")).toString();
-    int roomId = snapshotPayload.value("targetRoomId", snapshot.value("roomId")).toInt();
-
-    // If already in a perspective view or cross-room spectate, exit first
-    if (m_isPerspectiveSwitched)
-        exitPerspectiveView();
-    if (m_crossRoomSceneActive)
-        onCrossRoomSpectateEnded(QStringLiteral("REPLACED"));
-
-    clearPendingMoveStash();
-
-    // Build the list of non-Self virtual players sorted by seat
-    // (Client has already set Self = target player and players = virtual players)
-    QList<ClientPlayer *> seatPlayers;
-    foreach (const ClientPlayer *player, ClientInstance->getPlayers()) {
-        if (player != Self)
-            seatPlayers << const_cast<ClientPlayer *>(player);
-    }
-    if (seatPlayers.isEmpty()) {
-        // Client has already swapped Self/players; ask it to roll back.
-        ClientInstance->requestStopCrossRoomSpectate();
-        return;
-    }
-
-    std::sort(seatPlayers.begin(), seatPlayers.end(), [](const ClientPlayer *a, const ClientPlayer *b) {
-        return a->getSeat() < b->getSeat();
-    });
-    // Rotate the sorted list so that the first player clockwise from Self
-    // comes first, matching the convention in Client::arrangeSeats().
-    if (Self != nullptr) {
-        int selfSeat = Self->getSeat();
-        int rotateIndex = 0;
-        while (rotateIndex < seatPlayers.length()
-               && seatPlayers.at(rotateIndex)->getSeat() <= selfSeat)
-            ++rotateIndex;
-
-        if (rotateIndex > 0 && rotateIndex < seatPlayers.length()) {
-            QList<ClientPlayer *> rotated = seatPlayers.mid(rotateIndex);
-            rotated.append(seatPlayers.mid(0, rotateIndex));
-            seatPlayers = rotated;
-        }
-    }
-
-    // Save current waiting room scene state
-    m_savedName2photo = name2photo;
-    m_savedPhotosOrder = photos;
-    m_savedPhotoPlayers.clear();
-    m_savedPhotoVisibility.clear();
-    foreach (Photo *photo, m_savedPhotosOrder) {
-        m_savedPhotoPlayers.insert(photo, photo->getPlayer());
-        m_savedPhotoVisibility.insert(photo, photo->isVisible());
-    }
-    m_savedDashboardPlayer = dashboard->getPlayer();
-    m_savedGameStarted = game_started;
-
-    // Ensure we have enough Photo widgets for the target room's non-Self players.
-    int requiredPhotoCount = seatPlayers.length();
-    QList<Photo *> activePhotos = m_savedPhotosOrder;
-    while (activePhotos.length() < requiredPhotoCount) {
-        Photo *photo = new Photo;
-        photo->setZValue(-0.5);
-        addItem(photo);
-        connect(photo, SIGNAL(selected_changed()), this, SLOT(updateSelectedTargets()));
-        connect(photo, SIGNAL(enable_changed()), this, SLOT(onEnabledChange()));
-        m_crossRoomAddedPhotos << photo;
-        activePhotos << photo;
-    }
-
-    // Hide excess Photos if the target room has fewer players
-    for (int i = requiredPhotoCount; i < activePhotos.length(); ++i) {
-        activePhotos[i]->setPlayer(nullptr);
-        activePhotos[i]->setEnabled(false);
-        activePhotos[i]->hide();
-    }
-    if (requiredPhotoCount < activePhotos.length())
-        activePhotos = activePhotos.mid(0, requiredPhotoCount);
-
-    // Assign virtual players to Photos
-    photos = activePhotos;
-    name2photo.clear();
-    for (int i = 0; i < photos.length(); ++i) {
-        Photo *photo = photos.at(i);
-        ClientPlayer *player = seatPlayers.at(i);
-
-        photo->show();
-        photo->setEnabled(true);
-        photo->setPlayer(player);
-        photo->syncCardAreasFromPlayer();
-        if (player->isAlive()) {
-            photo->revivePlayer();
-        } else {
-            photo->killPlayer();
-        }
-        photo->syncRemovedVisualState();
-        // Sync role indicator to the virtual player's actual role
-        if (isHegemonyGameMode(ServerInfo.GameMode))
-            photo->getHegemonyRoleComboBox()->fix(player->getRole() == "careerist" ? "careerist" : player->getRole());
-        else
-            photo->getRoleComboBox()->fix(player->getRole());
-        name2photo[player->objectName()] = photo;
-    }
-
-    // Set Dashboard to the target player (Self)
-    dashboard->setPlayer(Self);
-    dashboard->syncContainerFromPlayer();
-    if (Self != nullptr && Self->isAlive()) {
-        dashboard->revivePlayer();
-    } else {
-        dashboard->killPlayer();
-    }
-    dashboard->syncRemovedVisualState();
-    // Sync role indicator to Self's actual role
-    if (Self != nullptr) {
-        if (isHegemonyGameMode(ServerInfo.GameMode))
-            dashboard->getHegemonyRoleComboBox()->fix(Self->getRole() == "careerist" ? "careerist" : Self->getRole());
-        else
-            dashboard->getRoleComboBox()->fix(Self->getRole());
-    }
-
-    // Save current lord name and apply the spectated room's lord BGM/backdrop.
-    m_savedLordName = ClientInstance->lord_name;
-    QString spectateLordGeneral;
-    if (Self != nullptr && Self->isLord())
-        spectateLordGeneral = Self->getGeneralName();
-    if (spectateLordGeneral.isEmpty()) {
-        foreach (ClientPlayer *player, seatPlayers) {
-            if (player != nullptr && player->isLord()) {
-                spectateLordGeneral = player->getGeneralName();
-                break;
-            }
-        }
-    }
-    if (!spectateLordGeneral.isEmpty()) {
-        ClientInstance->lord_name = spectateLordGeneral;
-        setLordBGM(spectateLordGeneral);
-        setLordBackdrop(spectateLordGeneral);
-    }
-
-    game_started = true;
-    m_crossRoomSceneActive = true;
-    dashboard->setSpectating(true);
-    applyPerspectiveInputLock(true);
-
-    // Hide waiting-room center buttons
-    if (add_robot != nullptr)
-        add_robot->hide();
-    if (fill_robots != nullptr)
-        fill_robots->hide();
-    if (return_to_main_menu != nullptr)
-        return_to_main_menu->hide();
-    if (spectate_other_rooms != nullptr)
-        spectate_other_rooms->hide();
-
-    refreshItem2PlayerMap();
-    updateTable();
-
-    log_box->append(QString("<font color='%1'>-- %2 --</font>")
-                        .arg(Config.TextEditColor.name())
-                        .arg(tr("Cross-room spectate started: room %1, target %2").arg(roomId).arg(targetName)));
-    log_box->append(QString("<font color='%1'>%2</font>")
-                        .arg(Config.TextEditColor.name())
-                        .arg(tr("Press Escape to stop spectating.")));
-}
-
-void RoomScene::onCrossRoomSpectateEnded(const QString &reason)
-{
-    qDebug() << "[CrossRoom] onCrossRoomSpectateEnded: reason=" << reason
-             << "m_crossRoomSceneActive=" << m_crossRoomSceneActive;
-    if (m_crossRoomSceneActive) {
-        dashboard->setSpectating(false);
-        clearPendingMoveStash();
-        // Hide all game overlay widgets that may have been shown during spectate
-        m_tablePile->clear(false);
-        if (pileContainer->isVisible()) {
-            pileContainer->clear();
-            pileContainer->hide();
-        }
-        if (card_container->isVisible()) {
-            card_container->clear();
-            card_container->hide();
-        }
-        prompt_box->setOpacity(0);
-        pindian_box->setOpacity(0);
-        guanxing_box->clear();
-        if (guanxing_box->isVisible())
-            guanxing_box->hide();
-        clearPerspectiveSensitiveAnimations();
-        applyPerspectiveInputLock(false);
-
-        // Stop residual HuaShen animation on the proxy photo that
-        // exitPerspectiveView() would have cleaned up.
-        if (m_isPerspectiveSwitched && m_perspectiveProxyPhoto != nullptr)
-            m_perspectiveProxyPhoto->stopHuaShen();
-
-        // Remove dynamically created Photos
-        foreach (Photo *photo, m_crossRoomAddedPhotos) {
-            photos.removeOne(photo);
-            removeItem(photo);
-            delete photo;
-        }
-        m_crossRoomAddedPhotos.clear();
-
-        // Restore saved waiting room scene state
-        photos = m_savedPhotosOrder;
-        name2photo = m_savedName2photo;
-        foreach (Photo *photo, photos) {
-            const ClientPlayer *savedPlayer = m_savedPhotoPlayers.value(photo, nullptr);
-            photo->setPlayer(const_cast<ClientPlayer *>(savedPlayer));
-            photo->setVisible(m_savedPhotoVisibility.value(photo, true));
-            photo->setEnabled(true);
-
-            // The saved Photos were physically reused during cross-room spectate
-            // (activePhotos starts from m_savedPhotosOrder), so they carry residual
-            // visual state (general names, small avatar, phase icons, etc.) from the
-            // target room.  A full repaintAll() is needed to reset everything.
-            photo->repaintAll();
-
-            if (savedPlayer != nullptr) {
-                photo->syncCardAreasFromPlayer();
-                if (savedPlayer->isAlive())
-                    photo->revivePlayer();
-                else
-                    photo->killPlayer();
-                photo->syncRemovedVisualState();
-            } else {
-                // Clear residual card areas and visual state from cross-room spectate
-                photo->syncCardAreasFromPlayer();
-                photo->updateHp();
-                photo->revivePlayer();
-            }
-
-            // Reset role/kingdom display — setPlayer() connects signals but
-            // does not push the current value into the combo box.
-            // Guard against empty strings: Player::role defaults to "" before
-            // assignment, which would produce an invalid image path in
-            // RoleComboBoxItem::setRole (e.g. "image/system/roles/-1.png").
-            if (isHegemonyGameMode(ServerInfo.GameMode)) {
-                QString kingdom = (savedPlayer != nullptr) ? savedPlayer->getKingdom() : QString();
-                photo->updateKingdom(kingdom.isEmpty() ? "unknown" : kingdom);
-            } else {
-                QString role = (savedPlayer != nullptr) ? savedPlayer->getRole() : QString();
-                photo->updateRole(role.isEmpty() ? "unknown" : role);
-            }
-        }
-
-        // Restore Dashboard to the original player (Self has been restored by Client)
-        const ClientPlayer *dashPlayer = (m_savedDashboardPlayer != nullptr) ? m_savedDashboardPlayer : Self;
-        dashboard->setPlayer(const_cast<ClientPlayer *>(dashPlayer));
-        // setPlayer() only calls updateAvatar(); explicitly refresh the deputy
-        // avatar to clear residual general2 visuals from the spectated room.
-        dashboard->updateSmallAvatar();
-        dashboard->syncContainerFromPlayer();
-        if (dashPlayer != nullptr && dashPlayer->isAlive())
-            dashboard->revivePlayer();
-        else
-            dashboard->killPlayer();
-        dashboard->syncRemovedVisualState();
-
-        // Reset role/kingdom display — setPlayer() connects signals but
-        // does not push the current value into the combo box.
-        // Guard against empty strings to avoid invalid image paths.
-        if (isHegemonyGameMode(ServerInfo.GameMode)) {
-            QString kingdom = (dashPlayer != nullptr) ? dashPlayer->getKingdom() : QString();
-            qDebug() << "[CrossRoom] Dashboard kingdom reset:" << kingdom << "-> unknown";
-            dashboard->updateKingdom(kingdom.isEmpty() ? "unknown" : kingdom);
-        } else {
-            QString role = (dashPlayer != nullptr) ? dashPlayer->getRole() : QString();
-            qDebug() << "[CrossRoom] Dashboard role reset:" << role << "-> unknown"
-                     << "hegemony=" << isHegemonyGameMode(ServerInfo.GameMode)
-                     << "GameMode=" << ServerInfo.GameMode;
-            dashboard->updateRole(role.isEmpty() ? "unknown" : role);
-        }
-
-        game_started = m_savedGameStarted;
-        refreshItem2PlayerMap();
-        updateTable();
-
-        // Restore the original lord BGM/backdrop from before cross-room spectate.
-        ClientInstance->lord_name = m_savedLordName;
-        setLordBGM();
-        if (!m_savedLordName.isEmpty()) {
-            setLordBackdrop(m_savedLordName);
-        } else {
-            // setLordBackdrop() with empty lord_name builds an invalid path
-            // ("backdrop/.jpg") and skips changeTableBg; restore default explicitly.
-            changeTableBg();
-        }
-
-        m_savedName2photo.clear();
-        m_savedPhotosOrder.clear();
-        m_savedPhotoPlayers.clear();
-        m_savedPhotoVisibility.clear();
-        m_savedLordName.clear();
-        m_savedDashboardPlayer = nullptr;
-        m_savedGameStarted = false;
-        m_isPerspectiveSwitched = false;
-        m_perspectiveTargetName.clear();
-        m_perspectiveProxyPhoto = nullptr;
-        m_perspectiveSource = PerspectiveSourceNone;
-        m_originalPhotosOrder.clear();
-        m_crossRoomSceneActive = false;
-
-        // Restore waiting-room center buttons
-        if (return_to_main_menu != nullptr)
-            return_to_main_menu->show();
-        if (spectate_other_rooms != nullptr)
-            spectate_other_rooms->show();
-        if (add_robot != nullptr && ServerInfo.EnableAI)
-            add_robot->show();
-        if (fill_robots != nullptr && ServerInfo.EnableAI)
-            fill_robots->show();
-    }
-
-    QString displayReason = reason;
-    if (reason == "TARGET_ROOM_OVER")
-        displayReason = tr("Target room game ended");
-    else if (reason == "SOURCE_ROOM_STARTING")
-        displayReason = tr("Your room is starting");
-    else if (reason == "VIEWER_REQUESTED")
-        displayReason = tr("Stopped by you");
-    else if (reason == "REPLACED")
-        displayReason = tr("Switched to another spectate target");
-
-    log_box->append(QString("<font color='%1'>-- %2: %3 --</font>")
-                        .arg(Config.TextEditColor.name())
-                        .arg(tr("Cross-room spectate ended"))
-                        .arg(displayReason));
-    log_box->append(QString("<font color='%1'>%2</font>")
-                        .arg(Config.TextEditColor.name())
-                        .arg("════════════════════════════════"));
-}
-
 void RoomScene::onPerspectiveChanged(const QString &targetName, const QList<int> &handCardIds, const QVariantMap &piles)
 {
     Q_UNUSED(handCardIds);
@@ -5984,6 +5640,7 @@ void RoomScene::onPerspectiveChanged(const QString &targetName, const QList<int>
     if (!m_isPerspectiveSwitched && ClientInstance->isCrossRoomSpectating()) {
         applyPerspectiveInputLock(true);
         dashboard->revivePlayer();
+        dashboard->setSpectating(true);
     }
 
 }
@@ -6169,8 +5826,11 @@ void RoomScene::refreshItem2PlayerMap()
 {
     item2player.clear();
     item2player.insert(dashboard, dashboardPlayer());
+    connect(dashboard, SIGNAL(selected_changed()), this, SLOT(updateSelectedTargets()), Qt::UniqueConnection);
     foreach (Photo *photo, photos) {
         const ClientPlayer *p = photo->getPlayer();
+        connect(photo, SIGNAL(selected_changed()), this, SLOT(updateSelectedTargets()), Qt::UniqueConnection);
+        connect(photo, SIGNAL(enable_changed()), this, SLOT(onEnabledChange()), Qt::UniqueConnection);
         if (p != nullptr)
             item2player.insert(photo, p);
     }

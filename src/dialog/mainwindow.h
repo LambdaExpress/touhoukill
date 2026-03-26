@@ -24,6 +24,8 @@ class QWinTaskbarButton;
 class UpdateDialog;
 class ConnectionDialog;
 class ConfigDialog;
+class SpectateScene;
+class SpectateViewModel;
 
 class BroadcastBox : public QDialog
 {
@@ -61,13 +63,18 @@ protected:
 private:
     FitView *view;
     QGraphicsScene *scene;
+    QGraphicsScene *base_scene;
+    QGraphicsScene *overlay_scene;
     Ui::MainWindow *ui;
     ConnectionDialog *connection_dialog;
     ConfigDialog *config_dialog;
     UpdateDialog *update_dialog;
     QSystemTrayIcon *systray;
+    SpectateViewModel *spectate_view_model;
 
     void restoreFromConfig();
+    void pushOverlayScene(QGraphicsScene *scene);
+    void popOverlayScene();
 
 public slots:
     void startConnection();
@@ -103,6 +110,8 @@ private slots:
     void startGameInAnotherInstance();
     void changeBackground();
     void changeTableBg();
+    void enterSpectateScene(const QVariantMap &payload);
+    void leaveSpectateScene(const QString &reason);
     void on_actionView_ban_list_triggered();
 
     void on_actionDownload_Hero_Skin_and_BGM_triggered();

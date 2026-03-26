@@ -174,7 +174,7 @@ private slots:
     void checkCurrentBtnIsRoleMode(bool v);
 };
 
-class CrossRoomSpectateManager;
+class SpectateHub;
 class ServerPlayer;
 
 class Server : public QObject
@@ -192,7 +192,7 @@ public:
 
     Room *findRoomById(int roomId) const;
     QList<Room *> getRooms() const;
-    CrossRoomSpectateManager *crossRoomSpectateManager() const;
+    SpectateHub *spectateHub() const;
 
 private:
     ServerSocket *server;
@@ -201,7 +201,7 @@ private:
     QHash<QString, ServerPlayer *> players;
     QSet<QString> addresses;
     QMultiHash<QString, QString> name2objname;
-    CrossRoomSpectateManager *m_crossRoomSpectate;
+    SpectateHub *m_spectateHub;
 
 private:
     void getLack(ClientSocket *socket);

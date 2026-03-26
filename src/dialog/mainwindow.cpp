@@ -13,6 +13,9 @@
 #include "roomscene.h"
 #include "server.h"
 #include "sgswindow.h"
+#include "spectatescene.h"
+#include "spectatesessioncontroller.h"
+#include "spectateviewmodel.h"
 #include "startscene.h"
 #include "ui_mainwindow.h"
 #include "updatedialog.h"
@@ -98,6 +101,9 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     scene = nullptr;
+    base_scene = nullptr;
+    overlay_scene = nullptr;
+    spectate_view_model = nullptr;
 
     setWindowTitle(tr("TouhouSatsu") + "    " + Sanguosha->getVersionName() + "    " + Sanguosha->getVersionNumber());
 
@@ -188,8 +194,17 @@ MainWindow::~MainWindow()
 
 void MainWindow::gotoScene(QGraphicsScene *scene)
 {
-    if (this->scene != nullptr)
-        this->scene->deleteLater();
+    QGraphicsScene *previousScene = this->scene;
+    if (overlay_scene != nullptr) {
+        QGraphicsScene *previousOverlay = overlay_scene;
+        overlay_scene->deleteLater();
+        overlay_scene = nullptr;
+        if (previousScene == previousOverlay)
+            previousScene = nullptr;
+    }
+    base_scene = scene;
+    if (previousScene != nullptr)
+        previousScene->deleteLater();
     this->scene = scene;
     view->setScene(scene);
     /* @todo: Need a better way to replace the magic number '4' */
@@ -205,6 +220,45 @@ void MainWindow::gotoScene(QGraphicsScene *scene)
     }
 #endif
     changeBackground();
+}
+
+void MainWindow::pushOverlayScene(QGraphicsScene *overlay)
+{
+    if (overlay == nullptr)
+        return;
+
+    if (overlay_scene != nullptr)
+        overlay_scene->deleteLater();
+
+    overlay_scene = overlay;
+    this->scene = overlay_scene;
+    view->setScene(overlay_scene);
+    QResizeEvent e(QSize(view->size().width(), view->size().height()), view->size());
+    view->resizeEvent(&e);
+    changeBackground();
+}
+
+void MainWindow::popOverlayScene()
+{
+    if (overlay_scene == nullptr)
+        return;
+
+    overlay_scene->deleteLater();
+    overlay_scene = nullptr;
+
+    this->scene = base_scene;
+    view->setScene(base_scene);
+    if (base_scene != nullptr && base_scene->inherits("RoomScene"))
+        RoomSceneInstance = qobject_cast<RoomScene *>(base_scene);
+
+    QResizeEvent e(QSize(view->size().width(), view->size().height()), view->size());
+    view->resizeEvent(&e);
+    changeBackground();
+
+    if (spectate_view_model != nullptr) {
+        spectate_view_model->deleteLater();
+        spectate_view_model = nullptr;
+    }
 }
 
 void MainWindow::on_actionExit_triggered()
@@ -354,6 +408,8 @@ void MainWindow::enterRoom()
     ui->actionSaveRecord->setEnabled(true);
 
     connect(ClientInstance, SIGNAL(surrender_enabled(bool)), ui->actionSurrender, SLOT(setEnabled(bool)));
+    connect(ClientInstance, &Client::cross_room_spectate_started, this, &MainWindow::enterSpectateScene, Qt::UniqueConnection);
+    connect(ClientInstance, &Client::cross_room_spectate_ended, this, &MainWindow::leaveSpectateScene, Qt::UniqueConnection);
 
     connect(ui->actionView_Discarded, SIGNAL(triggered()), room_scene, SLOT(toggleDiscards()));
     connect(ui->actionView_distance, SIGNAL(triggered()), room_scene, SLOT(viewDistance()));
@@ -550,6 +606,27 @@ void MainWindow::changeBackground()
         StartScene *start_scene = qobject_cast<StartScene *>(scene);
         start_scene->setServerLogBackground();
     }
+}
+
+void MainWindow::enterSpectateScene(const QVariantMap &payload)
+{
+    Q_UNUSED(payload);
+    if (ClientInstance == nullptr || ClientInstance->spectateController() == nullptr)
+        return;
+
+    if (spectate_view_model != nullptr)
+        spectate_view_model->deleteLater();
+
+    spectate_view_model = new SpectateViewModel(ClientInstance->spectateController()->state(), this);
+    pushOverlayScene(new SpectateScene(this, spectate_view_model));
+}
+
+void MainWindow::leaveSpectateScene(const QString &reason)
+{
+    Q_UNUSED(reason);
+    popOverlayScene();
+    if (ClientInstance != nullptr)
+        Self = ClientInstance->selfPlayer();
 }
 
 void MainWindow::changeTableBg()

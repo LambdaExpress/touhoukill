@@ -39,8 +39,7 @@ void ClientPlayer::addCard(const Card *card, Place place)
 {
     switch (place) {
     case PlaceHand: {
-        if (card != nullptr)
-            known_cards << card;
+        known_cards << card;
         handcard_num++;
         break;
     }
@@ -80,6 +79,8 @@ QList<int> ClientPlayer::getKnownHandCardIds() const
     foreach (const Card *card, known_cards) {
         if (card != nullptr)
             ids << card->getId();
+        else
+            ids << Card::S_UNKNOWN_CARD_ID;
     }
     return ids;
 }
@@ -115,6 +116,8 @@ void ClientPlayer::removeCard(const Card *card, Place place)
         handcard_num--;
         if (card != nullptr)
             known_cards.removeOne(card);
+        else
+            known_cards.removeOne(nullptr);
         break;
     }
     case PlaceEquip: {
@@ -140,9 +143,16 @@ void ClientPlayer::setCards(const QList<int> &card_ids)
 {
     known_cards.clear();
     foreach (int cardId, card_ids) {
+        if (cardId == Card::S_UNKNOWN_CARD_ID) {
+            known_cards.append(nullptr);
+            continue;
+        }
+
         const Card *card = Sanguosha->getCard(cardId);
         if (card != nullptr)
             known_cards.append(card);
+        else
+            known_cards.append(nullptr);
     }
 }
 

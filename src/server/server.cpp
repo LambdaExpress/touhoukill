@@ -1,7 +1,7 @@
 #include "server.h"
 #include "SkinBank.h"
 #include "choosegeneraldialog.h"
-#include "crossroomspectatemanager.h"
+#include "spectatehub.h"
 #include "engine.h"
 #include "nativesocket.h"
 #include "protocol.h"
@@ -1033,7 +1033,7 @@ Server::Server(QObject *parent)
     server = new NativeServerSocket;
     server->setParent(this);
 
-    m_crossRoomSpectate = new CrossRoomSpectateManager(this);
+    m_spectateHub = new SpectateHub(this);
 
     //synchronize ServerInfo on the server side to avoid ambiguous usage of Config and ServerInfo
     ServerInfo.parse(Sanguosha->getSetupString());
@@ -1080,15 +1080,11 @@ Room *Server::createNewRoom()
     connect(current, SIGNAL(room_message(QString)), this, SIGNAL(server_message(QString)));
     connect(current, SIGNAL(game_over(QString)), this, SLOT(gameOver()));
 
-    // Cross-room spectate tap signals (Qt::QueuedConnection for thread safety)
-    connect(current, &Room::crossRoomNotify,
-            m_crossRoomSpectate, &CrossRoomSpectateManager::onTargetNotify,
-            Qt::QueuedConnection);
-    connect(current, &Room::crossRoomBroadcast,
-            m_crossRoomSpectate, &CrossRoomSpectateManager::onBroadcastNotify,
+    connect(current, &Room::spectateProjectionAdvanced,
+            m_spectateHub, &SpectateHub::onProjectionAdvanced,
             Qt::QueuedConnection);
     connect(current, &Room::roomTearingDown,
-            m_crossRoomSpectate, &CrossRoomSpectateManager::onRoomTeardown,
+            m_spectateHub, &SpectateHub::onRoomTeardown,
             Qt::QueuedConnection);
 
     return current;
@@ -1322,7 +1318,7 @@ QList<Room *> Server::getRooms() const
     return rooms.toList();
 }
 
-CrossRoomSpectateManager *Server::crossRoomSpectateManager() const
+SpectateHub *Server::spectateHub() const
 {
-    return m_crossRoomSpectate;
+    return m_spectateHub;
 }

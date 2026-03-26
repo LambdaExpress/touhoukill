@@ -11,6 +11,7 @@
 class Recorder;
 class Replayer;
 class QTextDocument;
+class SpectateSessionController;
 
 class Client : public QObject
 {
@@ -49,7 +50,7 @@ public:
         ClientStatusBasicMask = 0x00FF
     };
 
-    explicit Client(QObject *parent, const QString &filename = QString());
+    explicit Client(QObject *parent, const QString &filename = QString(), bool connectSocket = true, bool installGlobals = true);
     ~Client() override;
 
     // cheat functions
@@ -71,7 +72,9 @@ public:
     void requestCrossRoomSpectate(int roomId, const QString &targetName);
     void requestStopCrossRoomSpectate();
     void requestCrossRoomPerspectiveSwitch(const QString &targetName);
-    bool isCrossRoomSpectating() const { return m_isCrossRoomSpectating; }
+    bool isCrossRoomSpectating() const;
+    SpectateSessionController *spectateController() const { return m_spectateController; }
+    ClientPlayer *selfPlayer() const { return m_self; }
 
     void disconnectFromHost();
     void replyToServer(QSanProtocol::CommandType command, const QVariant &arg = QVariant());
@@ -274,13 +277,20 @@ protected:
     int alive_count;
     int swap_pile;
     RoomState _m_roomState;
+    ClientPlayer *m_self;
+    QHash<QSanProtocol::CommandType, Callback> m_interactions;
+    QHash<QSanProtocol::CommandType, Callback> m_callbacks;
+    QList<const ClientPlayer *> players;
+    QString m_perspectiveTargetName;
+    int m_lastPerspectiveSyncSerial;
+    QMap<QString, bool> m_savedPileOpenState;
+
+    Callback callbackForCommand(QSanProtocol::CommandType command) const { return m_callbacks.value(command, nullptr); }
+    bool hasInteractiveCommand(QSanProtocol::CommandType command) const { return m_interactions.contains(command); }
 
 private:
     ClientSocket *socket;
     bool m_isGameOver;
-    QHash<QSanProtocol::CommandType, Callback> m_interactions;
-    QHash<QSanProtocol::CommandType, Callback> m_callbacks;
-    QList<const ClientPlayer *> players;
     QStringList ban_packages;
     Recorder *recorder;
     Replayer *replayer;
@@ -292,25 +302,9 @@ private:
 
     unsigned int _m_lastServerSerial;
     bool m_isObjectNameRecorded;
-
-    // Perspective switching
-    QString m_perspectiveTargetName;
-    int m_lastPerspectiveSyncSerial;
-    QMap<QString, bool> m_savedPileOpenState; // true if the pile was already open before spectate sync
-
-    // Cross-room spectate state
-    bool m_crossSpectateActive;
-    bool m_isCrossRoomSpectating;
-    QString m_crossSpectateSessionId;
-    QString m_crossSpectateTargetName;
-    int m_crossSpectateRoomId;
-    int m_crossSpectateSerial;
-
-    // Saved state for cross-room spectate (restored when spectate ends)
-    ClientPlayer *m_savedSelf;
-    QList<const ClientPlayer *> m_savedPlayers;
-    int m_savedAliveCount;
-    QList<ClientPlayer *> m_crossRoomVirtualPlayers;
+    SpectateSessionController *m_spectateController;
+    bool m_installGlobals;
+    bool m_connectSocket;
 
     void updatePileNum();
     QString setPromptList(const QStringList &text);

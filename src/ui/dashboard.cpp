@@ -1901,10 +1901,16 @@ void Dashboard::syncContainerFromPlayer()
 {
     selected = nullptr;
     pendings.clear();
+    // Cross-room/perspective switches replace the underlying player/room state.
+    // Any pending view-as context from the previous scene becomes invalid and
+    // must be cleared before the new hand/equip widgets are rebuilt.
+    view_as_skill = nullptr;
+    filter = nullptr;
     if (pending_card != nullptr && pending_card->parent() == nullptr && pending_card->isVirtualCard()) {
         delete pending_card;
     }
     pending_card = nullptr;
+    emit card_selected(nullptr);
     _m_pile_expanded.clear();
     _m_id_expanded.clear();
 

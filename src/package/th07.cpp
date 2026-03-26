@@ -390,7 +390,7 @@ void XijianCard::onUse(Room *room, const CardUseStruct &card_use) const
     else {
         room->moveCardTo(card, to1, to2, place, CardMoveReason(CardMoveReason::S_REASON_TRANSFER, from->objectName(), "xijian", QString()));
         if (place == Player::PlaceDelayedTrick) {
-            CardUseStruct use(card, nullptr, to2);
+            CardUseStruct use(card, to1, to2);
             QVariant _data = QVariant::fromValue(use);
             room->getThread()->trigger(TargetConfirming, room, _data);
             CardUseStruct new_use = _data.value<CardUseStruct>();

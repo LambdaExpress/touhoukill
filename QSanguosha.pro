@@ -8,6 +8,7 @@ TEMPLATE = app
 !macx: CONFIG += audio
 
 win32: QT += winextras
+win32:CONFIG(debug, debug|release): CONFIG += console
 
 !equals(QT_MAJOR_VERSION, "5") {
     error("QSanguosha requires Qt 5 after 5.6.")
@@ -31,6 +32,8 @@ SOURCES += \
     src/client/client.cpp \
     src/client/clientplayer.cpp \
     src/client/clientstruct.cpp \
+    src/client/spectateroomstate.cpp \
+    src/client/spectatesessioncontroller.cpp \
     src/core/card.cpp \
     src/core/engine.cpp \
     src/core/general.cpp \
@@ -84,11 +87,12 @@ SOURCES += \
     src/package/hegemonyGeneral.cpp \
     src/package/washout.cpp \
     src/server/ai.cpp \
-    src/server/crossroomspectatemanager.cpp \
     src/server/gamerule.cpp \
     src/server/generalselector.cpp \
     src/server/room.cpp \
     src/server/roomthread.cpp \
+    src/server/spectatehub.cpp \
+    src/server/spectateprojection.cpp \
     src/server/server.cpp \
     src/server/serverplayer.cpp \
     src/ui/bubblechatbox.cpp \
@@ -117,6 +121,8 @@ SOURCES += \
     src/ui/SkinBank.cpp \
     src/ui/sgswindow.cpp \
     src/ui/skinitem.cpp \
+    src/ui/spectatescene.cpp \
+    src/ui/spectateviewmodel.cpp \
     src/ui/sprite.cpp \
     src/ui/startscene.cpp \
     src/ui/TablePile.cpp \
@@ -141,6 +147,8 @@ HEADERS += \
     src/client/client.h \
     src/client/clientplayer.h \
     src/client/clientstruct.h \
+    src/client/spectateroomstate.h \
+    src/client/spectatesessioncontroller.h \
     src/core/audio.h \
     src/core/card.h \
     src/core/compiler-specific.h \
@@ -196,11 +204,12 @@ HEADERS += \
     src/package/hegemonyGeneral.h \
     src/package/washout.h \
     src/server/ai.h \
-    src/server/crossroomspectatemanager.h \
     src/server/gamerule.h \
     src/server/generalselector.h \
     src/server/room.h \
     src/server/roomthread.h \
+    src/server/spectatehub.h \
+    src/server/spectateprojection.h \
     src/server/server.h \
     src/server/serverplayer.h \
     src/ui/bubblechatbox.h \
@@ -229,6 +238,8 @@ HEADERS += \
     src/ui/SkinBank.h \
     src/ui/sgswindow.h \
     src/ui/skinitem.h \
+    src/ui/spectatescene.h \
+    src/ui/spectateviewmodel.h \
     src/ui/sprite.h \
     src/ui/startscene.h \
     src/ui/TablePile.h \
@@ -461,4 +472,3 @@ INCLUDEPATH += $$_PRO_FILE_PWD_/include/freetype
 DEPENDPATH += $$_PRO_FILE_PWD_/include/freetype
 
 #ANDROID_PACKAGE_SOURCE_DIR = $$_PRO_FILE_PWD_/resource/android
-

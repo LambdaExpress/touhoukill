@@ -9,13 +9,21 @@
 
 ClientLogBox::ClientLogBox(QWidget *parent)
     : QTextEdit(parent)
+    , m_client(ClientInstance)
 {
     setReadOnly(true);
 }
 
+void ClientLogBox::setClient(Client *client)
+{
+    m_client = client;
+}
+
 void ClientLogBox::appendLog(const QString &type, const QString &from_general, const QStringList &tos, const QString &card_str, QString arg, QString arg2)
 {
-    if (Self->hasFlag("marshalling"))
+    Client *client = (m_client != nullptr) ? m_client : ClientInstance;
+    ClientPlayer *selfPlayer = (client != nullptr) ? client->selfPlayer() : Self;
+    if (selfPlayer != nullptr && selfPlayer->hasFlag("marshalling"))
         return;
 
     if (type == "$AppendSeparator") {
@@ -25,7 +33,7 @@ void ClientLogBox::appendLog(const QString &type, const QString &from_general, c
 
     QString from;
     if (!from_general.isEmpty()) {
-        from = ClientInstance->getPlayerName(from_general);
+        from = (client != nullptr) ? client->getPlayerName(from_general) : Sanguosha->translate(from_general);
         from = bold(from, Qt::green);
     }
 
@@ -33,7 +41,7 @@ void ClientLogBox::appendLog(const QString &type, const QString &from_general, c
     if (!tos.isEmpty()) {
         QStringList to_list;
         foreach (QString to, tos)
-            to_list << ClientInstance->getPlayerName(to);
+            to_list << ((client != nullptr) ? client->getPlayerName(to) : Sanguosha->translate(to));
         to = to_list.join(", ");
         to = bold(to, Qt::red);
     }

@@ -323,7 +323,8 @@ void CardContainer::view(const ClientPlayer *player)
     QList<int> card_ids;
     QList<const Card *> cards = player->getHandcards();
     foreach (const Card *card, cards)
-        card_ids << card->getEffectiveId();
+        if (card != nullptr)
+            card_ids << card->getEffectiveId();
 
     fillCards(card_ids);
 }
