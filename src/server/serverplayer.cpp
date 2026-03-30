@@ -1193,6 +1193,10 @@ void ServerPlayer::marshal(ServerPlayer *player) const
     room->notifyProperty(player, this, "maxhp");
     room->notifyProperty(player, this, "hp");
     room->notifyProperty(player, this, "dyingFactor");
+    room->notifyProperty(player, this, "temporary");
+    room->notifyProperty(player, this, "temporaryOwnerName");
+    room->notifyProperty(player, this, "temporarySerial");
+    room->notifyProperty(player, this, "destroyPending");
     room->notifyProperty(player, this, "general_showed");
     room->notifyProperty(player, this, "general2_showed");
     room->notifyProperty(player, this, "inital_seat");
@@ -1209,6 +1213,10 @@ void ServerPlayer::marshal(ServerPlayer *player) const
     } else {
         if (getKingdom() != getGeneral()->getKingdom())
             room->notifyProperty(player, this, "kingdom");
+        if (isTemporary() && getTemporaryOwnerName() == player->objectName()) {
+            room->notifyProperty(player, this, "kingdom");
+            room->notifyProperty(player, this, "role");
+        }
     }
 
     if (isAlive()) {
@@ -1226,6 +1234,9 @@ void ServerPlayer::marshal(ServerPlayer *player) const
 
     if (isChained())
         room->notifyProperty(player, this, "chained");
+
+    if (getState() != "online")
+        room->notifyProperty(player, this, "state");
 
     room->notifyProperty(player, this, "removed");
     room->notifyProperty(player, this, "gender");

@@ -382,11 +382,20 @@ void Photo::playBattleArrayAnimations()
 
 void Photo::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (Self != nullptr && m_player != nullptr && !Self->isAlive()) {
-        if (m_player->isAlive()) {
+    if (Self != nullptr && m_player != nullptr) {
+        bool ownedTemporary = m_player->property("temporary").toBool()
+            && m_player->property("temporaryOwnerName").toString() == Self->objectName();
+
+        if (!Self->isAlive() && m_player->isAlive()) {
             ClientInstance->requestPerspectiveSwitch(m_player->objectName());
             return;
         }
+
+        if (Self->isAlive() && ownedTemporary && m_player->isAlive()) {
+            ClientInstance->requestPerspectiveSwitch(m_player->objectName(), Client::PerspectiveSourceControl);
+            return;
+        }
+
         if (m_player == Self && RoomSceneInstance->isPerspectiveSwitched()) {
             // Double-click own proxy Photo to exit perspective view
             ClientInstance->requestPerspectiveSwitch(QString());

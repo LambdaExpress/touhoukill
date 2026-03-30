@@ -519,7 +519,8 @@ void Client::removePlayer(const QVariant &player_name)
     ClientPlayer *player = findChild<ClientPlayer *>(name);
     if (player != nullptr) {
         player->setParent(nullptr);
-        alive_count--;
+        if (player->isAlive())
+            alive_count--;
         emit player_removed(name);
         players.removeOne(player);
         connect(this, &Client::destroyed, player, &ClientPlayer::deleteLater);
@@ -1355,9 +1356,17 @@ void Client::requestSurrender()
     onPlayerResponseCard(new SurrenderCard);
 }
 
-void Client::requestPerspectiveSwitch(const QString &targetName)
+void Client::requestPerspectiveSwitch(const QString &targetName, PerspectiveSource source)
 {
-    notifyServer(S_COMMAND_PERSPECTIVE_REQUEST, targetName);
+    if (source == PerspectiveSourceSpectate) {
+        notifyServer(S_COMMAND_PERSPECTIVE_REQUEST, targetName);
+        return;
+    }
+
+    JsonArray arg;
+    arg << targetName;
+    arg << static_cast<int>(source);
+    notifyServer(S_COMMAND_PERSPECTIVE_REQUEST, arg);
 }
 
 ClientPlayer *Client::getOperationPlayer()

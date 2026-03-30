@@ -44,6 +44,10 @@ class Player : public QObject
     Q_PROPERTY(bool removed READ isRemoved WRITE setRemoved)
     Q_PROPERTY(bool owner READ isOwner WRITE setOwner)
     Q_PROPERTY(bool role_shown READ hasShownRole WRITE setShownRole)
+    Q_PROPERTY(bool temporary READ isTemporary WRITE setTemporary)
+    Q_PROPERTY(QString temporaryOwnerName READ getTemporaryOwnerName WRITE setTemporaryOwnerName)
+    Q_PROPERTY(int temporarySerial READ getTemporarySerial WRITE setTemporarySerial)
+    Q_PROPERTY(bool destroyPending READ isDestroyPending WRITE setDestroyPending)
 
     Q_PROPERTY(bool general_showed READ hasShownGeneral WRITE setGeneralShowed)
     Q_PROPERTY(bool general2_showed READ hasShownGeneral2 WRITE setGeneral2Showed)
@@ -280,6 +284,15 @@ public:
     void setRemoved(bool removed);
     bool isRemoved() const;
 
+    void setTemporary(bool temporary);
+    bool isTemporary() const;
+    void setTemporaryOwnerName(const QString &owner_name);
+    QString getTemporaryOwnerName() const;
+    void setTemporarySerial(int serial);
+    int getTemporarySerial() const;
+    void setDestroyPending(bool pending);
+    bool isDestroyPending() const;
+
     bool canSlash(const Player *other, const Card *slash, bool distance_limit = true, int rangefix = 0, const QList<const Player *> &others = QList<const Player *>()) const;
     bool canSlash(const Player *other, bool distance_limit = true, int rangefix = 0, const QList<const Player *> &others = QList<const Player *>()) const;
     int getCardCount(bool include_equip = true, bool include_judging = false) const;
@@ -411,6 +424,10 @@ private:
     bool face_up;
     bool chained;
     bool removed;
+    bool temporary;
+    QString temporaryOwnerName;
+    int temporarySerial;
+    bool destroyPending;
     QList<int> judging_area;
     QHash<const Player *, int> fixed_distance;
 

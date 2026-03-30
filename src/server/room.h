@@ -60,6 +60,20 @@ public:
         PerspectiveSource source;
     };
 
+    struct TemporaryPlayerSpec
+    {
+        TemporaryPlayerSpec()
+            : takeControl(true)
+        {
+        }
+
+        QString generalName;
+        QString general2Name;
+        QString screenName;
+        QString insertAfterName;
+        bool takeControl;
+    };
+
     friend class RoomThread;
     friend class RoomThread3v3;
     friend class RoomThreadXMode;
@@ -262,6 +276,13 @@ public:
     void setControlRelation(ServerPlayer *controller, ServerPlayer *target);
     void clearControlRelation(ServerPlayer *controller);
     bool isPlayerControlled(const ServerPlayer *player) const;
+    ServerPlayer *createTemporaryPlayer(ServerPlayer *controller, const TemporaryPlayerSpec &spec);
+    ServerPlayer *createTemporaryPlayer(ServerPlayer *controller, const QString &general_name, const QString &general2_name = QString(),
+                                        const QString &screen_name = QString(), const QString &insert_after = QString(), bool take_control = true);
+    bool destroyTemporaryPlayer(ServerPlayer *player, bool deferred = true);
+    bool isTemporaryPlayer(const ServerPlayer *player) const;
+    QList<ServerPlayer *> getTemporaryPlayers(ServerPlayer *controller = nullptr) const;
+    bool setTemporaryControlFocus(ServerPlayer *controller, ServerPlayer *target);
 
     bool isHuanhunDefinitelyImpossible(const ServerPlayer *player) const;
     bool isDeadPlayerRevivable(const ServerPlayer *player) const;
@@ -584,12 +605,21 @@ private:
     // Perspective switching base layer
     QMap<ServerPlayer *, PerspectiveEntry> m_perspectiveViewers; // viewer -> (target, source)
     int m_perspectiveSyncSerial;
+    int m_temporarySerial;
+    QHash<ServerPlayer *, ServerPlayer *> m_temporaryOwners; // temporary player -> owner/controller
     void addPerspectiveViewer(ServerPlayer *viewer, ServerPlayer *target, PerspectiveSource source);
     PerspectiveSource getPerspectiveSource(ServerPlayer *viewer) const;
     ServerPlayer *getPerspectiveTarget(ServerPlayer *viewer) const;
     void sendPerspectiveSync(ServerPlayer *viewer, ServerPlayer *target);
     void clearPerspectiveViewer(ServerPlayer *viewer);
     void clearAllPerspectiveViewersOf(ServerPlayer *target);
+    ServerPlayer *getTemporaryOwner(const ServerPlayer *player) const;
+    QList<ServerPlayer *> getOwnedTemporaryPlayers(ServerPlayer *controller) const;
+    bool shouldDeferTemporaryDestroy(const ServerPlayer *player) const;
+    void cleanupPendingTemporaryPlayers();
+    void synchronizePlayerSeats(bool broadcast_arrangement = true, bool initialize_seat = false);
+    void notifyTemporaryPlayerAdded(ServerPlayer *player);
+    void notifyTemporaryPlayerRemoved(ServerPlayer *player);
 
     // Command proxy interface (Control mode)
     ServerPlayer *resolveRequestReceiver(ServerPlayer *player) const;

@@ -54,6 +54,62 @@
 
 using namespace QSanProtocol;
 
+namespace {
+
+static QList<int> buildSeatRegionList(const int *regions, int count)
+{
+    QList<int> result;
+    for (int i = 0; i < count; ++i)
+        result << regions[i];
+    return result;
+}
+
+static QList<int> buildRegularSeatRegions(int photoCount)
+{
+    static const int regularSeatIndex[][9] = {
+        {1}, // 02
+        {5, 6}, // 03
+        {5, 1, 6}, // 04
+        {3, 1, 1, 4}, // 05
+        {3, 1, 1, 1, 4}, // 06
+        {5, 5, 1, 1, 6, 6}, // 07
+        {5, 5, 1, 1, 1, 6, 6}, // 08
+        {3, 3, 7, 7, 7, 7, 4, 4}, // 09
+        {3, 3, 7, 7, 7, 7, 7, 4, 4}, // 10
+    };
+
+    if (photoCount <= 0)
+        return QList<int>();
+
+    const int presetCount = sizeof(regularSeatIndex) / sizeof(regularSeatIndex[0]);
+    if (photoCount <= presetCount)
+        return buildSeatRegionList(regularSeatIndex[photoCount - 1], photoCount);
+
+    // 11+ total players (10+ photos): keep the layout symmetric and split the
+    // top row into right corner, center, and left corner to reduce overflow.
+    int topCenterCount = (photoCount % 2 == 0) ? 4 : 5;
+    topCenterCount = qMin(topCenterCount, qMax(1, photoCount - 2));
+
+    int sideCount = qMax(0, (photoCount - topCenterCount - 2) / 2);
+
+    QList<int> result;
+    for (int i = 0; i < sideCount; ++i)
+        result << 3;
+    result << 0;
+    for (int i = 0; i < topCenterCount; ++i)
+        result << 1;
+    result << 2;
+    for (int i = 0; i < sideCount; ++i)
+        result << 4;
+
+    while (result.length() < photoCount)
+        result.insert(result.length() / 2, 1);
+
+    return result;
+}
+
+} // namespace
+
 RoomScene *RoomSceneInstance;
 
 void RoomScene::resetPiles()
@@ -1072,12 +1128,24 @@ void RoomScene::_dispersePhotos(QList<Photo *> &photos, QRectF fillRegion, Qt::O
     double stepY = NAN;
 
     if (orientation == Qt::Horizontal) {
-        double maxWidth = fillRegion.width();
-        stepX = qMax(photoWidth + G_ROOM_LAYOUT.m_photoHDistance, maxWidth / numPhotos);
+        if (numPhotos == 1) {
+            stepX = 0;
+        } else {
+            double maxWidth = fillRegion.width();
+            double baseStep = qMax(photoWidth + G_ROOM_LAYOUT.m_photoHDistance, maxWidth / numPhotos);
+            double maxFitStep = qMax(0.0, (maxWidth - photoWidth) / (numPhotos - 1));
+            stepX = qMin(baseStep, maxFitStep);
+        }
         stepY = 0;
     } else {
         stepX = 0;
-        stepY = G_ROOM_LAYOUT.m_photoVDistance + photoHeight;
+        if (numPhotos == 1) {
+            stepY = 0;
+        } else {
+            double baseStep = G_ROOM_LAYOUT.m_photoVDistance + photoHeight;
+            double maxFitStep = qMax(0.0, (fillRegion.height() - photoHeight) / (numPhotos - 1));
+            stepY = qMin(baseStep, maxFitStep);
+        }
     }
 
     switch (vAlign) {
@@ -1135,17 +1203,6 @@ void RoomScene::updateTable()
     // ------------------------
     // region 5 = 0 + 3, region 6 = 2 + 4, region 7 = 0 + 1 + 2
 
-    static int regularSeatIndex[][9] = {
-        {1}, // 02
-        {5, 6}, // 03
-        {5, 1, 6}, // 04
-        {3, 1, 1, 4}, // 05
-        {3, 1, 1, 1, 4}, // 06
-        {5, 5, 1, 1, 6, 6}, // 07
-        {5, 5, 1, 1, 1, 6, 6}, // 08
-        {3, 3, 7, 7, 7, 7, 4, 4}, // 09
-        {3, 3, 7, 7, 7, 7, 7, 4, 4}, // 10
-    };
     static int hulaoSeatIndex[][3] = {
         {1, 1, 1}, // if self is shenlvbu
         {3, 3, 1},
@@ -1214,27 +1271,45 @@ void RoomScene::updateTable()
     pausing_item->setRect(sceneRect());
     pausing_item->setPos(0, 0);
 
-    int *seatToRegion = nullptr;
+    QList<int> seatToRegion;
     bool pkMode = false;
     if (ServerInfo.GameMode == "04_1v3" && game_started) {
-        seatToRegion = hulaoSeatIndex[dashboardPlayer()->getSeat() - 1];
-        pkMode = true;
+        int seatIndex = dashboardPlayer()->getSeat() - 1;
+        if (seatIndex >= 0 && seatIndex < (int)(sizeof(hulaoSeatIndex) / sizeof(hulaoSeatIndex[0]))) {
+            seatToRegion = buildSeatRegionList(hulaoSeatIndex[seatIndex], 3);
+            pkMode = true;
+        }
     } else if (ServerInfo.GameMode == "06_3v3" && game_started) {
-        seatToRegion = kof3v3SeatIndex[(dashboardPlayer()->getSeat() - 1) % 3];
-        pkMode = true;
+        int seatIndex = (dashboardPlayer()->getSeat() - 1) % 3;
+        if (seatIndex >= 0 && seatIndex < (int)(sizeof(kof3v3SeatIndex) / sizeof(kof3v3SeatIndex[0]))) {
+            seatToRegion = buildSeatRegionList(kof3v3SeatIndex[seatIndex], 5);
+            pkMode = true;
+        }
     } else if (ServerInfo.GameMode == "03_1v2" && game_started) {
-        seatToRegion = pvlSeatIndex[dashboardPlayer()->getSeat() - 1];
-        pkMode = true;
+        int seatIndex = dashboardPlayer()->getSeat() - 1;
+        if (seatIndex >= 0 && seatIndex < (int)(sizeof(pvlSeatIndex) / sizeof(pvlSeatIndex[0]))) {
+            seatToRegion = buildSeatRegionList(pvlSeatIndex[seatIndex], 2);
+            pkMode = true;
+        }
     } else if (ServerInfo.GameMode == "04_2v2" && game_started) {
-        seatToRegion = happy2v2SeatIndex[(dashboardPlayer()->getSeat() - 1) % 2];
-        pkMode = true;
-    } else {
-        seatToRegion = regularSeatIndex[photos.length() - 1];
+        int seatIndex = (dashboardPlayer()->getSeat() - 1) % 2;
+        if (seatIndex >= 0 && seatIndex < (int)(sizeof(happy2v2SeatIndex) / sizeof(happy2v2SeatIndex[0]))) {
+            seatToRegion = buildSeatRegionList(happy2v2SeatIndex[seatIndex], 3);
+            pkMode = true;
+        }
     }
+
+    if (seatToRegion.length() < photos.length()) {
+        seatToRegion = buildRegularSeatRegions(photos.length());
+        pkMode = false;
+    }
+
     QList<Photo *> photosInRegion[C_NUM_REGIONS];
     int n = photos.length();
     for (int i = 0; i < n; i++) {
-        int regionIndex = seatToRegion[i];
+        int regionIndex = seatToRegion.value(i, 1);
+        if (regionIndex < 0 || regionIndex >= C_NUM_REGIONS)
+            regionIndex = 1;
         if (regionIndex == 4 || regionIndex == 6)
             photosInRegion[regionIndex].append(photos[i]);
         else
@@ -1266,11 +1341,15 @@ void RoomScene::updateTable()
 
 void RoomScene::addPlayer(ClientPlayer *player)
 {
+    ensurePhotoCapacity(qMax(0, ClientInstance->getPlayers().length() - 1));
+
     for (int i = 0; i < photos.length(); i++) {
         Photo *photo = photos[i];
         if (photo->getPlayer() == nullptr) {
             photo->setPlayer(player);
             name2photo[player->objectName()] = photo;
+            if (!item2player.isEmpty())
+                refreshItem2PlayerMap();
 
             if (!Self->hasFlag("marshalling"))
                 Sanguosha->playSystemAudioEffect("add-player");
@@ -1286,6 +1365,8 @@ void RoomScene::removePlayer(const QString &player_name)
     if (photo != nullptr) {
         photo->setPlayer(nullptr);
         name2photo.remove(player_name);
+        if (!item2player.isEmpty())
+            refreshItem2PlayerMap();
         Sanguosha->playSystemAudioEffect("remove-player");
     }
 }
@@ -1293,7 +1374,8 @@ void RoomScene::removePlayer(const QString &player_name)
 void RoomScene::arrangeSeats(const QList<const ClientPlayer *> &seats)
 {
     // rearrange the photos
-    Q_ASSERT(seats.length() == photos.length());
+    ensurePhotoCapacity(seats.length());
+    Q_ASSERT(seats.length() <= photos.length());
 
     for (int i = 0; i < seats.length(); i++) {
         const Player *player = seats.at(i);
@@ -1319,6 +1401,8 @@ void RoomScene::arrangeSeats(const QList<const ClientPlayer *> &seats)
             connect(photo, SIGNAL(selected_changed()), this, SLOT(updateSelectedTargets()));
             connect(photo, SIGNAL(enable_changed()), this, SLOT(onEnabledChange()));
         }
+    } else {
+        refreshItem2PlayerMap();
     }
 
     QList<QString> names = name2photo.keys();
@@ -1358,6 +1442,21 @@ void RoomScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
             changed = true;
         if (changed)
             emit cancel_role_box_expanding();
+    }
+}
+
+void RoomScene::ensurePhotoCapacity(int seatCount)
+{
+    while (photos.length() < seatCount) {
+        Photo *photo = new Photo;
+        photos << photo;
+        addItem(photo);
+        photo->setZValue(-0.5);
+
+        if (!item2player.isEmpty()) {
+            connect(photo, SIGNAL(selected_changed()), this, SLOT(updateSelectedTargets()));
+            connect(photo, SIGNAL(enable_changed()), this, SLOT(onEnabledChange()));
+        }
     }
 }
 
@@ -6026,13 +6125,32 @@ void RoomScene::onRequestRouted(const QString &onBehalfOf)
             ClientInstance->setControlSuspended(true);
             exitPerspectiveView();
         }
-    } else {
-        // Request is for controlled player → ensure Control view is active
-        if (!m_isPerspectiveSwitched && !m_controlSuspendedTargetName.isEmpty()
-            && onBehalfOf == m_controlSuspendedTargetName) {
-            ClientInstance->setControlSuspended(false);
-            enterPerspectiveView(m_controlSuspendedTargetName, PerspectiveSourceControl, false);
+        return;
+    }
+
+    ClientPlayer *routedPlayer = ClientInstance->getPlayer(onBehalfOf);
+    if (routedPlayer == nullptr)
+        return;
+
+    bool ownedTemporary = routedPlayer->property("temporary").toBool()
+        && routedPlayer->property("temporaryOwnerName").toString() == Self->objectName();
+    if (!ownedTemporary)
+        return;
+
+    if (!m_isPerspectiveSwitched && !m_controlSuspendedTargetName.isEmpty()
+        && onBehalfOf == m_controlSuspendedTargetName) {
+        ClientInstance->setControlSuspended(false);
+        enterPerspectiveView(m_controlSuspendedTargetName, PerspectiveSourceControl, false);
+        m_controlSuspendedTargetName.clear();
+        return;
+    }
+
+    if (!m_isPerspectiveSwitched || m_perspectiveSource != PerspectiveSourceControl || m_perspectiveTargetName != onBehalfOf) {
+        ClientInstance->setControlSuspended(false);
+        if (m_isPerspectiveSwitched)
+            exitPerspectiveView();
+        enterPerspectiveView(onBehalfOf, PerspectiveSourceControl, false);
+        if (m_controlSuspendedTargetName == onBehalfOf)
             m_controlSuspendedTargetName.clear();
-        }
     }
 }

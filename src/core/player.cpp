@@ -33,6 +33,9 @@ Player::Player(QObject *parent)
     , face_up(true)
     , chained(false)
     , removed(false)
+    , temporary(false)
+    , temporarySerial(0)
+    , destroyPending(false)
 {
 }
 
@@ -1333,6 +1336,46 @@ void Player::setRemoved(bool removed)
         this->removed = removed;
         emit removedChanged();
     }
+}
+
+void Player::setTemporary(bool temporary)
+{
+    this->temporary = temporary;
+}
+
+bool Player::isTemporary() const
+{
+    return temporary;
+}
+
+void Player::setTemporaryOwnerName(const QString &owner_name)
+{
+    temporaryOwnerName = owner_name;
+}
+
+QString Player::getTemporaryOwnerName() const
+{
+    return temporaryOwnerName;
+}
+
+void Player::setTemporarySerial(int serial)
+{
+    temporarySerial = serial;
+}
+
+int Player::getTemporarySerial() const
+{
+    return temporarySerial;
+}
+
+void Player::setDestroyPending(bool pending)
+{
+    destroyPending = pending;
+}
+
+bool Player::isDestroyPending() const
+{
+    return destroyPending;
 }
 
 void Player::addMark(const QString &mark, int add_num)

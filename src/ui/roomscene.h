@@ -309,6 +309,7 @@ private:
     double _m_last_front_ZValue;
     GenericCardContainer *_getGenericCardContainer(Player::Place place, Player *player);
     const ClientPlayer *dashboardPlayer() const;
+    void ensurePhotoCapacity(int seatCount);
     void refreshItem2PlayerMap();
     void applyPerspectiveInputLock(bool locked);
     QMap<int, QList<QList<CardItem *>>> _m_cardsMoveStash;

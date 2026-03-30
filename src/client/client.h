@@ -71,7 +71,7 @@ public:
 
     // other client requests
     void requestSurrender();
-    void requestPerspectiveSwitch(const QString &targetName);
+    void requestPerspectiveSwitch(const QString &targetName, PerspectiveSource source = PerspectiveSourceSpectate);
     QString perspectiveTargetName() const { return m_perspectiveTargetName; }
     bool isPerspectiveActive() const { return !m_perspectiveTargetName.isEmpty(); }
     PerspectiveSource perspectiveSource() const { return m_perspectiveSource; }

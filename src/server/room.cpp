@@ -18,6 +18,7 @@
 #include <QHostAddress>
 #include <QMessageBox>
 #include <QMetaEnum>
+#include <QSet>
 #include <QStringList>
 #include <QTextCodec>
 #include <QTextStream>
@@ -31,6 +32,53 @@
 #endif
 
 using namespace QSanProtocol;
+
+namespace {
+template <typename Func>
+class ScopeExit
+{
+public:
+    explicit ScopeExit(Func func)
+        : m_func(std::move(func))
+        , m_active(true)
+    {
+    }
+
+    ScopeExit(ScopeExit &&other)
+        : m_func(std::move(other.m_func))
+        , m_active(other.m_active)
+    {
+        other.m_active = false;
+    }
+
+    ~ScopeExit()
+    {
+        if (m_active)
+            m_func();
+    }
+
+private:
+    ScopeExit(const ScopeExit &);
+    ScopeExit &operator=(const ScopeExit &);
+
+    Func m_func;
+    bool m_active;
+};
+
+template <typename Func>
+ScopeExit<Func> makeScopeExit(Func func)
+{
+    return ScopeExit<Func>(std::move(func));
+}
+}
+
+#define ROOM_CONCAT_IMPL(a, b) a##b
+#define ROOM_CONCAT(a, b) ROOM_CONCAT_IMPL(a, b)
+#define ROOM_PENDING_TEMPORARY_CLEANUP_GUARD()                                                                \
+    const auto ROOM_CONCAT(_pendingTemporaryCleanupGuard_, __LINE__) = makeScopeExit([this]() {              \
+        cleanupPendingTemporaryPlayers();                                                                     \
+    });                                                                                                       \
+    Q_UNUSED(ROOM_CONCAT(_pendingTemporaryCleanupGuard_, __LINE__))
 
 Room::Room(QObject *parent, const QString &mode)
     : QObject(parent)
@@ -55,6 +103,7 @@ Room::Room(QObject *parent, const QString &mode)
     , provider(nullptr)
     , m_fillAGWho(nullptr)
     , m_perspectiveSyncSerial(0)
+    , m_temporarySerial(0)
 {
     static int s_global_room_id = 0;
     _m_Id = s_global_room_id++;
@@ -364,6 +413,7 @@ void Room::revivePlayer(ServerPlayer *player, bool initialize)
 
     QVariant v = QVariant::fromValue(player);
     thread->trigger(Revive, this, v);
+    cleanupPendingTemporaryPlayers();
 }
 
 void Room::updateStateItem()
@@ -489,6 +539,8 @@ void Room::killPlayer(ServerPlayer *victim, DamageStruct *reason)
                 makeSurrender(victim);
         }
     }
+
+    cleanupPendingTemporaryPlayers();
 }
 
 void Room::judge(JudgeStruct &judge_struct)
@@ -545,9 +597,19 @@ void Room::returnToDrawPile(const QList<int> &cards, bool bottom)
 QStringList Room::aliveRoles(ServerPlayer *except) const
 {
     QStringList roles;
+    QSet<QString> countedKeys;
     foreach (ServerPlayer *player, m_alivePlayers) {
-        if (player != except)
-            roles << player->getRole();
+        if (player == except)
+            continue;
+
+        QString aliveKey = player->objectName();
+        if (player->isTemporary() && !player->getTemporaryOwnerName().isEmpty())
+            aliveKey = player->getTemporaryOwnerName();
+
+        if (countedKeys.contains(aliveKey))
+            continue;
+        countedKeys << aliveKey;
+        roles << player->getRole();
     }
 
     return roles;
@@ -1069,6 +1131,7 @@ bool Room::notifyMoveFocus(const QList<ServerPlayer *> &players, CommandType com
 
 bool Room::askForSkillInvoke(ServerPlayer *player, const QString &skill_name, const QVariant &data, const QString &prompt)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
     notifyMoveFocus(player, S_COMMAND_INVOKE_SKILL);
 
@@ -1129,6 +1192,7 @@ bool Room::askForSkillInvoke(ServerPlayer *player, const Skill *skill, const QVa
 
 QString Room::askForChoice(ServerPlayer *player, const QString &skill_name, const QString &choices, const QVariant &data)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
     notifyMoveFocus(player, S_COMMAND_MULTIPLE_CHOICE);
     //QStringList validChoices = choices.split("+");
@@ -1335,6 +1399,7 @@ bool Room::askForNullification(const Card *trick, ServerPlayer *from, ServerPlay
 
 bool Room::_askForNullification(const Card *trick, ServerPlayer *from, ServerPlayer *to, bool positive, _NullificationAiHelper aiHelper)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
 
     _m_roomState.setCurrentCardUseReason(CardUseStruct::CARD_USE_REASON_RESPONSE_USE);
@@ -1535,6 +1600,7 @@ bool Room::_askForNullification(const Card *trick, ServerPlayer *from, ServerPla
 int Room::askForCardChosen(ServerPlayer *player, ServerPlayer *who, const QString &flags, const QString &reason, bool handcard_visible, Card::HandlingMethod method,
                            const QList<int> &disabled_ids)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
     notifyMoveFocus(player, S_COMMAND_CHOOSE_CARD);
 
@@ -1651,6 +1717,7 @@ const Card *Room::askForCard(ServerPlayer *player, const QString &pattern, const
 const Card *Room::askForCard(ServerPlayer *player, const QString &pattern, const QString &prompt, const QVariant &data, Card::HandlingMethod method, ServerPlayer *to,
                              bool isRetrial, const QString &skill_name, bool isProvision, int notice_index)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     Q_ASSERT(pattern != "slash" || method != Card::MethodUse); // use askForUseSlashTo instead
     tryPause();
     notifyMoveFocus(player, S_COMMAND_RESPONSE_CARD);
@@ -1892,6 +1959,7 @@ const Card *Room::askForCard(ServerPlayer *player, const QString &pattern, const
 const Card *Room::askForUseCard(ServerPlayer *player, const QString &pattern, const QString &prompt, int notice_index, Card::HandlingMethod method, bool addHistory,
                                 const QString &skill_name)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     Q_ASSERT(method != Card::MethodResponse);
 
     tryPause();
@@ -1993,6 +2061,7 @@ const Card *Room::askForUseSlashTo(ServerPlayer *slasher, ServerPlayer *victim, 
 
 int Room::askForAG(ServerPlayer *player, const QList<int> &card_ids, bool refusable, const QString &reason)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
     notifyMoveFocus(player, S_COMMAND_AMAZING_GRACE);
     Q_ASSERT(card_ids.length() > 0);
@@ -2058,6 +2127,7 @@ void Room::doExtraAmazingGrace(ServerPlayer *from, ServerPlayer *target, int tim
 
 const Card *Room::askForCardShow(ServerPlayer *player, ServerPlayer *requester, const QString &reason)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     Q_ASSERT(!player->isKongcheng());
 
     tryPause();
@@ -2092,6 +2162,7 @@ const Card *Room::askForCardShow(ServerPlayer *player, ServerPlayer *requester, 
 
 void Room::askForSinglePeach(ServerPlayer *player, ServerPlayer *dying, CardUseStruct &use)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
     notifyMoveFocus(player, S_COMMAND_ASK_PEACH);
     _m_roomState.setCurrentCardUseReason(CardUseStruct::CARD_USE_REASON_RESPONSE_USE);
@@ -2156,6 +2227,7 @@ void Room::askForSinglePeach(ServerPlayer *player, ServerPlayer *dying, CardUseS
 
 QSharedPointer<SkillInvokeDetail> Room::askForTriggerOrder(ServerPlayer *player, const QList<QSharedPointer<SkillInvokeDetail>> &sameTiming, bool cancelable, const QVariant &data)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
 
     Q_ASSERT(!sameTiming.isEmpty());
@@ -2727,6 +2799,7 @@ void Room::setFixedDistance(Player *from, const Player *to, int distance)
 
 void Room::reverseFor3v3(const Card *card, ServerPlayer *player, QList<ServerPlayer *> &list)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
     notifyMoveFocus(player, S_COMMAND_CHOOSE_DIRECTION);
 
@@ -2794,6 +2867,7 @@ int Room::drawCard(bool bottom)
 
 void Room::prepareForStart()
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     if (mode == "06_3v3" || mode == "06_XMode" || mode == "02_1v1") {
         return;
     } else if (isHegemonyGameMode(mode)) {
@@ -2932,14 +3006,17 @@ void Room::reportDisconnection()
                 player->releaseLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
         }
 
-        // Release proxied player's waiting lock if this controller disconnects
-        ServerPlayer *proxiedPlayer = getProxiedPlayer(player);
-        if (proxiedPlayer != nullptr && proxiedPlayer != player && proxiedPlayer->m_isWaitingReply) {
+        // Release owned temporary players' waiting locks if this controller disconnects
+        foreach (ServerPlayer *proxiedPlayer, getOwnedTemporaryPlayers(player)) {
+            if (proxiedPlayer == nullptr || proxiedPlayer == player || !proxiedPlayer->m_isWaitingReply)
+                continue;
+
             if (_m_raceStarted) {
                 _m_raceWinner.store(proxiedPlayer);
                 _m_semRaceRequest.release();
-            } else
+            } else {
                 proxiedPlayer->releaseLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
+            }
         }
 
         setPlayerProperty(player, "state", "offline");
@@ -2986,14 +3063,17 @@ void Room::trustCommand(ServerPlayer *player, const QVariant & /*unused*/)
             } else
                 player->releaseLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
 
-            // Release proxied player's waiting lock if this controller enters trust
-            ServerPlayer *proxiedPlayer = getProxiedPlayer(player);
-            if (proxiedPlayer != nullptr && proxiedPlayer != player && proxiedPlayer->m_isWaitingReply) {
+            // Release owned temporary players' waiting locks if this controller enters trust
+            foreach (ServerPlayer *proxiedPlayer, getOwnedTemporaryPlayers(player)) {
+                if (proxiedPlayer == nullptr || proxiedPlayer == player || !proxiedPlayer->m_isWaitingReply)
+                    continue;
+
                 if (_m_raceStarted) {
                     _m_raceWinner.store(proxiedPlayer);
                     _m_semRaceRequest.release();
-                } else
+                } else {
                     proxiedPlayer->releaseLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
+                }
             }
         }
     } else
@@ -3035,6 +3115,7 @@ void Room::cheat(ServerPlayer *player, const QVariant &args)
 
 bool Room::makeSurrender(ServerPlayer *initiator)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     bool loyalGiveup = true;
     int loyalAlive = 0;
     bool renegadeGiveup = true;
@@ -3171,6 +3252,8 @@ void Room::processClientPacket(const QString &request)
                 return;
             (this->*callback)(player, packet.getMessageBody());
         }
+
+        cleanupPendingTemporaryPlayers();
     }
 }
 
@@ -3335,6 +3418,7 @@ void Room::assignGeneralsForPlayers(const QList<ServerPlayer *> &to_assign)
 
 void Room::chooseGenerals()
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     QStringList ban_list = Config.value("Banlist/Roles").toStringList();
     //Sanguosha->banRandomGods(); //why this function add the rest gods into banlist....
     // for lord.
@@ -3405,6 +3489,7 @@ void Room::chooseGenerals()
 
 void Room::choose1v2Generals()
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     QStringList ban_list = Config.value("Banlist/03_1v2").toStringList();
     //Sanguosha->banRandomGods(); //why this function add the rest gods into banlist....
 
@@ -3444,6 +3529,7 @@ void Room::choose1v2Generals()
 
 void Room::choose2v2Generals()
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     QStringList ban_list = Config.value("Banlist/04_2v2").toStringList();
     //Sanguosha->banRandomGods(); //why this function add the rest gods into banlist....
 
@@ -3483,6 +3569,7 @@ void Room::choose2v2Generals()
 
 void Room::chooseHegemonyGenerals()
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     QStringList ban_list = Config.value("Banlist/Hegemony").toStringList();
     QList<ServerPlayer *> to_assign = m_players;
 
@@ -3613,10 +3700,63 @@ void Room::swapSeat(ServerPlayer *a, ServerPlayer *b)
 
     m_players.swap(seat1, seat2);
 
-    QStringList player_circle;
-    foreach (ServerPlayer *player, m_players)
-        player_circle << player->objectName();
-    doBroadcastNotify(S_COMMAND_ARRANGE_SEATS, JsonUtils::toJsonArray(player_circle));
+    synchronizePlayerSeats(true, false);
+}
+
+ServerPlayer *Room::getTemporaryOwner(const ServerPlayer *player) const
+{
+    if (player == nullptr)
+        return nullptr;
+
+    return m_temporaryOwners.value(const_cast<ServerPlayer *>(player), nullptr);
+}
+
+QList<ServerPlayer *> Room::getOwnedTemporaryPlayers(ServerPlayer *controller) const
+{
+    QList<ServerPlayer *> result;
+    if (controller == nullptr)
+        return result;
+
+    for (auto it = m_temporaryOwners.constBegin(); it != m_temporaryOwners.constEnd(); ++it) {
+        if (it.value() == controller)
+            result << it.key();
+    }
+    return result;
+}
+
+bool Room::shouldDeferTemporaryDestroy(const ServerPlayer *player) const
+{
+    if (player == nullptr)
+        return false;
+
+    return player == current || player->m_isWaitingReply || !m_damageStack.isEmpty();
+}
+
+void Room::cleanupPendingTemporaryPlayers()
+{
+    QList<ServerPlayer *> pending;
+    foreach (ServerPlayer *player, m_players) {
+        if (player != nullptr && player->isTemporary() && player->isDestroyPending() && !shouldDeferTemporaryDestroy(player))
+            pending << player;
+    }
+
+    foreach (ServerPlayer *player, pending)
+        destroyTemporaryPlayer(player, false);
+}
+
+void Room::synchronizePlayerSeats(bool broadcast_arrangement, bool initialize_seat)
+{
+    if (m_players.isEmpty()) {
+        m_alivePlayers.clear();
+        return;
+    }
+
+    if (broadcast_arrangement) {
+        QStringList player_circle;
+        foreach (ServerPlayer *player, m_players)
+            player_circle << player->objectName();
+        doBroadcastNotify(S_COMMAND_ARRANGE_SEATS, JsonUtils::toJsonArray(player_circle));
+    }
 
     m_alivePlayers.clear();
     for (int i = 0; i < m_players.length(); i++) {
@@ -3630,9 +3770,44 @@ void Room::swapSeat(ServerPlayer *a, ServerPlayer *b)
 
         broadcastProperty(player, "seat");
 
+        if (initialize_seat && player->getInitialSeat() == 0 && player->getSeat() > 0) {
+            player->setInitialSeat(player->getSeat());
+            broadcastProperty(player, "inital_seat");
+        }
+    }
+
+    for (int i = 0; i < m_players.length(); i++) {
+        ServerPlayer *player = m_players.at(i);
         player->setNext(m_players.at((i + 1) % m_players.length()));
         broadcastProperty(player, "next");
     }
+}
+
+void Room::notifyTemporaryPlayerAdded(ServerPlayer *player)
+{
+    if (player == nullptr)
+        return;
+
+    foreach (ServerPlayer *viewer, m_players) {
+        if (viewer == player)
+            continue;
+
+        player->introduceTo(viewer);
+        player->marshal(viewer);
+
+        if (player->isTemporary() && player->getTemporaryOwnerName() == viewer->objectName()) {
+            notifyProperty(viewer, player, "role");
+            notifyProperty(viewer, player, "kingdom");
+        }
+    }
+}
+
+void Room::notifyTemporaryPlayerRemoved(ServerPlayer *player)
+{
+    if (player == nullptr)
+        return;
+
+    doBroadcastNotify(S_COMMAND_REMOVE_PLAYER, player->objectName());
 }
 
 void Room::setPlayerSkillInvalidity(ServerPlayer *player, const Skill *skill, bool invalidity, bool trigger_event)
@@ -3974,14 +4149,28 @@ void Room::processResponse(ServerPlayer *player, const Packet *packet)
     if (validateReply(player)) {
         responsePlayer = player;
     } else {
-        // Proxy scenario: sender is a controller, route to the proxied player
-        ServerPlayer *proxiedPlayer = getProxiedPlayer(player);
-        if (proxiedPlayer != nullptr && proxiedPlayer != player) {
+        // Proxy scenario: sender is a controller, route to the owned temporary player
+        foreach (ServerPlayer *proxiedPlayer, getOwnedTemporaryPlayers(player)) {
+            if (proxiedPlayer == nullptr || proxiedPlayer == player)
+                continue;
+
             proxiedPlayer->acquireLock(ServerPlayer::SEMA_MUTEX);
             if (validateReply(proxiedPlayer)) {
                 responsePlayer = proxiedPlayer;
-            } else {
-                proxiedPlayer->releaseLock(ServerPlayer::SEMA_MUTEX);
+                break;
+            }
+            proxiedPlayer->releaseLock(ServerPlayer::SEMA_MUTEX);
+        }
+
+        if (responsePlayer == nullptr) {
+            ServerPlayer *proxiedPlayer = getProxiedPlayer(player);
+            if (proxiedPlayer != nullptr && proxiedPlayer != player) {
+                proxiedPlayer->acquireLock(ServerPlayer::SEMA_MUTEX);
+                if (validateReply(proxiedPlayer)) {
+                    responsePlayer = proxiedPlayer;
+                } else {
+                    proxiedPlayer->releaseLock(ServerPlayer::SEMA_MUTEX);
+                }
             }
         }
     }
@@ -5406,19 +5595,14 @@ void Room::spectateCommand(ServerPlayer *player, const QVariant &arg)
         targetName = arg.toString();
     }
 
-    // Spectate source: only dead players can use free spectate
-    if (requestedSource == PerspectiveSpectate && player->isAlive())
-        return;
-
-    // Control source: validated by server-side API only (setControlRelation)
-    // Client cannot directly request Control mode via this command
-    if (requestedSource == PerspectiveControl)
-        return;
-
     if (targetName.isEmpty()) {
         clearPerspectiveViewer(player);
         return;
     }
+
+    // Spectate source: only dead players can use free spectate
+    if (requestedSource == PerspectiveSpectate && player->isAlive())
+        return;
 
     if (requestedSource == PerspectiveSpectate && isDeadPlayerRevivable(player)) {
         if (m_perspectiveViewers.contains(player))
@@ -5434,6 +5618,14 @@ void Room::spectateCommand(ServerPlayer *player, const QVariant &arg)
     ServerPlayer *target = findPlayerByObjectName(targetName);
     if (target == nullptr || !target->isAlive())
         return;
+
+    if (requestedSource == PerspectiveControl) {
+        if (!target->isTemporary() || getTemporaryOwner(target) != player)
+            return;
+
+        setTemporaryControlFocus(player, target);
+        return;
+    }
 
     if (m_perspectiveViewers.contains(player))
         clearPerspectiveViewer(player);
@@ -5517,10 +5709,185 @@ void Room::clearAllPerspectiveViewersOf(ServerPlayer *target)
         clearPerspectiveViewer(viewer);
 }
 
+ServerPlayer *Room::createTemporaryPlayer(ServerPlayer *controller, const QString &general_name, const QString &general2_name,
+                                          const QString &screen_name, const QString &insert_after, bool take_control)
+{
+    TemporaryPlayerSpec spec;
+    spec.generalName = general_name;
+    spec.general2Name = general2_name;
+    spec.screenName = screen_name;
+    spec.insertAfterName = insert_after;
+    spec.takeControl = take_control;
+    return createTemporaryPlayer(controller, spec);
+}
+
+ServerPlayer *Room::createTemporaryPlayer(ServerPlayer *controller, const TemporaryPlayerSpec &spec)
+{
+    if (!game_started || controller == nullptr)
+        return nullptr;
+
+    const General *general = Sanguosha->getGeneral(spec.generalName);
+    if (general == nullptr)
+        return nullptr;
+    if (!spec.general2Name.isEmpty() && Sanguosha->getGeneral(spec.general2Name) == nullptr)
+        return nullptr;
+
+    ServerPlayer *player = new ServerPlayer(this);
+    player->setObjectName(QString("temp_%1_%2").arg(controller->objectName()).arg(++m_temporarySerial));
+    player->setScreenName(spec.screenName.isEmpty() ? Sanguosha->translate(spec.generalName) : spec.screenName);
+    player->setProperty("avatar", controller->property("avatar"));
+    player->setState("robot");
+    player->setRole(controller->getRole());
+    player->setShownRole(controller->hasShownRole());
+    player->setKingdom(controller->getKingdom());
+    player->setAlive(true);
+    player->setFaceUp(true);
+    player->setChained(false);
+    player->setRemoved(false);
+    player->setTemporary(true);
+    player->setTemporaryOwnerName(controller->objectName());
+    player->setTemporarySerial(m_temporarySerial);
+    player->setDestroyPending(false);
+    player->setGeneralName(spec.generalName);
+    if (!spec.general2Name.isEmpty())
+        player->setGeneral2Name(spec.general2Name);
+    player->setMaxHp(player->getGeneralMaxHp());
+    player->setHp(player->getMaxHp());
+    player->setGender(player->getGeneral()->getGender());
+
+    int insertIndex = m_players.indexOf(controller);
+    if (!spec.insertAfterName.isEmpty()) {
+        ServerPlayer *insertAfter = findPlayerByObjectName(spec.insertAfterName, true);
+        if (insertAfter != nullptr)
+            insertIndex = m_players.indexOf(insertAfter);
+    }
+    if (insertIndex < 0 || insertIndex >= m_players.length())
+        m_players << player;
+    else
+        m_players.insert(insertIndex + 1, player);
+
+    m_temporaryOwners[player] = controller;
+
+    notifyTemporaryPlayerAdded(player);
+    changeHero(player, spec.generalName, false, false, false, false);
+    if (!spec.general2Name.isEmpty())
+        changeHero(player, spec.general2Name, false, false, true, false);
+    synchronizePlayerSeats(true, true);
+    updateStateItem();
+    cleanupPendingTemporaryPlayers();
+
+    if (spec.takeControl)
+        setTemporaryControlFocus(controller, player);
+
+    return player;
+}
+
+bool Room::destroyTemporaryPlayer(ServerPlayer *player, bool deferred)
+{
+    if (!isTemporaryPlayer(player))
+        return false;
+
+    if (deferred && shouldDeferTemporaryDestroy(player)) {
+        if (!player->isDestroyPending())
+            setPlayerProperty(player, "destroyPending", true);
+        return true;
+    }
+
+    if (player->isDestroyPending())
+        setPlayerProperty(player, "destroyPending", false);
+
+    ServerPlayer *owner = getTemporaryOwner(player);
+    if (owner != nullptr && getPerspectiveTarget(owner) == player)
+        clearPerspectiveViewer(owner);
+
+    clearAllPerspectiveViewersOf(player);
+    m_temporaryOwners.remove(player);
+
+    int index = m_players.indexOf(player);
+    bool wasCurrent = current == player;
+    bool wasAlive = player->isAlive();
+
+    player->bury();
+
+    if (wasAlive)
+        m_alivePlayers.removeOne(player);
+
+    m_players.removeOne(player);
+    notifyTemporaryPlayerRemoved(player);
+
+    if (wasCurrent) {
+        if (m_players.isEmpty()) {
+            current = nullptr;
+        } else {
+            int fallbackIndex = index;
+            if (fallbackIndex >= m_players.length())
+                fallbackIndex = 0;
+            current = m_players.at(fallbackIndex);
+            if ((current != nullptr) && !current->isAlive())
+                current = qobject_cast<ServerPlayer *>(current->getNextAlive(1, false));
+        }
+    }
+
+    synchronizePlayerSeats(true, false);
+    updateStateItem();
+
+    AI *smart_ai = player->getSmartAI();
+    if (smart_ai != nullptr) {
+        ais.removeOne(smart_ai);
+        smart_ai->deleteLater();
+    }
+
+    player->setParent(nullptr);
+    player->deleteLater();
+    cleanupPendingTemporaryPlayers();
+    return true;
+}
+
+bool Room::isTemporaryPlayer(const ServerPlayer *player) const
+{
+    return player != nullptr && player->isTemporary();
+}
+
+QList<ServerPlayer *> Room::getTemporaryPlayers(ServerPlayer *controller) const
+{
+    QList<ServerPlayer *> result;
+    foreach (ServerPlayer *player, m_players) {
+        if (!player->isTemporary())
+            continue;
+        if (controller != nullptr && getTemporaryOwner(player) != controller)
+            continue;
+        result << player;
+    }
+    return result;
+}
+
+bool Room::setTemporaryControlFocus(ServerPlayer *controller, ServerPlayer *target)
+{
+    if (controller == nullptr || !isTemporaryPlayer(target))
+        return false;
+    if (getTemporaryOwner(target) != controller)
+        return false;
+
+    setControlRelation(controller, target);
+    return true;
+}
+
 void Room::setControlRelation(ServerPlayer *controller, ServerPlayer *target)
 {
     if (controller == nullptr || target == nullptr || controller == target)
         return;
+
+    if (target->isTemporary()) {
+        if (getTemporaryOwner(target) != controller)
+            return;
+
+        if (m_perspectiveViewers.contains(controller))
+            clearPerspectiveViewer(controller);
+
+        addPerspectiveViewer(controller, target, PerspectiveControl);
+        sendPerspectiveSync(controller, target);
+        return;
+    }
 
     // Verify target is not already controlled by someone else
     if (isPlayerControlled(target))
@@ -5590,6 +5957,12 @@ ServerPlayer *Room::getCommandProxy(const ServerPlayer *player) const
 {
     if (player == nullptr)
         return nullptr;
+
+    if (player->isTemporary()) {
+        ServerPlayer *owner = getTemporaryOwner(player);
+        if (owner != nullptr && owner->isOnline())
+            return owner;
+    }
 
     for (auto it = m_perspectiveViewers.constBegin(); it != m_perspectiveViewers.constEnd(); ++it) {
         if (it.value().source == PerspectiveControl && it.value().target == player) {
@@ -5979,6 +6352,7 @@ void Room::setEmotion(ServerPlayer *target, const QString &emotion)
 
 void Room::activate(ServerPlayer *player, CardUseStruct &card_use)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
 
     if (player->hasFlag("Global_PlayPhaseTerminated") || player->hasFlag("Global_TurnTerminated")) {
@@ -6038,6 +6412,7 @@ void Room::activate(ServerPlayer *player, CardUseStruct &card_use)
 
 void Room::askForLuckCard()
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
 
     QList<ServerPlayer *> players;
@@ -6154,6 +6529,7 @@ void Room::askForLuckCard()
 
 Card::Suit Room::askForSuit(ServerPlayer *player, const QString &reason)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
     notifyMoveFocus(player, S_COMMAND_CHOOSE_SUIT);
 
@@ -6191,6 +6567,7 @@ Card::Suit Room::askForSuit(ServerPlayer *player, const QString &reason)
 
 QString Room::askForKingdom(ServerPlayer *player)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
     notifyMoveFocus(player, S_COMMAND_CHOOSE_KINGDOM);
 
@@ -6228,6 +6605,7 @@ QString Room::askForKingdom(ServerPlayer *player)
 
 bool Room::askForDiscard(ServerPlayer *player, const QString &reason, int discard_num, int min_num, bool optional, bool include_equip, const QString &prompt)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     if (!player->isAlive())
         return false;
     tryPause();
@@ -6357,6 +6735,7 @@ void Room::doJileiShow(ServerPlayer *player, const QList<int> &jilei_ids)
 
 const Card *Room::askForExchange(ServerPlayer *player, const QString &reason, int discard_num, int min_num, bool include_equip, const QString &prompt, bool optional)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     if (!player->isAlive())
         return nullptr;
     tryPause();
@@ -6467,6 +6846,7 @@ ServerPlayer *Room::getLord(const QString & /*unused*/, bool /*unused*/) const
 
 void Room::askForGuanxing(ServerPlayer *zhuge, const QList<int> &cards, GuanxingType guanxing_type, const QString &skillName)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     // ATTENTION: DO REMOVE THE CARD FROM getDrawPile (But keep their place in DrawPile, via getNCards or something) BEFORE USING THIS FUNCTION!
     // Else duplicated card ids will appear in the bottom of draw pile, which will cause card stuck when accessed, and (maybe other) subsequent Client / Server misbehave
 
@@ -6570,6 +6950,7 @@ void Room::askForGuanxing(ServerPlayer *zhuge, const QList<int> &cards, Guanxing
 
 int Room::doGongxin(ServerPlayer *shenlvmeng, ServerPlayer *target, QList<int> enabled_ids, const QString &skill_name, bool cancellable)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     Q_ASSERT(!target->isKongcheng());
     tryPause();
     notifyMoveFocus(shenlvmeng, S_COMMAND_SKILL_GONGXIN);
@@ -6635,6 +7016,7 @@ int Room::doGongxin(ServerPlayer *shenlvmeng, ServerPlayer *target, QList<int> e
 
 const Card *Room::askForPindian(ServerPlayer *player, ServerPlayer *from, ServerPlayer *to, const QString &reason, PindianStruct *pindian)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     if (!from->isAlive() || !to->isAlive() || player->isKongcheng())
         return nullptr;
     Q_ASSERT(!player->isKongcheng());
@@ -6680,6 +7062,7 @@ const Card *Room::askForPindian(ServerPlayer *player, ServerPlayer *from, Server
 
 QList<const Card *> Room::askForPindianRace(ServerPlayer *from, ServerPlayer *to, const QString &reason)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     if (!from->isAlive() || !to->isAlive())
         return QList<const Card *>() << nullptr << nullptr;
     Q_ASSERT(!from->isKongcheng() && !to->isKongcheng());
@@ -6758,6 +7141,7 @@ QList<const Card *> Room::askForPindianRace(ServerPlayer *from, ServerPlayer *to
 ServerPlayer *Room::askForPlayerChosen(ServerPlayer *player, const QList<ServerPlayer *> &targets, const QString &skillName, const QString &prompt, bool optional,
                                        bool notify_skill)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     if (targets.isEmpty()) {
         Q_ASSERT(optional);
         return nullptr;
@@ -6853,6 +7237,7 @@ void Room::_setupChooseGeneralRequestArgs(ServerPlayer *player)
 
 QString Room::askForGeneral(ServerPlayer *player, const QStringList &generals, QString default_choice)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
     notifyMoveFocus(player, S_COMMAND_CHOOSE_GENERAL);
 
@@ -7258,6 +7643,7 @@ void Room::retrial(const Card *card, ServerPlayer *player, JudgeStruct *judge, c
 int Room::askForRende(ServerPlayer *liubei, QList<int> &cards, const QString &skill_name, bool /*unused*/, bool optional, int max_num, QList<ServerPlayer *> players,
                       CardMoveReason reason, const QString &prompt, bool notify_skill)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     if (max_num == -1)
         max_num = cards.length();
     if (players.isEmpty())
@@ -7399,6 +7785,7 @@ int Room::askForRende(ServerPlayer *liubei, QList<int> &cards, const QString &sk
 bool Room::askForYiji(ServerPlayer *guojia, QList<int> &cards, const QString &skill_name, bool is_preview, bool visible, bool optional, int max_num, QList<ServerPlayer *> players,
                       CardMoveReason reason, const QString &prompt, bool notify_skill)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     if (max_num == -1)
         max_num = cards.length();
     if (players.isEmpty())
@@ -7505,6 +7892,7 @@ QString Room::generatePlayerName()
 
 QString Room::askForOrder(ServerPlayer *player, const QString &default_choice)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
     notifyMoveFocus(player, S_COMMAND_CHOOSE_ORDER);
 
@@ -7521,6 +7909,7 @@ QString Room::askForOrder(ServerPlayer *player, const QString &default_choice)
 
 QString Room::askForRole(ServerPlayer *player, const QStringList &roles, const QString &scheme)
 {
+    ROOM_PENDING_TEMPORARY_CLEANUP_GUARD();
     tryPause();
     notifyMoveFocus(player, S_COMMAND_CHOOSE_ROLE_3V3);
 

@@ -107,6 +107,15 @@ public:
 	void setRemoved(bool removed);
     bool isRemoved() const;
 
+    void setTemporary(bool temporary);
+    bool isTemporary() const;
+    void setTemporaryOwnerName(const char *owner_name);
+    QString getTemporaryOwnerName() const;
+    void setTemporarySerial(int serial);
+    int getTemporarySerial() const;
+    void setDestroyPending(bool pending);
+    bool isDestroyPending() const;
+
 
     bool hasShownRole() const;
     void setShownRole(bool shown);
@@ -1460,6 +1469,15 @@ public:
     void doLightbox(const char *lightboxName, int duration = 2000);
     void doAnimate(QSanProtocol::AnimateType type, const char *arg1 = NULL, const char *arg2 = NULL, QList<ServerPlayer *> players = QList<ServerPlayer *>());
     void doAnimate(int type, const char *arg1 = NULL, const char *arg2 = NULL, QList<ServerPlayer *> players = QList<ServerPlayer *>());
+    void setControlRelation(ServerPlayer *controller, ServerPlayer *target);
+    void clearControlRelation(ServerPlayer *controller);
+    bool isPlayerControlled(const ServerPlayer *player) const;
+    ServerPlayer *createTemporaryPlayer(ServerPlayer *controller, const char *general_name, const char *general2_name = NULL,
+                                        const char *screen_name = NULL, const char *insert_after = NULL, bool take_control = true);
+    bool destroyTemporaryPlayer(ServerPlayer *player, bool deferred = true);
+    bool isTemporaryPlayer(const ServerPlayer *player) const;
+    QList<ServerPlayer *> getTemporaryPlayers(ServerPlayer *controller = NULL) const;
+    bool setTemporaryControlFocus(ServerPlayer *controller, ServerPlayer *target);
 
     void changePlayerGeneral(ServerPlayer *player, const char *new_general);
     void changePlayerGeneral2(ServerPlayer *player, const char *new_general);
