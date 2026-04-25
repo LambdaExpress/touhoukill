@@ -1,0 +1,189 @@
+name: Build Windows release package
+
+on:
+  push:
+    branches:
+      - release
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  QT_VERSION: 5.12.12
+  QT_ARCH: win32_mingw73
+  MINGW_TOOL: qt.tools.win32_mingw730
+  PACKAGE_BASENAME: TouhouKill-windows
+
+jobs:
+  build:
+    name: Build playable Windows zip
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Qt and MinGW
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: windows
+          target: desktop
+          arch: ${{ env.QT_ARCH }}
+          tools: tools_mingw,${{ env.MINGW_TOOL }}
+          cache: true
+
+      - name: Print toolchain versions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          qmake.exe -v
+          mingw32-make.exe -v
+          Get-Command windeployqt.exe
+
+      - name: Build release executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          qmake.exe -spec win32-g++ CONFIG+=release QSanguosha.pro
+          $jobs = [Math]::Max(2, [int]$env:NUMBER_OF_PROCESSORS)
+          mingw32-make.exe "-j$jobs" release
+
+          if (!(Test-Path 'release/QSanguosha.exe')) {
+            throw 'Expected release/QSanguosha.exe was not produced.'
+          }
+
+      - name: Create playable package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          $versionLine = Select-String -Path 'QSanguosha.pro' -Pattern '^VERSION\s*=\s*(\S+)' | Select-Object -First 1
+          if (!$versionLine) {
+            throw 'Could not read VERSION from QSanguosha.pro.'
+          }
+
+          $projectVersion = $versionLine.Matches[0].Groups[1].Value
+          $safeVersion = $projectVersion -replace '[^A-Za-z0-9_.-]', '-'
+          $packageName = "${{ env.PACKAGE_BASENAME }}-v$safeVersion-run${{ github.run_number }}"
+          $stage = Join-Path $env:RUNNER_TEMP $packageName
+          $zipPath = Join-Path $env:GITHUB_WORKSPACE "$packageName.zip"
+
+          Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
+          Remove-Item -Force $zipPath -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $stage | Out-Null
+
+          Copy-Item 'release/QSanguosha.exe' $stage
+
+          windeployqt.exe --release --compiler-runtime --verbose 1 (Join-Path $stage 'QSanguosha.exe')
+
+          $runtimeDirectories = @(
+            'acknowledgement',
+            'audio',
+            'backdrop',
+            'developers',
+            'etc',
+            'font',
+            'image',
+            'lang',
+            'lua',
+            'skins'
+          )
+
+          foreach ($directory in $runtimeDirectories) {
+            if (Test-Path $directory) {
+              Copy-Item $directory $stage -Recurse -Force
+            }
+          }
+
+          $runtimeFiles = @(
+            'sanguosha.qm',
+            'sanguosha.qss',
+            'fmodex.dll',
+            'LICENSE',
+            'GPLv3',
+            'MCFR',
+            'README.md'
+          )
+
+          foreach ($file in $runtimeFiles) {
+            if (Test-Path $file) {
+              Copy-Item $file $stage -Force
+            }
+          }
+
+          New-Item -ItemType Directory -Path (Join-Path $stage 'records') -Force | Out-Null
+
+          $requiredFiles = @(
+            'QSanguosha.exe',
+            'Qt5Core.dll',
+            'Qt5Gui.dll',
+            'Qt5Network.dll',
+            'Qt5Svg.dll',
+            'Qt5Widgets.dll',
+            'Qt5WinExtras.dll',
+            'fmodex.dll',
+            'sanguosha.qm',
+            'sanguosha.qss',
+            'lua/config.lua',
+            'lang/zh_CN/Common.lua',
+            'image/logo/logo.png',
+            'audio/title/main.ogg',
+            'skins/skinList.json',
+            'font/simli.ttf',
+            'imageformats/qjpeg.dll',
+            'platforms/qwindows.dll'
+          )
+
+          foreach ($file in $requiredFiles) {
+            $path = Join-Path $stage $file
+            if (!(Test-Path $path)) {
+              throw "Required package file is missing: $file"
+            }
+          }
+
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zipPath -CompressionLevel Optimal
+
+          if (!(Test-Path $zipPath)) {
+            throw 'Package zip was not produced.'
+          }
+
+          $zip = Get-Item $zipPath
+          if ($zip.Length -lt 10MB) {
+            throw "Package zip is unexpectedly small: $($zip.Length) bytes"
+          }
+
+          "PACKAGE_NAME=$packageName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKAGE_ZIP=$zipPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKAGE_VERSION=$safeVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload package to published GitHub release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          gh release upload "${{ github.event.release.tag_name }}" "$env:PACKAGE_ZIP" --clobber
+
+      - name: Create GitHub release with package
+        if: github.event_name != 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $releaseTag = "windows-v$env:PACKAGE_VERSION-run${{ github.run_number }}"
+          gh release create $releaseTag "$env:PACKAGE_ZIP" `
+            --target "${{ github.sha }}" `
+            --title "TouhouKill Windows v$env:PACKAGE_VERSION run ${{ github.run_number }}" `
+            --notes "Automated playable Windows package from ${{ github.ref_name }}."
