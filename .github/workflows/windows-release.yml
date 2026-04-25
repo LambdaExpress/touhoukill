@@ -37,6 +37,37 @@ jobs:
           tools: tools_mingw,${{ env.MINGW_TOOL }}
           cache: true
 
+      - name: Install SWIG for qmake
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          choco install swig --yes --no-progress
+
+          $swigExe = Get-ChildItem -Path "$env:ChocolateyInstall\lib\swig" -Recurse -Filter 'swig.exe' |
+            Where-Object { $_.FullName -notmatch '\\bin\\' } |
+            Select-Object -First 1
+
+          if (!$swigExe) {
+            throw 'Could not locate Chocolatey SWIG executable.'
+          }
+
+          $swigSourceDir = Split-Path $swigExe.FullName -Parent
+          $swigTargetDir = Join-Path $env:GITHUB_WORKSPACE 'tools\swig'
+
+          Remove-Item -Recurse -Force $swigTargetDir -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $swigTargetDir -Force | Out-Null
+          Copy-Item (Join-Path $swigSourceDir '*') $swigTargetDir -Recurse -Force
+
+          $swigLibDir = Join-Path $swigTargetDir 'Lib'
+          if (!(Test-Path $swigLibDir)) {
+            throw 'Could not locate copied SWIG Lib directory.'
+          }
+
+          "SWIG_LIB=$swigLibDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & (Join-Path $swigTargetDir 'swig.exe') -version
+
       - name: Print toolchain versions
         shell: pwsh
         run: |
@@ -45,6 +76,7 @@ jobs:
           qmake.exe -v
           mingw32-make.exe -v
           Get-Command windeployqt.exe
+          & '.\tools\swig\swig.exe' -version
 
       - name: Build release executable
         shell: pwsh
