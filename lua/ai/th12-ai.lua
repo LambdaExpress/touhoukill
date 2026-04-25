@@ -1048,7 +1048,7 @@ sgs.ai_skill_use["@@huisheng"] = function(self, prompt)
 	--if victim then
 	--  table.insert(targets,victim:objectName())
 	--end
-	return "@HuishengCard=.->" .. table.concat(targets, "+")
+	return sgs.ai_skill_card_action_proposal("huisheng", "HuishengCard", nil, targets)
 end
 
 --[夜响]

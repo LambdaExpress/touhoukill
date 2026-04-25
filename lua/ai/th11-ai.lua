@@ -305,7 +305,7 @@ sgs.ai_skill_use["@@yaoban"] = function(self, prompt)
 	cards = sgs.QList2Table(cards)
 	self:sortByKeepValue(cards)
 	--return "#yaoban:" ..cards[1]:getEffectiveId().. ":->" .. targets[1]:objectName()
-	return "@YaobanCard=" ..cards[1]:getEffectiveId().. "->" .. targets[1]:objectName()
+	return sgs.ai_skill_card_action_proposal("yaoban", "YaobanCard", cards[1]:getEffectiveId(), { targets[1]:objectName() })
 end
 sgs.ai_card_intention.YaobanCard = 60
 sgs.ai_slash_prohibit.yaoban = function(self, from, to, card)
@@ -692,10 +692,7 @@ sgs.ai_skill_use["@@liaoluo"] = function(self)
 	viewAsSlash:deleteLater()
 	if use.card then
 		-- 杀！
-		local realUse = sgs.CardUseStruct()
-		realUse.card = viewAsSlash
-		realUse.to = use.to
-		return realUse:toString()
+		return sgs.ai_card_action_proposal(viewAsSlash, use.to, "liaoluo")
 	end
 end
 sgs.ai_skill_invoke.youju = function(self)

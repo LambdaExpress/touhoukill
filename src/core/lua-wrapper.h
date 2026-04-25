@@ -81,6 +81,7 @@ public:
 
     bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const override;
     const Card *viewAs(const QList<const Card *> &cards) const override;
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override;
 
     bool shouldBeVisible(const Player *player) const override;
 

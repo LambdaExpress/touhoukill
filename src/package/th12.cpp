@@ -174,12 +174,22 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() > 0) {
-            WeizhiCard *card = new WeizhiCard;
-            card->addSubcards(cards);
-
-            return card;
+            return createViewAsCard<WeizhiCard>(cards);
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.isEmpty() || !extra.isEmpty())
+            return nullptr;
+
+        foreach (const Card *card, selected) {
+            if (card == nullptr || card->isKindOf("TrickCard") || (ctx.player != nullptr && ctx.player->isJilei(card)))
+                return nullptr;
+        }
+
+        return createViewAsCard<WeizhiCard>(selected);
     }
 };
 
@@ -1050,6 +1060,34 @@ public:
         }
         return nullptr;
     }
+
+    bool isDeclaredCardNameAccepted(const QString &cardName, const QList<const Card *> &selected, const ActionRequestContext &ctx) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 1 || selected.first()->isEquipped() || (cardName != QStringLiteral("slash") && cardName != QStringLiteral("jink")))
+            return false;
+
+        Card *card = Sanguosha->cloneCard(cardName, selected.first()->getSuit(), selected.first()->getNumber());
+        if (card == nullptr)
+            return false;
+        DELETE_OVER_SCOPE(Card, card)
+        card->addSubcard(selected.first());
+        card->setSkillName(objectName());
+        return isDeclaredCardUseValid(card, ctx);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() != 1 || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+        if (!isSubcardSelectionValid(QList<const Card *>(), selected.first(), CardUseGrant(), ctx))
+            return nullptr;
+
+        const QString name = extra.value(QStringLiteral("declaredCardName")).toString();
+        if (!isDeclaredCardNameAccepted(name, selected, ctx))
+            return nullptr;
+
+        return cloneViewAsCard(name, selected, objectName(), QString(), selected.first()->getSuit(), selected.first()->getNumber());
+    }
 };
 
 class Lingbai : public TriggerSkill
@@ -1485,11 +1523,22 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() > 0) {
-            DummyCard *dc = new DummyCard;
-            dc->addSubcards(cards);
-            return dc;
+            return createViewAsCard<DummyCard>(cards, objectName());
         }
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.isEmpty() || !extra.isEmpty())
+            return nullptr;
+
+        foreach (const Card *card, selected) {
+            if (card == nullptr || !card->isBlack() || (ctx.player != nullptr && ctx.player->isJilei(card)))
+                return nullptr;
+        }
+
+        return createViewAsCard<DummyCard>(selected, objectName());
     }
 };
 

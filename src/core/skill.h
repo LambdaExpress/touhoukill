@@ -86,6 +86,12 @@ public:
     virtual const Card *viewAs(const QList<const Card *> &cards) const = 0;
 
     bool isAvailable(const Player *invoker, CardUseStruct::CardUseReason reason, const QString &pattern) const;
+    virtual QStringList producedCardClasses() const;
+    virtual CardUseGrant makeGrant(const Player *player, const ClientActionContext &ctx) const;
+    virtual const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const;
+    virtual bool isCardUseValid(const CardUseStruct &card_use, const CardUseGrant &grant, const ClientActionContext &ctx) const;
+    virtual bool isGeneratedCardValid(const QList<const Card *> &selected, const Card *to_validate, const CardUseGrant &grant, const ClientActionContext &ctx) const;
+    virtual bool isSubcardSelectionValid(const QList<const Card *> &selected, const Card *to_select, const CardUseGrant &grant, const ClientActionContext &ctx) const;
     virtual bool isEnabledAtPlay(const Player *player) const;
     virtual bool isEnabledAtResponse(const Player *player, const QString &pattern) const;
     virtual bool isEnabledAtNullification(const ServerPlayer *player) const;
@@ -97,6 +103,23 @@ public:
     virtual QString getExpandPile() const;
 
 protected:
+    Card *prepareViewAsCard(Card *card, const QList<const Card *> &subcards, const QString &skillName = QString(), const QString &showSkill = QString()) const;
+    Card *cloneViewAsCard(const QString &cardName, const QList<const Card *> &subcards, const QString &skillName = QString(), const QString &showSkill = QString(),
+        Card::Suit suit = Card::SuitToBeDecided, int number = -1, bool canRecast = true) const;
+    bool acceptsDeclaredCardName(const JsonObject &extra, const QString &cardName) const;
+    virtual bool isDeclaredCardNameAccepted(const QString &cardName, const QList<const Card *> &selected, const ActionRequestContext &ctx) const;
+    bool isDeclaredCardUseValid(const Card *card, const ActionRequestContext &ctx) const;
+    Card *buildDeclaredCardForServer(
+        const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra, bool inheritSelectedCardSuitNumber, const QString &showSkill = QString()) const;
+
+    template <typename CardType>
+    CardType *createViewAsCard(const QList<const Card *> &subcards = QList<const Card *>(), const QString &skillName = QString(), const QString &showSkill = QString()) const
+    {
+        CardType *card = new CardType;
+        prepareViewAsCard(card, subcards, skillName, showSkill);
+        return card;
+    }
+
     QString response_pattern;
     bool response_or_use;
     QString expand_pile;
@@ -111,6 +134,9 @@ public:
 
     bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const final;
     const Card *viewAs(const QList<const Card *> &cards) const final;
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override;
+    bool isCardUseValid(const CardUseStruct &card_use, const CardUseGrant &grant, const ClientActionContext &ctx) const override;
+    bool isGeneratedCardValid(const QList<const Card *> &selected, const Card *to_validate, const CardUseGrant &grant, const ClientActionContext &ctx) const override;
     virtual const Card *viewAs() const = 0;
 };
 
@@ -123,9 +149,14 @@ public:
 
     bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const final;
     const Card *viewAs(const QList<const Card *> &cards) const final;
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override;
+    bool isCardUseValid(const CardUseStruct &card_use, const CardUseGrant &grant, const ClientActionContext &ctx) const override;
+    bool isGeneratedCardValid(const QList<const Card *> &selected, const Card *to_validate, const CardUseGrant &grant, const ClientActionContext &ctx) const override;
+    bool isSubcardSelectionValid(const QList<const Card *> &selected, const Card *to_select, const CardUseGrant &grant, const ClientActionContext &ctx) const override;
 
     virtual bool viewFilter(const Card *to_select) const;
     virtual const Card *viewAs(const Card *originalCard) const = 0;
+    virtual bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const;
 
 protected:
     QString filter_pattern;

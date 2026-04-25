@@ -184,6 +184,7 @@ public:
         _m_clientResponse = val;
     }
     unsigned int m_expectedReplySerial; // Suggest the acceptable serial number of an expected response.
+    unsigned int m_lastRequestSerial; // Keeps the last server request serial available after getResult clears the expected reply state.
     bool m_isClientResponseReady; //Suggest whether a valid player's response has been received.
     bool m_isWaitingReply; // Suggest if the server player is waiting for client's response.
     QVariant m_cheatArgs; // Store the cheat code received from client.

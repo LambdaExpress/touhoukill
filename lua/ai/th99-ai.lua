@@ -435,7 +435,7 @@ sgs.ai_skill_use["@@mengxian_hegemony"] = function(self, prompt)
     if current and self:isFriend(current) and self:getOverflow(current) > 0  then
         local jingjies =  self.player:getPile("jingjie")
 		if not jingjies:isEmpty() then
-			return "@MengxianCard=".. jingjies:first().."->"
+			return sgs.ai_skill_card_action_proposal("mengxian_hegemony", "MengxianCard", jingjies:first())
 		end
 	end
 	return "."
@@ -497,16 +497,16 @@ sgs.ai_skill_use["@@lianxi"] = function(self, prompt)
 	self:useTrickCard(card, dummy_use)
 	if not dummy_use.card then return false end
 	if dummy_use.to:isEmpty()  or need_recast then
-		return dummy_use.card:toString()
+		return sgs.ai_card_action_proposal(dummy_use.card, nil, "lianxi")
 	else
 		local target_objectname = {}
 		for _, p in sgs.qlist(dummy_use.to) do
 			table.insert(target_objectname, p:objectName())
 			if #target_objectname==2 then break end
 		end
-		return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+		return sgs.ai_card_action_proposal(dummy_use.card, target_objectname, "lianxi")
 	end
-	return dummy_use.card:toString()
+	return sgs.ai_card_action_proposal(dummy_use.card, nil, "lianxi")
 end
 sgs.ai_cardneed.lianxi = function(to, card, self)
 	return  card:isKindOf("Slash")
@@ -696,7 +696,7 @@ sgs.ai_skill_use["@@zheshe"] = function(self, data, method)
 			if (enemy:getHandcardNum() <= 2 or enemy:hasSkills("guose|leiji|ganglie|enyuan|qingguo|wuyan|kongcheng") or enemy:containsTrick("indulgence"))
 				and self:canAttack(enemy, dmg.from or self.room:getCurrent(), dmg.nature)
 				and not (dmg.card and dmg.card:getTypeId() == sgs.Card_TypeTrick and enemy:hasSkill("wuyan")) then
-				return "@ZhesheCard=" ..card_id.. "->" .. enemy:objectName()
+				return sgs.ai_skill_card_action_proposal("zheshe", "ZhesheCard", card_id, { enemy:objectName() })
 			end
 		end
 	end
@@ -709,9 +709,9 @@ sgs.ai_skill_use["@@zheshe"] = function(self, data, method)
 						or self:getDamagedEffects(friend, dmg.from or self.room:getCurrent())
 						or self:needToLoseHp(friend)
 						or (friend:getHandcardNum() < 3 and (friend:hasSkill("nosrende") or (friend:hasSkill("rende") and not friend:hasUsed("RendeCard"))))) then
-				return "@ZhesheCard=" ..card_id.. "->" .. friend:objectName()
+				return sgs.ai_skill_card_action_proposal("zheshe", "ZhesheCard", card_id, { friend:objectName() })
 				elseif dmg.card and dmg.card:getTypeId() == sgs.Card_TypeTrick and friend:hasSkill("wuyan") and friend:getLostHp() > 1 then
-					return "@ZhesheCard=" ..card_id.. "->" .. friend:objectName()
+					return sgs.ai_skill_card_action_proposal("zheshe", "ZhesheCard", card_id, { friend:objectName() })
 			end
 		end
 	end
@@ -722,7 +722,7 @@ sgs.ai_skill_use["@@zheshe"] = function(self, data, method)
 				or enemy:containsTrick("indulgence") or enemy:hasSkills("guose|leiji|vsganglie|ganglie|enyuan|qingguo|wuyan|kongcheng")
 				and self:canAttack(enemy, (dmg.from or self.room:getCurrent()), dmg.nature)
 				and not (dmg.card and dmg.card:getTypeId() == sgs.Card_TypeTrick and enemy:hasSkill("wuyan")) then
-				return "@ZhesheCard=" ..card_id.. "->" .. enemy:objectName()
+				return sgs.ai_skill_card_action_proposal("zheshe", "ZhesheCard", card_id, { enemy:objectName() })
 			end
 		end
 	end
@@ -732,7 +732,7 @@ sgs.ai_skill_use["@@zheshe"] = function(self, data, method)
 		if not enemy:isWounded() and not self:hasSkills(sgs.masochism_skill, enemy) and enemy:isAlive()
 			and self:canAttack(enemy, dmg.from or self.room:getCurrent(), dmg.nature)
 			and (not (dmg.card and dmg.card:getTypeId() == sgs.Card_TypeTrick and enemy:hasSkill("wuyan") and enemy:getLostHp() > 0) or self:isWeak()) then
-			return "@ZhesheCard=" ..card_id.. "->" .. enemy:objectName()
+			return sgs.ai_skill_card_action_proposal("zheshe", "ZhesheCard", card_id, { enemy:objectName() })
 		end
 	end
 

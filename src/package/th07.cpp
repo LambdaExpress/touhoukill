@@ -75,12 +75,23 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (!cards.isEmpty()) {
-            DummyCard *d = new DummyCard;
-            d->addSubcards(cards);
-            return d;
+            return createViewAsCard<DummyCard>(cards, objectName());
         }
 
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.isEmpty() || !extra.isEmpty())
+            return nullptr;
+
+        foreach (const Card *card, selected) {
+            if (card == nullptr || card->getTypeId() != Card::TypeEquip || (ctx.player != nullptr && ctx.player->isJilei(card)))
+                return nullptr;
+        }
+
+        return createViewAsCard<DummyCard>(selected, objectName());
     }
 };
 
@@ -721,12 +732,19 @@ public:
     {
         int maxnum = qMax(Self->getEquips().length(), 1);
         if (cards.length() == maxnum) {
-            ExNihilo *exnihilo = new ExNihilo(Card::SuitToBeDecided, -1);
-            exnihilo->addSubcards(cards);
-            exnihilo->setSkillName("_shihui");
-            return exnihilo;
+            return prepareViewAsCard(new ExNihilo(Card::SuitToBeDecided, -1), cards, "_shihui");
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.length() != qMax(ctx.player->getEquips().length(), 1))
+            return nullptr;
+        if (!acceptsDeclaredCardName(extra, QStringLiteral("ex_nihilo")))
+            return nullptr;
+
+        return prepareViewAsCard(new ExNihilo(Card::SuitToBeDecided, -1), selected, "_shihui");
     }
 };
 
@@ -1165,6 +1183,34 @@ public:
             }
         } else
             return nullptr;
+    }
+
+    bool isDeclaredCardNameAccepted(const QString &cardName, const QList<const Card *> &selected, const ActionRequestContext &ctx) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 1 || (cardName != QStringLiteral("slash") && cardName != QStringLiteral("jink")))
+            return false;
+
+        Card *card = Sanguosha->cloneCard(cardName, selected.first()->getSuit(), selected.first()->getNumber());
+        if (card == nullptr)
+            return false;
+        DELETE_OVER_SCOPE(Card, card)
+        card->addSubcard(selected.first());
+        card->setSkillName(objectName());
+        return isDeclaredCardUseValid(card, ctx);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() != 1 || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+        if (!isSubcardSelectionValid(QList<const Card *>(), selected.first(), CardUseGrant(), ctx))
+            return nullptr;
+
+        const QString name = extra.value(QStringLiteral("declaredCardName")).toString();
+        if (!isDeclaredCardNameAccepted(name, selected, ctx))
+            return nullptr;
+
+        return cloneViewAsCard(name, selected, objectName(), QString(), selected.first()->getSuit(), selected.first()->getNumber());
     }
 };
 
@@ -1795,11 +1841,27 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() == 2) {
-            DummyCard *d = new DummyCard;
-            d->addSubcards(cards);
-            return d;
+            return createViewAsCard<DummyCard>(cards, objectName());
         }
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 2 || !extra.isEmpty())
+            return nullptr;
+
+        const Card *reference = Card::Parse(ctx.player->property("wangwu").toString());
+        if (reference == nullptr)
+            return nullptr;
+        DELETE_OVER_SCOPE(const Card, reference)
+
+        foreach (const Card *card, selected) {
+            if (card == nullptr || card->getColor() != reference->getColor() || ctx.player->isJilei(card))
+                return nullptr;
+        }
+
+        return createViewAsCard<DummyCard>(selected, objectName());
     }
 };
 

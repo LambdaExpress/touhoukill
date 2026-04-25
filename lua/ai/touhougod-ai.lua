@@ -1054,7 +1054,7 @@ sgs.ai_skill_use["@@wendao"] = function(self, prompt)
 		end
 	end
 	if #targets >=1 then
-		return "@WendaoCard=.->" .. table.concat(targets, "+")
+		return sgs.ai_skill_card_action_proposal("wendao", "WendaoCard", nil, targets)
 	end
 	return "."
 end
@@ -1145,10 +1145,7 @@ sgs.ai_skill_use["@@nanti"] = function(self)
 	local use = {isDummy = true, to = sgs.SPlayerList()}
 	self:useCardSlash(slash, use)
 	if use.card then
-		local cardUse = sgs.CardUseStruct()
-		cardUse.card = use.card
-		cardUse.to = use.to
-		return cardUse:toString()
+		return sgs.ai_card_action_proposal(use.card, use.to, "nanti")
 	end
 end
 
@@ -1431,7 +1428,7 @@ sgs.ai_skill_use["@@wenyue"] = function(self, prompt)
 
 	self:sortByUseValue(cards)
 	table.insert(ids, cards[1]:getId())
-	return "@WenyueCard=".. table.concat(ids, "+") .."->" .. target:objectName()
+	return sgs.ai_skill_card_action_proposal("wenyue", "WenyueCard", ids, { target:objectName() })
 end
 
 sgs.ai_skill_playerchosen.wenyue = function(self, targets)

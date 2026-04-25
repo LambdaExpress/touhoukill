@@ -702,11 +702,22 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() > 0) {
-            XingyunCard *card = new XingyunCard;
-            card->addSubcards(cards);
-            return card;
+            return createViewAsCard<XingyunCard>(cards);
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext & /*ctx*/, const JsonObject &extra) const override
+    {
+        if (selected.isEmpty() || !extra.isEmpty())
+            return nullptr;
+
+        foreach (const Card *card, selected) {
+            if (card == nullptr || !card->hasFlag("xingyun"))
+                return nullptr;
+        }
+
+        return createViewAsCard<XingyunCard>(selected);
     }
 };
 
@@ -1303,6 +1314,35 @@ public:
         }
         return nullptr;
     }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (!selected.isEmpty() || ctx.player == nullptr || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+
+        const QString name = extra.value(QStringLiteral("declaredCardName")).toString();
+        Card *declared = Sanguosha->cloneCard(name);
+        if (declared == nullptr)
+            return nullptr;
+        DELETE_OVER_SCOPE(Card, declared)
+
+        if ((!declared->isNDTrick() && !declared->isKindOf("BasicCard")) || Sanguosha->getBanPackages().contains(declared->getPackage()))
+            return nullptr;
+
+        ServerPlayer *user = nullptr;
+        foreach (ServerPlayer *p, ctx.player->getRoom()->getOtherPlayers(ctx.player)) {
+            if (p->getMark("chuangshi_user") > 0) {
+                user = p;
+                break;
+            }
+        }
+        if (user == nullptr || user->isCardLimited(declared, Card::MethodUse))
+            return nullptr;
+
+        ChuangshiCard *card = new ChuangshiCard;
+        card->setUserString(name);
+        return card;
+    }
 };
 
 class Chuangshi : public TriggerSkill
@@ -1389,8 +1429,10 @@ ChuangshiCard::ChuangshiCard()
 bool ChuangshiCard::targetFilter(const QList<const Player *> &targets, const Player *to_select, const Player *Self) const
 {
     const Player *user = Chuangshi::getChuangshiUser(Self);
-    QString name = Self->tag.value("chuangshi", QString()).toString();
+    QString name = user_string;
     Card *new_card = Sanguosha->cloneCard(name);
+    if (new_card == nullptr || user == nullptr)
+        return false;
     DELETE_OVER_SCOPE(Card, new_card)
     new_card->setSkillName("chuangshi");
 
@@ -1406,8 +1448,10 @@ bool ChuangshiCard::targetFilter(const QList<const Player *> &targets, const Pla
 bool ChuangshiCard::targetsFeasible(const QList<const Player *> &targets, const Player *Self) const
 {
     const Player *user = Chuangshi::getChuangshiUser(Self);
-    QString name = Self->tag.value("chuangshi", QString()).toString();
+    QString name = user_string;
     Card *new_card = Sanguosha->cloneCard(name);
+    if (new_card == nullptr || user == nullptr)
+        return false;
     DELETE_OVER_SCOPE(Card, new_card)
     new_card->setSkillName("chuangshi");
     if (new_card->canRecast() && targets.length() == 0)
@@ -1821,11 +1865,17 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() > 0 && cards.length() <= 2) {
-            MingmuCard *card = new MingmuCard;
-            card->addSubcards(cards);
-            return card;
+            return createViewAsCard<MingmuCard>(cards);
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext & /*ctx*/, const JsonObject &extra) const override
+    {
+        if (selected.isEmpty() || selected.length() > 2 || !extra.isEmpty())
+            return nullptr;
+
+        return createViewAsCard<MingmuCard>(selected);
     }
 };
 

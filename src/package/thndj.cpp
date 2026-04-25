@@ -186,6 +186,11 @@ public:
         expand_pile = "huanyue_pile";
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "DummyCard";
+    }
+
     bool viewFilter(const Card *to_select) const override
     {
         if (!Self->getPile("huanyue_pile").contains(to_select->getId()))
@@ -212,6 +217,15 @@ public:
     bool isEnabledAtResponse(const Player * /*player*/, const QString &pattern) const override
     {
         return pattern.startsWith("@@huanyue-card");
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        if (ctx.player == nullptr || to_select == nullptr || !ctx.player->getPile("huanyue_pile").contains(to_select->getEffectiveId()))
+            return false;
+        if (ctx.pattern == "@@huanyue-card2")
+            return ctx.player->property("huanyue").toString() != to_select->getType();
+        return true;
     }
 };
 
@@ -1229,6 +1243,14 @@ public:
         return !player->getPile("jinengPile").isEmpty();
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "Slash"
+                             << "Jink"
+                             << "Analeptic"
+                             << "KnownBoth";
+    }
+
     bool viewFilter(const Card *to_select) const override
     {
         if (!Self->getPile("jinengPile").contains(to_select->getEffectiveId()))
@@ -1306,6 +1328,61 @@ public:
             new_card->addSubcard(originalCard);
         }
         return new_card;
+    }
+
+    bool isGeneratedCardValid(const QList<const Card *> &selected, const Card *to_validate, const CardUseGrant &grant, const ClientActionContext &ctx) const override
+    {
+        Q_UNUSED(grant)
+        Q_UNUSED(ctx)
+        if (selected.length() != 1 || to_validate == nullptr)
+            return false;
+
+        const Card *expected = viewAs(selected.first());
+        const bool matched = expected != nullptr && expected->getClassName() == to_validate->getClassName() && expected->getSkillName(false) == to_validate->getSkillName(false)
+            && expected->canRecast() == to_validate->canRecast() && expected->toString() == to_validate->toString();
+        if (expected != nullptr && expected->parent() == nullptr)
+            delete expected;
+        return matched;
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        if (ctx.player == nullptr || to_select == nullptr || !ctx.player->getPile("jinengPile").contains(to_select->getEffectiveId()))
+            return false;
+
+        switch (ctx.reason) {
+        case CardUseStruct::CARD_USE_REASON_PLAY:
+            if (to_select->getSuit() == Card::Club)
+                return true;
+            if (to_select->getSuit() == Card::Spade) {
+                Slash slash(Card::SuitToBeDecided, -1);
+                slash.addSubcard(to_select);
+                return slash.isAvailable(ctx.player);
+            }
+            if (to_select->getSuit() == Card::Diamond) {
+                Analeptic ana(Card::SuitToBeDecided, -1);
+                ana.addSubcard(to_select);
+                return ana.isAvailable(ctx.player);
+            }
+            return false;
+        case CardUseStruct::CARD_USE_REASON_RESPONSE:
+        case CardUseStruct::CARD_USE_REASON_RESPONSE_USE: {
+            Slash s(Card::SuitToBeDecided, -1);
+            Jink j(Card::SuitToBeDecided, -1);
+            Analeptic a(Card::SuitToBeDecided, -1);
+            KnownBoth k(Card::SuitToBeDecided, -1);
+
+            const CardPattern *cardPattern = Sanguosha->getPattern(ctx.pattern);
+            return cardPattern != nullptr && ((to_select->getSuit() == Card::Heart && cardPattern->match(ctx.player, &j))
+                                              || (to_select->getSuit() == Card::Spade && cardPattern->match(ctx.player, &s))
+                                              || (to_select->getSuit() == Card::Diamond && cardPattern->match(ctx.player, &a))
+                                              || (to_select->getSuit() == Card::Club && cardPattern->match(ctx.player, &k)));
+        }
+        default:
+            break;
+        }
+
+        return false;
     }
 };
 
@@ -1605,11 +1682,21 @@ public:
         return Self->canDiscard(Self, to_select->getEffectiveId());
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "YaoliCard";
+    }
+
     const Card *viewAs(const Card *originalard) const override
     {
         YaoliCard *card = new YaoliCard;
         card->addSubcard(originalard);
         return card;
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        return ctx.player != nullptr && to_select != nullptr && ctx.player->canDiscard(ctx.player, to_select->getEffectiveId());
     }
 
     bool isEnabledAtPlay(const Player *player) const override

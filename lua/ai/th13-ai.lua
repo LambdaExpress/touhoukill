@@ -956,7 +956,7 @@ sgs.ai_skill_use["@@zhengti"] = function(self)
 		for _, e in ipairs(self.enemies) do
 			for _, c in ipairs(equipCardsGiveToEnemy) do
 				if zhengtiCardTargetFilter(self, c, e) then
-					return "@ZhengtiCard=" .. tostring(c:getEffectiveId()) .. "->" .. e:objectName()
+					return sgs.ai_skill_card_action_proposal("zhengti", "ZhengtiCard", c:getEffectiveId(), { e:objectName() })
 				end
 			end
 		end
@@ -968,7 +968,6 @@ sgs.ai_skill_use["@@zhengti"] = function(self)
 
 --		for _, e in ipairs(self.friends_noself) do
 --			if zhengtiCardTargetFilter(self, self.player:getArmor(), e) then
---				return "@ZhengtiCard=" .. tostring(self.player:getArmor():getEffectiveId()) .. "->" .. e:objectName()
 --			end
 --		end
 --	end

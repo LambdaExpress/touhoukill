@@ -1283,15 +1283,49 @@ public:
             pattern = Sanguosha->getCurrentCardUsePattern();
 
         if (isAwaitExhaustedAvailable(Self, pattern) && cards.isEmpty()) {
-            AwaitExhausted *ae = new AwaitExhausted(Card::NoSuit, 0);
-            ae->setSkillName("_" + objectName());
-            return ae;
+            return prepareViewAsCard(new AwaitExhausted(Card::NoSuit, 0), cards, "_" + objectName());
         }
         if (isMagicAnalepticAvailable(Self, pattern) && cards.length() == 1) {
-            MagicAnaleptic *ma = new MagicAnaleptic(Card::SuitToBeDecided, -1);
-            ma->addSubcards(cards);
-            ma->setSkillName("_" + objectName());
-            return ma;
+            return prepareViewAsCard(new MagicAnaleptic(Card::SuitToBeDecided, -1), cards, "_" + objectName());
+        }
+
+        return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr)
+            return nullptr;
+
+        QString pattern;
+        if (ctx.reason != CardUseStruct::CARD_USE_REASON_PLAY)
+            pattern = ctx.pattern;
+
+        QString declared;
+        if (!extra.isEmpty()) {
+            if (extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+                return nullptr;
+            declared = extra.value(QStringLiteral("declaredCardName")).toString();
+        }
+
+        if (selected.isEmpty() && isAwaitExhaustedAvailable(ctx.player, pattern) && (declared.isEmpty() || declared == QStringLiteral("await_exhausted"))) {
+            Card *card = prepareViewAsCard(new AwaitExhausted(Card::NoSuit, 0), selected, "_" + objectName());
+            if (!isDeclaredCardUseValid(card, ctx)) {
+                delete card;
+                return nullptr;
+            }
+            return card;
+        }
+        if (selected.length() == 1 && isMagicAnalepticAvailable(ctx.player, pattern) && (declared.isEmpty() || declared == QStringLiteral("magic_analeptic"))) {
+            const Card *selectedCard = selected.first();
+            if (selectedCard == nullptr || ctx.player->hasEquip(selectedCard))
+                return nullptr;
+            Card *card = prepareViewAsCard(new MagicAnaleptic(Card::SuitToBeDecided, -1), selected, "_" + objectName());
+            if (!isDeclaredCardUseValid(card, ctx)) {
+                delete card;
+                return nullptr;
+            }
+            return card;
         }
 
         return nullptr;
@@ -1485,6 +1519,37 @@ public:
         }
 
         return nullptr;
+    }
+
+    bool isDeclaredCardNameAccepted(const QString &cardName, const QList<const Card *> &selected, const ActionRequestContext &ctx) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 1 || (cardName != QStringLiteral("iron_slash") && cardName != QStringLiteral("light_slash")))
+            return false;
+
+        Card *card = Sanguosha->cloneCard(cardName);
+        if (card == nullptr)
+            return false;
+        DELETE_OVER_SCOPE(Card, card)
+        card->addSubcard(selected.first());
+        card->setSkillName(objectName());
+        if (ctx.player->hasUsed(objectName() + card->getClassName()))
+            return false;
+
+        return isDeclaredCardUseValid(card, ctx);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() != 1 || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+        if (!isSubcardSelectionValid(QList<const Card *>(), selected.first(), CardUseGrant(), ctx))
+            return nullptr;
+
+        const QString name = extra.value(QStringLiteral("declaredCardName")).toString();
+        if (!isDeclaredCardNameAccepted(name, selected, ctx))
+            return nullptr;
+
+        return cloneViewAsCard(name, selected, objectName());
     }
 };
 

@@ -897,13 +897,31 @@ public:
 
         QString name = Self->tag.value(objectName(), QString()).toString();
         if (!name.isEmpty()) {
-            Card *card = Sanguosha->cloneCard(name);
-            card->setSkillName(objectName());
-            card->addSubcards(cards);
-            card->setCanRecast(false);
-            return card;
+            return cloneViewAsCard(name, cards, objectName(), QString(), Card::SuitToBeDecided, -1, false);
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 2 || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+
+        if (selected.first()->getTypeId() == selected.last()->getTypeId())
+            return nullptr;
+        const QList<int> woodenOxIds = ctx.player->getPile("wooden_ox");
+        if ((selected.first()->isKindOf("WoodenOx") && woodenOxIds.contains(selected.last()->getId()))
+            || (selected.last()->isKindOf("WoodenOx") && woodenOxIds.contains(selected.first()->getId())))
+            return nullptr;
+
+        Card *card = cloneViewAsCard(extra.value(QStringLiteral("declaredCardName")).toString(), selected, objectName(), QString(), Card::SuitToBeDecided, -1, false);
+        if (card == nullptr)
+            return nullptr;
+        if (!isDeclaredCardUseValid(card, ctx)) {
+            delete card;
+            return nullptr;
+        }
+        return card;
     }
 };
 
@@ -1314,12 +1332,26 @@ public:
         if (checkedPatterns.length() == 1)
             name = checkedPatterns.first();
         if (name != nullptr) {
-            Card *card = Sanguosha->cloneCard(name);
-            card->setSkillName(objectName());
-            card->addSubcards(cards);
-            return card;
+            return cloneViewAsCard(name, cards, objectName());
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.length() != qMax(1, ctx.player->getHp()) || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+
+        Card *card = cloneViewAsCard(extra.value(QStringLiteral("declaredCardName")).toString(), selected, objectName());
+        if (card == nullptr || card->getTypeId() != Card::TypeBasic) {
+            delete card;
+            return nullptr;
+        }
+        if (!isDeclaredCardUseValid(card, ctx)) {
+            delete card;
+            return nullptr;
+        }
+        return card;
     }
 };
 

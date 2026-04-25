@@ -295,10 +295,15 @@ CardUseStruct::CardUseStruct(const Card *card, ServerPlayer *from, ServerPlayer 
     this->m_effectValue = {0, 0};
 }
 
-bool CardUseStruct::isValid(const QString &pattern) const
+bool CardUseStruct::isStructurallyValid(const QString &pattern) const
 {
     Q_UNUSED(pattern)
     return card != nullptr;
+}
+
+bool CardUseStruct::isValid(const QString &pattern) const
+{
+    return isStructurallyValid(pattern);
 #if 0
     if (card == NULL)
         return false;
@@ -346,6 +351,64 @@ bool CardUseStruct::isValid(const QString &pattern) const
         return card->targetsFeasible(targets, from);
     }
 #endif
+}
+
+QString normalizeCardUsePattern(const QString &pattern)
+{
+    QString normalized = pattern;
+    if (normalized.endsWith(QChar('!')))
+        normalized.chop(1);
+    if (normalized == QStringLiteral("."))
+        return QStringLiteral("..");
+    return normalized;
+}
+
+ActionRequestContext::ActionRequestContext()
+    : player(nullptr)
+    , command(QSanProtocol::S_COMMAND_UNKNOWN)
+    , reason(CardUseStruct::CARD_USE_REASON_UNKNOWN)
+    , method(Card::MethodNone)
+    , requestSerial(-1)
+    , fromClient(true)
+    , serverBuiltCard(false)
+    , requireSingleCardSelection(false)
+{
+}
+
+CardUseGrant::CardUseGrant()
+    : valid(false)
+    , player(nullptr)
+    , sourceKind(OwnedSkill)
+    , reason(CardUseStruct::CARD_USE_REASON_UNKNOWN)
+    , method(Card::MethodNone)
+    , allowNoSubcards(false)
+    , allowOtherPlayersCards(false)
+    , allowVirtualCard(true)
+    , allowRealCard(true)
+    , requireViewAsValidation(false)
+    , requestSerial(-1)
+    , remainingUses(1)
+{
+}
+
+bool CardUseGrant::isValid() const
+{
+    return valid && player != nullptr && remainingUses != 0;
+}
+
+bool CardUseGrant::matchesContext(const ClientActionContext &ctx) const
+{
+    if (!isValid() || ctx.player == nullptr || player != ctx.player)
+        return false;
+    if (reason != CardUseStruct::CARD_USE_REASON_UNKNOWN && ctx.reason != CardUseStruct::CARD_USE_REASON_UNKNOWN && reason != ctx.reason)
+        return false;
+    if (method != Card::MethodNone && ctx.method != Card::MethodNone && method != ctx.method)
+        return false;
+    if (!pattern.isEmpty() && pattern != ctx.pattern)
+        return false;
+    if (requestSerial >= 0 && requestSerial != ctx.requestSerial)
+        return false;
+    return true;
 }
 
 bool CardUseStruct::tryParse(const QVariant &usage, Room *room)
@@ -403,6 +466,271 @@ QString CardUseStruct::toString() const
         l << tos.join("+");
     }
     return l.join("->");
+}
+
+ActionProposal::ActionProposal()
+    : type(Invalid)
+{
+}
+
+bool ActionProposal::isValid() const
+{
+    return type != Invalid;
+}
+
+bool ActionProposal::isCancel() const
+{
+    return type == Cancel;
+}
+
+ActionProposal ActionProposal::makeCancel()
+{
+    ActionProposal proposal;
+    proposal.type = Cancel;
+    return proposal;
+}
+
+QString ActionProposal::typeName() const
+{
+    switch (type) {
+    case Cancel:
+        return QStringLiteral("cancel");
+    case RealCard:
+        return QStringLiteral("real_card");
+    case SelectedCards:
+        return QStringLiteral("selected_cards");
+    case ViewAsSkillCard:
+        return QStringLiteral("view_as");
+    case SkillCard:
+        return QStringLiteral("skill_card");
+    case Invalid:
+        break;
+    }
+    return QStringLiteral("invalid");
+}
+
+static ActionProposal::ActionType actionProposalTypeFromName(const QString &name)
+{
+    if (name == QStringLiteral("cancel"))
+        return ActionProposal::Cancel;
+    if (name == QStringLiteral("real_card"))
+        return ActionProposal::RealCard;
+    if (name == QStringLiteral("selected_cards"))
+        return ActionProposal::SelectedCards;
+    if (name == QStringLiteral("view_as"))
+        return ActionProposal::ViewAsSkillCard;
+    if (name == QStringLiteral("skill_card"))
+        return ActionProposal::SkillCard;
+    return ActionProposal::Invalid;
+}
+
+static QStringList actionProposalTargetNames(const QList<const Player *> &targets)
+{
+    QStringList names;
+    foreach (const Player *target, targets) {
+        if (target != nullptr)
+            names << target->objectName();
+    }
+    return names;
+}
+
+static QString extractSkillCardUserString(const Card *card)
+{
+    if (card == nullptr || !card->isVirtualCard())
+        return QString();
+
+    const QString cardString = card->toString();
+    const int subcardMarker = cardString.indexOf(QStringLiteral("]="));
+    const int userStringMarker = subcardMarker >= 0 ? cardString.indexOf(QChar(':'), subcardMarker + 2) : -1;
+    if (userStringMarker < 0)
+        return QString();
+
+    return cardString.mid(userStringMarker + 1);
+}
+
+static bool actionProposalUserStringIsSelectedEffect(const QString &cardClass)
+{
+    return cardClass == QStringLiteral("XianshiCard");
+}
+
+static QString actionProposalDeclaredCardNameFromUserString(const QString &cardClass, const QString &userString)
+{
+    if (userString.isEmpty())
+        return QString();
+
+    static const QStringList declaredCardNameCardClasses = QStringList() << QStringLiteral("NianliCard") << QStringLiteral("HuaxiangCard") << QStringLiteral("XihuaCard")
+                                                                        << QStringLiteral("YucanCard") << QStringLiteral("ChuangshiCard");
+    if (!declaredCardNameCardClasses.contains(cardClass))
+        return QString();
+
+    return userString.split(QStringLiteral("+")).first();
+}
+
+QString ActionProposal::skillNameFromPattern(const QString &pattern)
+{
+    if (!pattern.startsWith(QChar('@')))
+        return QString();
+
+    int index = pattern.startsWith(QStringLiteral("@@")) ? 2 : 1;
+    QString skillName;
+    while (index < pattern.length()) {
+        const QChar ch = pattern.at(index);
+        if (ch.isLetterOrNumber() || ch == QChar('_')) {
+            skillName.append(ch);
+            ++index;
+        } else {
+            break;
+        }
+    }
+
+    return skillName;
+}
+
+ActionProposal ActionProposal::fromCard(const Card *card, const QList<const Player *> &targets, const QString &sourceSkillName)
+{
+    if (card == nullptr)
+        return makeCancel();
+
+    QString cardSkillName = card->getSkillName(false);
+    if (cardSkillName.startsWith(QChar('_')))
+        cardSkillName = cardSkillName.mid(1);
+    QString inferredSkillName = cardSkillName;
+    if (inferredSkillName.isEmpty() && card->isKindOf("SkillCard") && card->getClassName().endsWith(QStringLiteral("Card"))
+        && card->getClassName() != QStringLiteral("DummyCard") && card->getClassName() != QStringLiteral("SurrenderCard")
+        && card->getClassName() != QStringLiteral("CheatCard")) {
+        inferredSkillName = card->getClassName();
+        inferredSkillName.chop(4);
+        inferredSkillName = inferredSkillName.toLower();
+    }
+
+    ActionProposal proposal;
+    proposal.skillName = sourceSkillName;
+    if (proposal.skillName.isEmpty())
+        proposal.skillName = inferredSkillName;
+    if (proposal.skillName.startsWith(QChar('_')))
+        proposal.skillName = proposal.skillName.mid(1);
+    const bool delegatedByAnyun = card->isVirtualCard() && (sourceSkillName == QStringLiteral("anyun") || card->showSkill() == QStringLiteral("anyun"))
+        && !inferredSkillName.isEmpty() && inferredSkillName != QStringLiteral("anyun");
+    if (delegatedByAnyun) {
+        proposal.skillName = QStringLiteral("anyun");
+        proposal.extra.insert(QStringLiteral("delegatedSkillName"), inferredSkillName);
+    }
+    proposal.cardClass = card->getClassName();
+    proposal.cardName = card->objectName();
+    proposal.declaredCardName = card->objectName();
+    proposal.targetNames = actionProposalTargetNames(targets);
+
+    if (card->isVirtualCard()) {
+        if (card->isKindOf("DummyCard") && proposal.skillName.isEmpty())
+            proposal.type = SelectedCards;
+        else
+            proposal.type = proposal.skillName.isEmpty() ? SkillCard : ViewAsSkillCard;
+        proposal.subcardIds = card->getSubcards();
+
+        const QString userString = extractSkillCardUserString(card);
+        if (!userString.isEmpty()) {
+            if (proposal.cardClass == QStringLiteral("CheatCard")) {
+                proposal.extra.insert(QStringLiteral("legacyUserString"), userString);
+            } else if (actionProposalUserStringIsSelectedEffect(proposal.cardClass)) {
+                proposal.extra.insert(QStringLiteral("selectedEffect"), userString);
+            } else {
+                const QString declaredCardName = actionProposalDeclaredCardNameFromUserString(proposal.cardClass, userString);
+                if (!declaredCardName.isEmpty())
+                    proposal.declaredCardName = declaredCardName;
+            }
+        }
+    } else {
+        proposal.type = RealCard;
+        proposal.subcardIds << card->getEffectiveId();
+    }
+
+    return proposal;
+}
+
+bool ActionProposal::tryParse(const QVariant &value)
+{
+    *this = ActionProposal();
+    if (!value.canConvert<JsonObject>())
+        return false;
+
+    JsonObject object = value.value<JsonObject>();
+    if (!object.contains(QStringLiteral("type")) || !JsonUtils::isString(object.value(QStringLiteral("type"))))
+        return false;
+
+    type = actionProposalTypeFromName(object.value(QStringLiteral("type")).toString());
+    if (type == Invalid)
+        return false;
+
+    skillName = object.value(QStringLiteral("skillName")).toString();
+    cardClass = object.value(QStringLiteral("cardClass")).toString();
+    cardName = object.value(QStringLiteral("cardName")).toString();
+    declaredCardName = object.value(QStringLiteral("declaredCardName")).toString();
+
+    if (object.contains(QStringLiteral("cardId"))) {
+        bool ok = false;
+        int cardId = object.value(QStringLiteral("cardId")).toInt(&ok);
+        if (!ok)
+            return false;
+        subcardIds << cardId;
+    }
+
+    if (object.contains(QStringLiteral("subcards"))) {
+        QList<int> parsedSubcards;
+        if (!JsonUtils::tryParse(object.value(QStringLiteral("subcards")), parsedSubcards))
+            return false;
+        subcardIds = parsedSubcards;
+    }
+
+    if (object.contains(QStringLiteral("targets"))) {
+        QStringList parsedTargets;
+        if (!JsonUtils::tryParse(object.value(QStringLiteral("targets")), parsedTargets))
+            return false;
+        targetNames = parsedTargets;
+    }
+
+    if (object.contains(QStringLiteral("extra"))) {
+        const QVariant extraValue = object.value(QStringLiteral("extra"));
+        if (!extraValue.canConvert<JsonObject>())
+            return false;
+        extra = extraValue.value<JsonObject>();
+    }
+
+    if (type == RealCard && subcardIds.length() != 1)
+        return false;
+    if (type == SelectedCards && subcardIds.isEmpty())
+        return false;
+    return true;
+}
+
+QVariant ActionProposal::toVariant() const
+{
+    JsonObject object;
+    object.insert(QStringLiteral("type"), typeName());
+    if (!skillName.isEmpty())
+        object.insert(QStringLiteral("skillName"), skillName);
+    if (!cardClass.isEmpty())
+        object.insert(QStringLiteral("cardClass"), cardClass);
+    if (!cardName.isEmpty())
+        object.insert(QStringLiteral("cardName"), cardName);
+    if (!declaredCardName.isEmpty())
+        object.insert(QStringLiteral("declaredCardName"), declaredCardName);
+    if (!subcardIds.isEmpty())
+        object.insert(QStringLiteral("subcards"), JsonUtils::toJsonArray(subcardIds));
+    if (!targetNames.isEmpty())
+        object.insert(QStringLiteral("targets"), JsonUtils::toJsonArray(targetNames));
+    if (!extra.isEmpty())
+        object.insert(QStringLiteral("extra"), extra);
+    return object;
+}
+
+QString ActionProposal::diagnosticString() const
+{
+    QStringList subcards;
+    foreach (int id, subcardIds)
+        subcards << QString::number(id);
+    return QStringLiteral("type=%1 skill=%2 class=%3 card=%4 declared=%5 subcards=%6 targets=%7 extra=%8")
+        .arg(typeName(), skillName, cardClass, cardName, declaredCardName, subcards.join(QStringLiteral("+")), targetNames.join(QStringLiteral("+")))
+        .arg(extra.keys().join(QStringLiteral("+")));
 }
 
 MarkChangeStruct::MarkChangeStruct()

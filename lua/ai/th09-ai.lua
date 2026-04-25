@@ -409,7 +409,7 @@ sgs.ai_skill_use["@@toupai"] = function(self, prompt)
 		if #target_objectname >=2 then break end
 	end
 	if #target_objectname >=0 then
-		return "@ToupaiCard=.->" .. table.concat(target_objectname, "+")
+		return sgs.ai_skill_card_action_proposal("toupai", "ToupaiCard", nil, target_objectname)
 	end
 	return "."
 end
@@ -820,7 +820,7 @@ sgs.ai_skill_use["@@kuaizhao-card1"] = function(self)
 	end
 	if #cards_without_peach == 0 then return end
 	self:sortByUseValue(cards_without_peach, true)
-	return "@KuaizhaoCard=" .. tostring(cards_without_peach[1]:getId()) .. "->" .. target:objectName()
+	return sgs.ai_skill_card_action_proposal("kuaizhao", "KuaizhaoCard", cards_without_peach[1]:getId(), { target:objectName() })
 end
 sgs.ai_skill_use["@@kuaizhao-card2"] = function(self)
 	local kuaizhao_black = string.split(self.player:property("kuaizhao_black"):toString(), "+")
@@ -861,10 +861,7 @@ sgs.ai_skill_use["@@kuaizhao-card2"] = function(self)
 	if #kuaizhao_used == 0 then
 		if self:getUseValue(willUse) < (sgs.ai_use_value.Slash - 0.1) then return end
 	end
-	local realUse = sgs.CardUseStruct()
-	realUse.card = willUse
-	realUse.to = use.to
-	return realUse:toString()
+	return sgs.ai_view_as_action_proposal("kuaizhao", willUse:getClassName(), willUse:objectName(), { willUse:getEffectiveId() }, use.to)
 end
 sgs.ai_card_intention.KuaizhaoCard = 80
 
@@ -1041,7 +1038,7 @@ sgs.ai_skill_use["@@mengxiang-card1"] = function(self)
 		table.insert(enemyNames, enemies[_]:objectName())
 	end
 
-	return "@MengxiangTargetCard=.->" .. table.concat(enemyNames, "+")
+	return sgs.ai_skill_card_action_proposal("mengxiang", "MengxiangTargetCard", nil, enemyNames)
 end
 
 sgs.ai_skill_use["@@mengxiang-card2"] = function(self)
@@ -1070,7 +1067,7 @@ sgs.ai_skill_use["@@mengxiang-card2"] = function(self)
 			mes.arg = "mengxiang"
 			mes.card_str = use.card:toString()
 			self.room:sendLog(mes)
-			return tostring(use.card:getId()) .. "->" .. table.concat(targets, "+")
+			return sgs.ai_skill_card_action_proposal("mengxiang", "MengxiangCard", use.card:getId(), targets)
 		end
 	end
 
@@ -1083,7 +1080,7 @@ sgs.ai_skill_invoke.jishi = true
 sgs.ai_skill_use["@@jishi"] = function(self)
 	local list = sgs.QList2Table(self.player:getTag("jishi_tempcards"):toIntList())
 	-- 相当无脑了
-	return "@JishiCard:" .. table.concat(list, "+") .. "->."
+	return sgs.ai_skill_card_action_proposal("jishi", "JishiCard", list)
 end
 
 --依神女苑&依神紫苑

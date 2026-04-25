@@ -1144,7 +1144,14 @@ public:
 
     const Card *viewAs(const QList<const Card *> & /*cards*/) const override
     {
-        return new ShowShezhengCard();
+        return createViewAsCard<ShowShezhengCard>(QList<const Card *>(), objectName());
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext & /*ctx*/, const JsonObject &extra) const override
+    {
+        if (!selected.isEmpty() || !extra.isEmpty())
+            return nullptr;
+        return createViewAsCard<ShowShezhengCard>(QList<const Card *>(), objectName());
     }
 };
 
@@ -1560,12 +1567,37 @@ public:
         if (checkedPatterns.length() == 1)
             name = checkedPatterns.first();
         if (name != nullptr) {
-            Card *card = Sanguosha->cloneCard(name);
-            card->setSkillName(objectName());
-            card->addSubcards(cards);
-            return card;
+            return cloneViewAsCard(name, cards, objectName());
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+
+        int roles = 1;
+        if (ctx.player->getRole() != "careerist") {
+            foreach (const Player *player, ctx.player->getAliveSiblings()) {
+                if (ctx.player->isFriendWith(player))
+                    roles++;
+            }
+        }
+        const int num = qMax(roles, ctx.player->getHp());
+        if (selected.length() != num)
+            return nullptr;
+
+        Card *card = cloneViewAsCard(extra.value(QStringLiteral("declaredCardName")).toString(), selected, objectName());
+        if (card == nullptr || card->getTypeId() != Card::TypeBasic) {
+            delete card;
+            return nullptr;
+        }
+        if (!isDeclaredCardUseValid(card, ctx)) {
+            delete card;
+            return nullptr;
+        }
+        return card;
     }
 };
 
@@ -1654,10 +1686,29 @@ public:
     {
         if (cards.length() != 2)
             return nullptr;
-        Peach *peach = new Peach(Card::SuitToBeDecided, -1);
-        peach->addSubcards(cards);
-        peach->setSkillName(objectName());
-        return peach;
+        return prepareViewAsCard(new Peach(Card::SuitToBeDecided, -1), cards, objectName());
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 2)
+            return nullptr;
+        if (!acceptsDeclaredCardName(extra, QStringLiteral("peach")))
+            return nullptr;
+
+        if (selected.first()->getTypeId() == selected.last()->getTypeId())
+            return nullptr;
+        const QList<int> woodenOxIds = ctx.player->getPile("wooden_ox");
+        if ((selected.first()->isKindOf("WoodenOx") && woodenOxIds.contains(selected.last()->getId()))
+            || (selected.last()->isKindOf("WoodenOx") && woodenOxIds.contains(selected.first()->getId())))
+            return nullptr;
+
+        Card *card = prepareViewAsCard(new Peach(Card::SuitToBeDecided, -1), selected, objectName());
+        if (!isDeclaredCardUseValid(card, ctx)) {
+            delete card;
+            return nullptr;
+        }
+        return card;
     }
 };
 
@@ -2937,7 +2988,14 @@ public:
 
     const Card *viewAs(const QList<const Card *> & /*cards*/) const override
     {
-        return new ShowFengsuCard();
+        return createViewAsCard<ShowFengsuCard>(QList<const Card *>(), objectName());
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext & /*ctx*/, const JsonObject &extra) const override
+    {
+        if (!selected.isEmpty() || !extra.isEmpty())
+            return nullptr;
+        return createViewAsCard<ShowFengsuCard>(QList<const Card *>(), objectName());
     }
 };
 
@@ -3739,9 +3797,21 @@ public:
     {
         if (cards.isEmpty())
             return nullptr;
-        ChunhenHegemonyCard *card = new ChunhenHegemonyCard;
-        card->addSubcards(cards);
-        return card;
+        return createViewAsCard<ChunhenHegemonyCard>(cards);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.isEmpty() || !extra.isEmpty())
+            return nullptr;
+
+        const QList<int> ids = StringList2IntList(ctx.player->property("chunhen_temp").toString().split("+"));
+        foreach (const Card *card, selected) {
+            if (card == nullptr || !ids.contains(card->getId()))
+                return nullptr;
+        }
+
+        return createViewAsCard<ChunhenHegemonyCard>(selected);
     }
 };
 
@@ -4255,6 +4325,11 @@ public:
         expand_pile = "jingjie";
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "DummyCard";
+    }
+
     bool viewFilter(const Card *to_select) const override
     {
         if (!Self->getPile("jingjie").contains(to_select->getId()))
@@ -4270,6 +4345,15 @@ public:
     const Card *viewAs(const Card *originalCard) const override
     {
         return new DummyCard({originalCard->getId()});
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        if (ctx.player == nullptr || to_select == nullptr || !ctx.player->getPile("jingjie").contains(to_select->getEffectiveId()))
+            return false;
+
+        const QString property = ctx.player->property("luanying").toString();
+        return property == "black" ? to_select->isBlack() : to_select->isRed();
     }
 };
 

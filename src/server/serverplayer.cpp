@@ -18,6 +18,7 @@ const int ServerPlayer::S_NUM_SEMAPHORES = 6;
 ServerPlayer::ServerPlayer(Room *room)
     : Player(room)
     , m_expectedReplySerial(0)
+    , m_lastRequestSerial(0)
     , m_isClientResponseReady(false)
     , m_isWaitingReply(false)
     , socket(nullptr)

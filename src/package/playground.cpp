@@ -387,6 +387,39 @@ public:
 
         return c;
     }
+
+    bool isDeclaredCardNameAccepted(const QString &cardName, const QList<const Card *> &selected, const ActionRequestContext &ctx) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 1)
+            return false;
+
+        Card *card = Sanguosha->cloneCard(cardName);
+        if (card == nullptr)
+            return false;
+        DELETE_OVER_SCOPE(Card, card)
+        card->setSkillName(objectName());
+        card->setShowSkill(objectName());
+        card->addSubcard(selected.first());
+
+        if (!card->inherits("DelayedTrick") || Sanguosha->getBanPackages().contains(card->getPackage()))
+            return false;
+
+        return isDeclaredCardUseValid(card, ctx);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() != 1 || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+        if (!isSubcardSelectionValid(QList<const Card *>(), selected.first(), CardUseGrant(), ctx))
+            return nullptr;
+
+        const QString name = extra.value(QStringLiteral("declaredCardName")).toString();
+        if (!isDeclaredCardNameAccepted(name, selected, ctx))
+            return nullptr;
+
+        return cloneViewAsCard(name, selected, objectName(), objectName());
+    }
 };
 
 class Fsu0413GainianDis : public TargetModSkill

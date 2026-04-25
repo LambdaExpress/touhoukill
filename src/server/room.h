@@ -123,6 +123,10 @@ public:
     void clearCardFlag(const Card *card, ServerPlayer *who = nullptr);
     void clearCardFlag(int card_id, ServerPlayer *who = nullptr);
     bool useCard(const CardUseStruct &card_use, bool add_history = true);
+    bool canCompileClientViewAsSkill(const ClientActionContext &ctx, const QString &skillName) const;
+    bool validateClientCardUse(CardUseStruct &card_use, const ClientActionContext &ctx);
+    void grantCardUse(ServerPlayer *player, const CardUseGrant &grant);
+    void clearCardUseGrants(ServerPlayer *player = nullptr);
     void damage(const DamageStruct &data);
     void sendDamageLog(const DamageStruct &data);
     void loseHp(ServerPlayer *victim, int lose = 1);
@@ -557,6 +561,7 @@ private:
 
     QMap<int, Player::Place> place_map;
     QMap<int, ServerPlayer *> owner_map;
+    QList<CardUseGrant> m_cardUseGrants;
 
     const Card *provided;
     bool has_provided;
@@ -623,6 +628,17 @@ private:
     };
     bool _askForNullification(const Card *trick, ServerPlayer *from, ServerPlayer *to, bool positive, _NullificationAiHelper helper);
     void _setupChooseGeneralRequestArgs(ServerPlayer *player);
+    QList<CardUseGrant> collectLongTermCardUseGrants(const ClientActionContext &ctx) const;
+    QList<CardUseGrant> collectRequestScopedCardUseGrants(const ClientActionContext &ctx) const;
+    bool validateClientCardUseStructure(const CardUseStruct &card_use, const ClientActionContext &ctx) const;
+    bool findGrantThatExplains(const CardUseStruct &card_use, const ClientActionContext &ctx, const QList<CardUseGrant> &grants, CardUseGrant *matchedGrant) const;
+    bool validateClientRealCardOwnership(const CardUseStruct &card_use, const ClientActionContext &ctx) const;
+    bool validateClientCardSubcards(const CardUseStruct &card_use, const CardUseGrant &grant, const ClientActionContext &ctx) const;
+    bool validateClientCardGeneratedByGrant(const CardUseStruct &card_use, const CardUseGrant &grant, const ClientActionContext &ctx) const;
+    bool validateClientCardTargets(const CardUseStruct &card_use) const;
+    bool validateClientCardUsageLimit(const CardUseStruct &card_use, const ClientActionContext &ctx) const;
+    void consumeCardUseGrant(const CardUseGrant &grant);
+    void clearExpiredCardUseGrants(ServerPlayer *player, int activeRequestSerial);
 
 private slots:
     void reportDisconnection();

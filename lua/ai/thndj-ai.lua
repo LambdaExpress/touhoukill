@@ -244,7 +244,7 @@ sgs.ai_skill_use["@@liexi"] = function(self, prompt)
 		end
 
 		if #target_objectname>0 then
-			return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+			return sgs.ai_card_action_proposal(dummy_use.card, target_objectname, "liexi")
 		end
 	end
 	return "."

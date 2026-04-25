@@ -538,11 +538,16 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() > 0 && cards.length() <= 3) {
-            SaiqianCard *card = new SaiqianCard;
-            card->addSubcards(cards);
-            return card;
+            return createViewAsCard<SaiqianCard>(cards);
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext & /*ctx*/, const JsonObject &extra) const override
+    {
+        if (selected.isEmpty() || selected.length() > 3 || !extra.isEmpty())
+            return nullptr;
+        return createViewAsCard<SaiqianCard>(selected);
     }
 };
 
@@ -775,12 +780,24 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() > 0 && cards.length() < 5) {
-            ShoucangCard *card = new ShoucangCard;
-            card->addSubcards(cards);
-
-            return card;
+            return createViewAsCard<ShoucangCard>(cards);
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.isEmpty() || selected.length() >= 5 || !extra.isEmpty())
+            return nullptr;
+
+        QList<Card::Suit> suits;
+        foreach (const Card *card, selected) {
+            if (card == nullptr || card->isEquipped() || suits.contains(card->getSuit()))
+                return nullptr;
+            suits << card->getSuit();
+        }
+
+        return createViewAsCard<ShoucangCard>(selected);
     }
 };
 class Shoucang : public TriggerSkill
@@ -894,6 +911,32 @@ public:
         }
         if (cards.length() > 0)
             card->addSubcards(cards);
+        return card;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || !extra.isEmpty())
+            return nullptr;
+
+        bool hasDelayedTrick = false;
+        BaoyiCard *card = new BaoyiCard;
+        foreach (int id, ctx.player->getJudgingAreaID()) {
+            card->addSubcard(id);
+            hasDelayedTrick = true;
+        }
+
+        foreach (const Card *selectedCard, selected) {
+            if (selectedCard == nullptr || !selectedCard->isKindOf("EquipCard") || ctx.player->isJilei(selectedCard)) {
+                delete card;
+                return nullptr;
+            }
+        }
+        if (selected.isEmpty() && !hasDelayedTrick) {
+            delete card;
+            return nullptr;
+        }
+        prepareViewAsCard(card, selected);
         return card;
     }
 };
@@ -1240,20 +1283,48 @@ public:
         if (pattern == "@@bllmwuyu") {
             if (cards.length() != 1)
                 return nullptr;
-            BllmShiyuDummy *shiyu = new BllmShiyuDummy;
-            shiyu->addSubcards(cards);
-            return shiyu;
+            return createViewAsCard<BllmShiyuDummy>(cards, objectName());
         } else {
             Analeptic card(Card::NoSuit, 0);
             if (Self->isCardLimited(&card, Card::MethodUse))
                 return nullptr;
 
             const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
+            SkillCard *skillCard = nullptr;
             if (cardPattern != nullptr && cardPattern->match(Self, &card))
-                return new BllmShiyuCard;
+                skillCard = new BllmShiyuCard;
             else
-                return new BllmWuyuCard;
+                skillCard = new BllmWuyuCard;
+            skillCard->setSkillName(objectName());
+            return skillCard;
         }
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || !extra.isEmpty())
+            return nullptr;
+
+        if (ctx.pattern == QStringLiteral("@@bllmwuyu")) {
+            if (selected.length() != 1 || selected.first() == nullptr || selected.first()->isEquipped())
+                return nullptr;
+            return createViewAsCard<BllmShiyuDummy>(selected, objectName());
+        }
+
+        Analeptic analeptic(Card::NoSuit, 0);
+        if (ctx.player->isCardLimited(&analeptic, Card::MethodUse))
+            return nullptr;
+
+        const CardPattern *cardPattern = Sanguosha->getPattern(ctx.pattern);
+        if (cardPattern != nullptr && cardPattern->match(ctx.player, &analeptic)) {
+            BllmShiyuCard *card = new BllmShiyuCard;
+            card->setSkillName(objectName());
+            return card;
+        }
+
+        BllmWuyuCard *card = new BllmWuyuCard;
+        card->setSkillName(objectName());
+        return card;
     }
 };
 
@@ -1575,12 +1646,29 @@ public:
             ok = true;
 
         if (ok) {
-            DummyCard *dc = new DummyCard;
-            dc->addSubcards(cards);
-            return dc;
+            return createViewAsCard<DummyCard>(cards, objectName());
         }
 
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.isEmpty() || !extra.isEmpty())
+            return nullptr;
+
+        foreach (const Card *card, selected) {
+            if (card == nullptr || card->isEquipped() || ctx.player->isJilei(card))
+                return nullptr;
+        }
+
+        bool ok = selected.length() == getQiangyuDiscardNum(ctx.player);
+        if (selected.length() == 1 && selected.first()->getSuit() == Card::Spade)
+            ok = true;
+        if (!ok)
+            return nullptr;
+
+        return createViewAsCard<DummyCard>(selected, objectName());
     }
 };
 
@@ -1768,12 +1856,18 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (!cards.isEmpty()) {
-            DfgzmSiyuCard *card = new DfgzmSiyuCard;
-            card->addSubcards(cards);
-            return card;
+            return createViewAsCard<DfgzmSiyuCard>(cards);
         }
 
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext & /*ctx*/, const JsonObject &extra) const override
+    {
+        if (selected.isEmpty() || selected.length() > 2 || !extra.isEmpty())
+            return nullptr;
+
+        return createViewAsCard<DfgzmSiyuCard>(selected);
     }
 };
 
@@ -2246,6 +2340,13 @@ public:
             return card;
         }
         return nullptr;
+    }
+
+    bool isSubcardSelectionValid(const QList<const Card *> &selected, const Card *to_select, const CardUseGrant &grant, const ClientActionContext &ctx) const override
+    {
+        Q_UNUSED(grant)
+        Q_UNUSED(ctx)
+        return selected.isEmpty() && to_select != nullptr && !to_select->hasFlag("using") && !to_select->isKindOf("TrickCard");
     }
 };
 

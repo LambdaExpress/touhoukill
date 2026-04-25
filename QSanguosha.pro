@@ -83,6 +83,7 @@ SOURCES += \
     src/package/touhougod.cpp \
     src/package/hegemonyGeneral.cpp \
     src/package/washout.cpp \
+    src/server/actioncompiler.cpp \
     src/server/ai.cpp \
     src/server/gamerule.cpp \
     src/server/generalselector.cpp \
@@ -193,6 +194,7 @@ HEADERS += \
     src/package/touhougod.h \
     src/package/hegemonyGeneral.h \
     src/package/washout.h \
+    src/server/actioncompiler.h \
     src/server/ai.h \
     src/server/gamerule.h \
     src/server/generalselector.h \

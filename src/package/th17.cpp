@@ -99,11 +99,50 @@ public:
             }
         }
 
-        Slash *s = new Slash(Card::SuitToBeDecided, -1);
-        s->addSubcards(cards);
-        s->setSkillName("_lingshou");
+        return prepareViewAsCard(new Slash(Card::SuitToBeDecided, -1), cards, "_lingshou");
+    }
 
-        return s;
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr)
+            return nullptr;
+        if (!acceptsDeclaredCardName(extra, QStringLiteral("slash")))
+            return nullptr;
+
+        bool ok = false;
+        const int selectedId = ctx.player->property("lingshouSelected").toString().toInt(&ok);
+        if (!ok)
+            return nullptr;
+
+        const Card *originalCard = Sanguosha->getCard(selectedId);
+        if (originalCard == nullptr)
+            return nullptr;
+
+        bool containsOriginal = false;
+        foreach (const Card *card, selected) {
+            if (card != nullptr && card->getId() == originalCard->getId()) {
+                containsOriginal = true;
+                break;
+            }
+        }
+        if (!containsOriginal)
+            return nullptr;
+
+        foreach (const Card *equip, ctx.player->getEquips()) {
+            if (equip->getSuit() != originalCard->getSuit())
+                continue;
+            bool containsEquip = false;
+            foreach (const Card *card, selected) {
+                if (card != nullptr && card->getId() == equip->getId()) {
+                    containsEquip = true;
+                    break;
+                }
+            }
+            if (!containsEquip)
+                return nullptr;
+        }
+
+        return prepareViewAsCard(new Slash(Card::SuitToBeDecided, -1), selected, "_lingshou");
     }
 };
 
@@ -869,10 +908,28 @@ public:
         if (Sanguosha->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_PLAY)
             return new WeiyiCard;
 
-        Slash *s = new Slash(Card::SuitToBeDecided, -1);
-        s->addSubcards(cards);
-        s->setSkillName("_" + objectName());
-        return s;
+        return prepareViewAsCard(new Slash(Card::SuitToBeDecided, -1), cards, "_" + objectName());
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.reason == CardUseStruct::CARD_USE_REASON_PLAY) {
+            if (!selected.isEmpty() || !extra.isEmpty())
+                return nullptr;
+            return new WeiyiCard;
+        }
+
+        if (ctx.pattern != QStringLiteral("@@weiyi") || ctx.player == nullptr || selected.length() != 1)
+            return nullptr;
+        if (!acceptsDeclaredCardName(extra, QStringLiteral("slash")))
+            return nullptr;
+
+        bool ok = false;
+        const int selectedId = ctx.player->property("weiyiSelected").toString().toInt(&ok);
+        if (!ok || selected.first() == nullptr || selected.first()->getId() != selectedId)
+            return nullptr;
+
+        return prepareViewAsCard(new Slash(Card::SuitToBeDecided, -1), selected, "_" + objectName());
     }
 
     bool isEnabledAtPlay(const Player *player) const override
@@ -1120,9 +1177,7 @@ public:
 
         QString pattern = Sanguosha->getCurrentCardUsePattern();
         if (pattern == "@@junzhen-card1") {
-            JunzhenCard *dc = new JunzhenCard;
-            dc->addSubcards(cards);
-            dc->setShowSkill("junzhen");
+            JunzhenCard *dc = createViewAsCard<JunzhenCard>(cards, QString(), "junzhen");
 
             // Wait! Since we decided to make JunzhenCard targetFixed = true when Self is not owner of junzhen
             // The judgement should be here
@@ -1143,10 +1198,51 @@ public:
             else
                 delete dc;
         } else if (pattern == "@@junzhen-card2") {
-            Slash *sl = new Slash(Card::SuitToBeDecided, -1);
-            sl->addSubcards(cards);
-            sl->setSkillName("_junzhen");
-            return sl;
+            return prepareViewAsCard(new Slash(Card::SuitToBeDecided, -1), cards, "_junzhen");
+        }
+
+        return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.isEmpty() || ctx.player == nullptr)
+            return nullptr;
+
+        if (ctx.pattern == QStringLiteral("@@junzhen-card1")) {
+            if (!extra.isEmpty())
+                return nullptr;
+            foreach (const Card *card, selected) {
+                if (card == nullptr || !card->isKindOf("EquipCard"))
+                    return nullptr;
+            }
+
+            JunzhenCard *card = createViewAsCard<JunzhenCard>(selected, QString(), "junzhen");
+
+            bool feasible = false;
+            if (ctx.player->hasFlag("junzhen_owner")) {
+                feasible = true;
+            } else {
+                foreach (const Player *player, ctx.player->getAliveSiblings()) {
+                    if (player->hasFlag("junzhen_owner")) {
+                        feasible = card->feasible(ctx.player, player);
+                        break;
+                    }
+                }
+            }
+            if (!feasible) {
+                delete card;
+                return nullptr;
+            }
+            return card;
+        }
+
+        if (ctx.pattern == QStringLiteral("@@junzhen-card2")) {
+            if (selected.length() != 1)
+                return nullptr;
+            if (!acceptsDeclaredCardName(extra, QStringLiteral("slash")))
+                return nullptr;
+            return prepareViewAsCard(new Slash(Card::SuitToBeDecided, -1), selected, "_junzhen");
         }
 
         return nullptr;

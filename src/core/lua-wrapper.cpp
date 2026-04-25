@@ -49,6 +49,23 @@ QDialog *LuaViewAsSkill::getDialog() const
     return QijiDialog::getInstance(objectName(), has_left, has_right);
 }
 
+const Card *LuaViewAsSkill::buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const
+{
+    Q_UNUSED(ctx)
+
+    if (!extra.isEmpty())
+        return nullptr;
+
+    QList<const Card *> accepted;
+    foreach (const Card *card, selected) {
+        if (card == nullptr || !viewFilter(accepted, card))
+            return nullptr;
+        accepted << card;
+    }
+
+    return viewAs(accepted);
+}
+
 LuaFilterSkill::LuaFilterSkill(const char *name)
     : FilterSkill(name)
     , view_filter(0)

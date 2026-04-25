@@ -1033,7 +1033,7 @@ sgs.ai_skill_use["@@xiaoyinVS!"] = function(self, prompt)
 	local card = sgs.cloneCard("lure_tiger", sgs.Card_SuitToBeDecided, -1)
 	card:addSubcard(cards[1])
 	if #targets > 0 then
-		return card:toString() .. "->" .. table.concat(targets, "+")
+		return sgs.ai_card_action_proposal(card, targets, "xiaoyinVS")
 	end
 	return "." -- !!!! 不能不使用啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊
 end

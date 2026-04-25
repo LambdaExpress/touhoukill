@@ -1759,6 +1759,30 @@ public:
 
         return nullptr;
     }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (!selected.isEmpty() || ctx.player == nullptr || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+
+        const QString name = extra.value(QStringLiteral("declaredCardName")).toString();
+        if (name != QStringLiteral("slash") && name != QStringLiteral("snatch"))
+            return nullptr;
+
+        Card *declared = Sanguosha->cloneCard(name, Card::SuitToBeDecided, 0);
+        if (declared == nullptr)
+            return nullptr;
+        DELETE_OVER_SCOPE(Card, declared)
+        declared->setSkillName(objectName());
+        if (ctx.player->isCardLimited(declared, Card::MethodUse))
+            return nullptr;
+        if (!isDeclaredCardUseValid(declared, ctx))
+            return nullptr;
+
+        NianliCard *card = new NianliCard;
+        card->setUserString(name);
+        return card;
+    }
 };
 
 class Nianli : public TriggerSkill
@@ -2169,9 +2193,7 @@ public:
     {
         if (Sanguosha->getCurrentCardUsePattern() == "@@mengxiang-card2") {
             if (cards.length() == 1) {
-                MengxiangCard *card = new MengxiangCard;
-                card->addSubcards(cards);
-                return card;
+                return createViewAsCard<MengxiangCard>(cards);
             }
         } else {
             if (cards.length() == 0)
@@ -2179,6 +2201,29 @@ public:
         }
 
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (!extra.isEmpty())
+            return nullptr;
+        if (ctx.pattern == QStringLiteral("@@mengxiang-card2")) {
+            if (ctx.player == nullptr || selected.length() != 1)
+                return nullptr;
+            const Card *card = selected.first();
+            if (card == nullptr || card->isKindOf("Jink") || card->isKindOf("Nullification"))
+                return nullptr;
+            if (card->isKindOf("Peach") && !card->isAvailable(ctx.player))
+                return nullptr;
+            if (!StringList2IntList(ctx.player->property("mengxiang_temp").toString().split("+")).contains(card->getId()))
+                return nullptr;
+
+            return createViewAsCard<MengxiangCard>(selected);
+        }
+
+        if (!selected.isEmpty())
+            return nullptr;
+        return new MengxiangTargetCard;
     }
 };
 
@@ -2328,9 +2373,21 @@ public:
         if (cards.isEmpty())
             return nullptr;
 
-        JishiCard *card = new JishiCard;
-        card->addSubcards(cards);
-        return card;
+        return createViewAsCard<JishiCard>(cards);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.isEmpty() || !extra.isEmpty())
+            return nullptr;
+
+        const QList<int> ids = StringList2IntList(ctx.player->property("jishi_temp").toString().split("+"));
+        foreach (const Card *card, selected) {
+            if (card == nullptr || !ids.contains(card->getId()))
+                return nullptr;
+        }
+
+        return createViewAsCard<JishiCard>(selected);
     }
 };
 
@@ -2471,17 +2528,35 @@ public:
     {
         if (Sanguosha->getCurrentCardUsePattern() == "@@mianling!") {
             if (Self->getPile("qsmian").length() - cards.length() == 1 + Self->getAliveSiblings().length()) {
-                DummyCard *dc = new DummyCard;
-                dc->addSubcards(cards);
-                return dc;
+                return createViewAsCard<DummyCard>(cards, objectName());
             }
         } else if (cards.length() == 1) {
-            MianLingCard *ml = new MianLingCard;
-            ml->addSubcards(cards);
-            return ml;
+            return createViewAsCard<MianLingCard>(cards);
         }
 
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || !extra.isEmpty())
+            return nullptr;
+
+        foreach (const Card *card, selected) {
+            if (card == nullptr || !ctx.player->getPile("qsmian").contains(card->getEffectiveId()))
+                return nullptr;
+        }
+
+        if (ctx.pattern == QStringLiteral("@@mianling!")) {
+            if (ctx.player->getPile("qsmian").length() - selected.length() != 1 + ctx.player->getAliveSiblings().length())
+                return nullptr;
+            return createViewAsCard<DummyCard>(selected, objectName());
+        }
+
+        if (selected.length() != 1)
+            return nullptr;
+
+        return createViewAsCard<MianLingCard>(selected);
     }
 
     bool isEnabledAtPlay(const Player *player) const override
@@ -3071,6 +3146,35 @@ public:
         }
 
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.pattern == "@@" + objectName() + "-card1!") {
+            if (!selected.isEmpty() || !extra.isEmpty())
+                return nullptr;
+            return new YucanSelectCard;
+        }
+
+        if (!selected.isEmpty() || ctx.player == nullptr || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+
+        const QString name = extra.value(QStringLiteral("declaredCardName")).toString();
+        Card *declared = Sanguosha->cloneCard(name);
+        if (declared == nullptr)
+            return nullptr;
+        DELETE_OVER_SCOPE(Card, declared)
+        declared->setSkillName(objectName());
+        declared->setShowSkill(objectName());
+
+        if (ctx.player->hasFlag(objectName()) || declared->getTypeId() != Card::TypeBasic || Sanguosha->getBanPackages().contains(declared->getPackage()))
+            return nullptr;
+        if (!isDeclaredCardUseValid(declared, ctx))
+            return nullptr;
+
+        YucanCard *card = new YucanCard;
+        card->setUserString(name);
+        return card;
     }
 };
 

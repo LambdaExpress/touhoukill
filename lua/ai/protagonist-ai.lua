@@ -440,7 +440,7 @@ sgs.ai_skill_use["@@shoucang"] = function(self, prompt)
 		end
 	end
 	if #show>0 then
-		return "@ShoucangCard=" ..table.concat(show, "+").."->."
+		return sgs.ai_skill_card_action_proposal("shoucang", "ShoucangCard", show)
 	end
 	return "."
 end
@@ -482,20 +482,22 @@ sgs.ai_skill_use["@@baoyi"] = function(self, prompt)
 		end
 	end
 	if has_spade then
-		return "@BaoyiCard=" .. table.concat(delay_ids, "+")
+		return sgs.ai_skill_card_action_proposal("baoyi", "BaoyiCard", delay_ids)
 	end
 	local target = sgs.ai_skill_playerchosen.zero_card_as_slash(self, self.room:getOtherPlayers(self.player))
 	if not  target then
-		return "@BaoyiCard="..table.concat(delay_ids, "+")
+		return sgs.ai_skill_card_action_proposal("baoyi", "BaoyiCard", delay_ids)
 	end
 	local equips={}
 	for _,c in sgs.qlist(self.player:getCards("hes")) do
 		if c:isKindOf("EquipCard") then
 			if c:getSuit()== sgs.Card_Spade then
 				if delay_num>0 then
-					return "@BaoyiCard="..c:getEffectiveId().."+"..table.concat(delay_ids, "+")
+					local ids = { c:getEffectiveId() }
+					for _, id in ipairs(delay_ids) do table.insert(ids, id) end
+					return sgs.ai_skill_card_action_proposal("baoyi", "BaoyiCard", ids)
 				else
-					return "@BaoyiCard="..c:getEffectiveId()
+					return sgs.ai_skill_card_action_proposal("baoyi", "BaoyiCard", c:getEffectiveId())
 				end
 			end
 			table.insert(equips,c)
@@ -504,10 +506,10 @@ sgs.ai_skill_use["@@baoyi"] = function(self, prompt)
 	if delay_num==0 then
 		if #equips>0  then
 			self:sortByKeepValue(equips)
-			return "@BaoyiCard="..equips[1]:getEffectiveId()
+			return sgs.ai_skill_card_action_proposal("baoyi", "BaoyiCard", equips[1]:getEffectiveId())
 		end
 	else
-		return "@BaoyiCard="..table.concat(delay_ids, "+")
+		return sgs.ai_skill_card_action_proposal("baoyi", "BaoyiCard", delay_ids)
 	end
 	return "."
 end
@@ -650,7 +652,7 @@ sgs.ai_skill_use["@@chunxi"] = function(self, prompt)
 	if selectedId then
 		local target = chunxiTargetChoose(self)
 		if target then
-			return "@ChunxiCard=" .. tostring(selectedId) .. "->" .. target:objectName()
+			return sgs.ai_skill_card_action_proposal("chunxi", "ChunxiCard", selectedId, { target:objectName() })
 		end
 	end
 	return "."
@@ -1137,7 +1139,7 @@ sgs.ai_skill_use["@@toushi"] = function(self, prompt)
 		if card:isKindOf("IronChain") then
 			return "."
 		end
-		return dummy_use.card:toString()
+		return sgs.ai_card_action_proposal(dummy_use.card, nil, "toushi")
 	else
 		local target_objectname = {}
 		if card:isKindOf("IronChain") then
@@ -1172,7 +1174,7 @@ sgs.ai_skill_use["@@toushi"] = function(self, prompt)
 			end
 		end]]
 		if #target_objectname>0 then
-			return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+			return sgs.ai_card_action_proposal(dummy_use.card, target_objectname, "toushi")
 		end
 	end
 	return "."

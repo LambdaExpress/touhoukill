@@ -226,7 +226,7 @@ sgs.ai_skill_use["@@modao"] = function(self)
 			targetstring = table.concat(targetstrings, "+")
 		end
 
-		return (card_str .. "->" .. targetstring)
+		return sgs.ai_card_action_proposal(skillcard, targetstrings, "modao")
 	end
 	return "."
 end
@@ -375,9 +375,9 @@ sgs.ai_skill_use["@@guwu"] = function(self, prompt)
 	end
 
 	if #avail > 0 then
-		return "@GuwuCard=".. avail[1]:getId()  .. "->" .. avail_targets[1]
+		return sgs.ai_skill_card_action_proposal("guwu", "GuwuCard", avail[1]:getId(), { avail_targets[1] })
 	elseif not self.player:isChained() then
-		return "@GuwuCard=.->" .. avail_targets[1]
+		return sgs.ai_skill_card_action_proposal("guwu", "GuwuCard", nil, { avail_targets[1] })
 	end
 	return "."
 end
@@ -395,7 +395,7 @@ sgs.ai_skill_use["@@minghe"] = function(self, prompt)
 		end
 	end
 	if #targets >1 then
-		return "@MingheCard=.->" .. table.concat(targets, "+")
+		return sgs.ai_skill_card_action_proposal("minghe", "MingheCard", nil, targets)
 	end
 	return "."
 end
@@ -430,9 +430,9 @@ sgs.ai_skill_use["@@kuangwu"] = function(self, prompt)
 	end
 
 	if #avail > 0 then
-		return "@KuangwuCard=".. avail[1]:getId()  .. "->" .. avail_targets[1]
+		return sgs.ai_skill_card_action_proposal("kuangwu", "KuangwuCard", avail[1]:getId(), { avail_targets[1] })
 	elseif not self.player:isChained() then
-		return "@KuangwuCard=.->" .. avail_targets[1]
+		return sgs.ai_skill_card_action_proposal("kuangwu", "KuangwuCard", nil, { avail_targets[1] })
 	end
 	return "."
 end
@@ -450,7 +450,7 @@ sgs.ai_skill_use["@@zhuti"] = function(self, prompt)
 		end
 	end
 	if #targets >1 then
-		return "@ZhutiCard=.->" .. table.concat(targets, "+")
+		return sgs.ai_skill_card_action_proposal("zhuti", "ZhutiCard", nil, targets)
 	end
 	return "."
 end
@@ -511,7 +511,7 @@ sgs.ai_skill_use["@@chunteng"] = function(self, prompt)
 	end
 	if #l > 0 then
 		self:sortByUseValue(l,true)
-		return "@ChuntengCard=".. l[1]:getId() .."->" .. self.friends_noself[1]:objectName()
+		return sgs.ai_skill_card_action_proposal("chunteng", "ChuntengCard", l[1]:getId(), { self.friends_noself[1]:objectName() })
 	end
 end
 
@@ -524,5 +524,5 @@ end
 sgs.ai_skill_invoke.huazhao = true
 sgs.ai_skill_use["@@huazhao"] = function(self, prompt)
 	local l = self.player:getPile("spring")
-	return "@HuazhaoCard=".. l:first() .."->."
+	return sgs.ai_skill_card_action_proposal("huazhao", "HuazhaoCard", l:first())
 end

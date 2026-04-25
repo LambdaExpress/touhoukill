@@ -308,6 +308,36 @@ public:
         return to_select->isRed() && !Self->isJilei(to_select);
     }
 
+    bool isCardUseValid(const CardUseStruct &card_use, const CardUseGrant &grant, const ClientActionContext &ctx) const override
+    {
+        if (card_use.card == nullptr || card_use.card->getClassName() != "HongwuCard" || card_use.card->subcardsLength() != 2)
+            return false;
+        return ViewAsSkill::isCardUseValid(card_use, grant, ctx);
+    }
+
+    bool isSubcardSelectionValid(const QList<const Card *> &selected, const Card *to_select, const CardUseGrant &grant, const ClientActionContext &ctx) const override
+    {
+        Q_UNUSED(grant)
+        return ctx.player != nullptr && to_select != nullptr && selected.length() < 2 && to_select->isRed() && !ctx.player->isJilei(to_select);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() != 2 || !extra.isEmpty())
+            return nullptr;
+
+        QList<const Card *> accepted;
+        foreach (const Card *card, selected) {
+            if (!isSubcardSelectionValid(accepted, card, CardUseGrant(), ctx))
+                return nullptr;
+            accepted << card;
+        }
+
+        HongwuCard *card = new HongwuCard;
+        card->addSubcards(selected);
+        return card;
+    }
+
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() == 2) {
@@ -353,12 +383,22 @@ public:
         return (to_select->isKindOf("Weapon") || to_select->getSuit() == Card::Heart) && !Self->isJilei(to_select);
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "ShenqiangCard";
+    }
+
     const Card *viewAs(const Card *originalCard) const override
     {
         ShenqiangCard *card = new ShenqiangCard;
         card->addSubcard(originalCard);
 
         return card;
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        return ctx.player != nullptr && to_select != nullptr && (to_select->isKindOf("Weapon") || to_select->getSuit() == Card::Heart) && !ctx.player->isJilei(to_select);
     }
 };
 
@@ -2123,18 +2163,47 @@ public:
         if (checkedPatterns.length() == 1) {
             HuaxiangCard *card = new HuaxiangCard;
             card->setUserString(checkedPatterns.first());
-            card->addSubcards(cards);
-            return card;
+            return prepareViewAsCard(card, cards);
         }
 
         QString name = Self->tag.value("huaxiang", QString()).toString();
         if (name != nullptr) {
             HuaxiangCard *card = new HuaxiangCard;
             card->setUserString(name);
-            card->addSubcards(cards);
-            return card;
+            return prepareViewAsCard(card, cards);
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 1 || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+
+        const Card *selectedCard = selected.first();
+        if (selectedCard == nullptr || selectedCard->isEquipped())
+            return nullptr;
+        foreach (int id, ctx.player->getPile("rainbow")) {
+            const Card *card = Sanguosha->getCard(id);
+            if (card != nullptr && card->getSuit() == selectedCard->getSuit())
+                return nullptr;
+        }
+
+        const QString name = extra.value(QStringLiteral("declaredCardName")).toString();
+        Card *declared = Sanguosha->cloneCard(name, Card::NoSuit, 0);
+        if (declared == nullptr)
+            return nullptr;
+        DELETE_OVER_SCOPE(Card, declared)
+        if (!declared->isKindOf("BasicCard") && !declared->isKindOf("Nullification"))
+            return nullptr;
+        declared->setSkillName(objectName());
+        if ((name.contains("jink") && ctx.player->getMaxHp() > 3) || (name.contains("peach") && ctx.player->getMaxHp() > 2)
+            || (name.contains("nullification") && ctx.player->getMaxHp() > 1) || !isDeclaredCardUseValid(declared, ctx))
+            return nullptr;
+
+        HuaxiangCard *card = new HuaxiangCard;
+        card->setUserString(name);
+        return prepareViewAsCard(card, selected);
     }
 
     QDialog *getDialog() const override
@@ -3777,7 +3846,7 @@ public:
 
         QString name = Self->tag.value("shenbao_choice").toString();
         if (name == "ShowShenbao") {
-            return new ShowShenbaoCard();
+            return createViewAsCard<ShowShenbaoCard>(QList<const Card *>(), objectName());
         }
         //if (name == "cancel")
         //    return NULL;
@@ -3790,6 +3859,13 @@ public:
             return skill->viewAs(cards);
 
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext & /*ctx*/, const JsonObject &extra) const override
+    {
+        if (!selected.isEmpty() || !extra.isEmpty())
+            return nullptr;
+        return createViewAsCard<ShowShenbaoCard>(QList<const Card *>(), objectName());
     }
 };
 
@@ -4417,8 +4493,11 @@ public:
         expand_pile = "%shown_card";
     }
 
-    static QStringList responsePatterns()
+    static QStringList responsePatterns(const Player *player)
     {
+        if (player == nullptr)
+            return {};
+
         QString pattern = Sanguosha->currentRoomState()->getCurrentCardUsePattern();
         const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
 
@@ -4440,7 +4519,7 @@ public:
             Card *card = Sanguosha->cloneCard(str);
             DELETE_OVER_SCOPE(Card, card)
 
-            if (cardPattern != nullptr && cardPattern->match(Self, card))
+            if (cardPattern != nullptr && cardPattern->match(player, card))
                 checkedPatterns << str;
         }
         return checkedPatterns;
@@ -4467,7 +4546,7 @@ public:
     {
         if (!hasShown(player))
             return false;
-        QStringList checkedPatterns = responsePatterns();
+        QStringList checkedPatterns = responsePatterns(player);
         if (checkedPatterns.contains("peach") && checkedPatterns.length() == 1 && player->getMark("Global_PreventPeach") > 0)
             return false;
         return !checkedPatterns.isEmpty();
@@ -4477,7 +4556,7 @@ public:
     {
         if (Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_RESPONSE_USE
             || Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_RESPONSE) {
-            QStringList patterns = responsePatterns();
+            QStringList patterns = responsePatterns(Self);
             foreach (const Player *p, Self->getAliveSiblings()) {
                 if (p->getShownHandcards().contains(to_select->getId())) {
                     foreach (const QString &pattern, patterns) {
@@ -4496,11 +4575,54 @@ public:
         return false;
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "XinhuaCard";
+    }
+
+    CardUseGrant makeGrant(const Player *player, const ClientActionContext &ctx) const override
+    {
+        CardUseGrant grant = ViewAsSkill::makeGrant(player, ctx);
+        if (!grant.isValid() || ctx.player == nullptr)
+            return grant;
+
+        grant.allowOtherPlayersCards = true;
+        foreach (const Player *p, ctx.player->getAliveSiblings())
+            grant.allowedCardIds << p->getShownHandcards();
+
+        return grant;
+    }
+
     const Card *viewAs(const Card *originalCard) const override
     {
         XinhuaCard *card = new XinhuaCard;
         card->addSubcard(originalCard);
         return card;
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        if (ctx.player == nullptr || to_select == nullptr)
+            return false;
+
+        Room *room = ctx.player->getRoom();
+        ServerPlayer *owner = room->getCardOwner(to_select->getEffectiveId());
+        if (owner == nullptr || !ctx.player->getAliveSiblings().contains(owner) || !owner->getShownHandcards().contains(to_select->getEffectiveId()))
+            return false;
+
+        if (ctx.reason == CardUseStruct::CARD_USE_REASON_RESPONSE_USE || ctx.reason == CardUseStruct::CARD_USE_REASON_RESPONSE) {
+            foreach (const QString &pattern, responsePatterns(ctx.player)) {
+                ExpPattern exp(pattern);
+                if (exp.match(ctx.player, to_select))
+                    return true;
+            }
+            return false;
+        }
+
+        if (ctx.reason == CardUseStruct::CARD_USE_REASON_PLAY)
+            return to_select->isAvailable(ctx.player);
+
+        return false;
     }
 
     bool isEnabledAtNullification(const ServerPlayer *player) const override
@@ -4911,6 +5033,29 @@ public:
     }
 };
 
+static const ViewAsSkill *anyunDelegatedViewAsSkill(const Player *player, const QString &skillName)
+{
+    if (player == nullptr || skillName.isEmpty() || skillName == QStringLiteral("anyun") || !player->canShowHiddenSkill())
+        return nullptr;
+
+    const Skill *skill = Sanguosha->getSkill(skillName);
+    if (skill == nullptr || skill->inherits("FilterSkill"))
+        return nullptr;
+
+    bool hiddenSkill = false;
+    foreach (const QString &hidden, player->getHiddenGenerals()) {
+        const General *general = Sanguosha->getGeneral(hidden);
+        if (general != nullptr && general->hasSkill(skillName)) {
+            hiddenSkill = true;
+            break;
+        }
+    }
+    if (!hiddenSkill)
+        return nullptr;
+
+    return Sanguosha->getViewAsSkill(skillName);
+}
+
 AnyunDialog *AnyunDialog::getInstance(const QString &object)
 {
     static QPointer<AnyunDialog> instance;
@@ -4944,6 +5089,8 @@ void AnyunDialog::popup()
     Self->tag.remove(object_name);
 
     bool play = (Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_PLAY);
+    const CardUseStruct::CardUseReason reason = Sanguosha->currentRoomState()->getCurrentCardUseReason();
+    const QString pattern = Sanguosha->currentRoomState()->getCurrentCardUsePattern();
 
     foreach (QAbstractButton *button, group->buttons()) {
         layout->removeWidget(button);
@@ -4953,15 +5100,16 @@ void AnyunDialog::popup()
 
     foreach (const QString &hidden, Self->getHiddenGenerals()) {
         const General *g = Sanguosha->getGeneral(hidden);
+        if (g == nullptr)
+            continue;
         foreach (const Skill *skill, g->getSkillList()) {
-            const ViewAsSkill *vs = Sanguosha->getViewAsSkill(skill->objectName());
-            if ((vs != nullptr) && !vs->inherits("FilterSkill")) {
+            const ViewAsSkill *vs = anyunDelegatedViewAsSkill(Self, skill->objectName());
+            if (vs != nullptr) {
                 bool add = false;
                 if (play && vs->isEnabledAtPlay(Self))
                     add = true;
                 if (!play) {
-                    QString pattern = Sanguosha->currentRoomState()->getCurrentCardUsePattern();
-                    if (vs->isEnabledAtResponse(Self, pattern))
+                    if (vs->isAvailable(Self, reason, pattern))
                         add = true;
                 }
                 if (add) {
@@ -5009,54 +5157,67 @@ public:
     {
         QString name = Self->tag.value("anyun", QString()).toString();
         if (name != nullptr) {
-            const ViewAsSkill *s = Sanguosha->getViewAsSkill(name);
-            return s->getExpandPile();
+            const ViewAsSkill *s = anyunDelegatedViewAsSkill(Self, name);
+            if (s != nullptr)
+                return s->getExpandPile();
         }
         return {};
     }
 
-    static bool hasHiddenViewas(const Player *player)
+    static bool hasHiddenViewas(const Player *player, CardUseStruct::CardUseReason reason, const QString &pattern)
     {
-        bool play = (Sanguosha->currentRoomState()->getCurrentCardUseReason() == CardUseStruct::CARD_USE_REASON_PLAY);
-        QString pattern = Sanguosha->currentRoomState()->getCurrentCardUsePattern();
-        foreach (const QString &hidden, Self->getHiddenGenerals()) {
+        foreach (const QString &hidden, player->getHiddenGenerals()) {
             const General *g = Sanguosha->getGeneral(hidden);
+            if (g == nullptr)
+                continue;
             foreach (const Skill *skill, g->getSkillList()) {
-                const ViewAsSkill *vs = Sanguosha->getViewAsSkill(skill->objectName());
-                if (vs != nullptr) {
-                    if (play && vs->isEnabledAtPlay(player))
-                        return true;
-                    if (!play) {
-                        if (vs->isEnabledAtResponse(player, pattern))
-                            return true;
-                    }
-                }
+                const ViewAsSkill *vs = anyunDelegatedViewAsSkill(player, skill->objectName());
+                if (vs != nullptr && vs->isAvailable(player, reason, pattern))
+                    return true;
             }
         }
         return false;
     }
 
-    bool isEnabledAtPlay(const Player *player) const override
+    static bool hasHiddenViewas(const Player *player)
     {
-        if (!player->canShowHiddenSkill())
+        if (player == nullptr)
             return false;
-        return hasHiddenViewas(player);
+        return hasHiddenViewas(player, Sanguosha->currentRoomState()->getCurrentCardUseReason(), Sanguosha->currentRoomState()->getCurrentCardUsePattern());
     }
 
-    bool isEnabledAtResponse(const Player *player, const QString & /*pattern*/) const override
+    static bool isAnyunAvailableForContext(const ServerPlayer *player, const ActionRequestContext &ctx)
     {
-        if (!player->canShowHiddenSkill())
+        if (player == nullptr || !player->canShowHiddenSkill())
+            return false;
+        if (ctx.reason != CardUseStruct::CARD_USE_REASON_PLAY && player->hasFlag("Global_viewasHidden_Failed"))
+            return false;
+        return hasHiddenViewas(player, ctx.reason, ctx.pattern);
+    }
+
+    bool isEnabledAtPlay(const Player *player) const override
+    {
+        if (player == nullptr || !player->canShowHiddenSkill())
+            return false;
+        return hasHiddenViewas(player, CardUseStruct::CARD_USE_REASON_PLAY, QString());
+    }
+
+    bool isEnabledAtResponse(const Player *player, const QString &pattern) const override
+    {
+        if (player == nullptr || !player->canShowHiddenSkill())
             return false;
         if (player->hasFlag("Global_viewasHidden_Failed"))
             return false;
-        return hasHiddenViewas(player);
+        return hasHiddenViewas(player, CardUseStruct::CARD_USE_REASON_RESPONSE, pattern);
     }
 
     bool viewFilter(const QList<const Card *> &selected, const Card *to_select) const override
     {
         QString name = Self->tag.value("anyun", QString()).toString();
         if (name != nullptr) {
-            const ViewAsSkill *s = Sanguosha->getViewAsSkill(name);
+            const ViewAsSkill *s = anyunDelegatedViewAsSkill(Self, name);
+            if (s == nullptr)
+                return false;
             return s->viewFilter(selected, to_select);
         }
         return false;
@@ -5066,24 +5227,76 @@ public:
     {
         QString name = Self->tag.value("anyun", QString()).toString();
         if (name != nullptr) {
-            const ViewAsSkill *s = Sanguosha->getViewAsSkill(name);
-            return s->viewAs(cards);
+            const ViewAsSkill *s = anyunDelegatedViewAsSkill(Self, name);
+            if (s == nullptr)
+                return nullptr;
+            const Card *card = s->viewAs(cards);
+            if (card != nullptr && card->isVirtualCard())
+                const_cast<Card *>(card)->setShowSkill(objectName());
+            return card;
         }
         return nullptr;
     }
 
+    static bool isDelegatedSkillAllowed(const ServerPlayer *player, const QString &skillName)
+    {
+        return anyunDelegatedViewAsSkill(player, skillName) != nullptr;
+    }
+
+    static bool isDelegatedSkillAvailable(const ViewAsSkill *skill, const ActionRequestContext &ctx)
+    {
+        if (skill == nullptr || ctx.player == nullptr)
+            return false;
+
+        switch (ctx.reason) {
+        case CardUseStruct::CARD_USE_REASON_PLAY:
+            return skill->isEnabledAtPlay(ctx.player);
+        case CardUseStruct::CARD_USE_REASON_RESPONSE:
+        case CardUseStruct::CARD_USE_REASON_RESPONSE_USE:
+            if (ctx.pattern == QStringLiteral("nullification") && skill->isEnabledAtNullification(ctx.player))
+                return true;
+            return skill->isEnabledAtResponse(ctx.player, ctx.pattern);
+        default:
+            break;
+        }
+        return false;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || !extra.contains(QStringLiteral("delegatedSkillName")))
+            return nullptr;
+        if (!isAnyunAvailableForContext(ctx.player, ctx))
+            return nullptr;
+
+        const QString delegatedSkillName = extra.value(QStringLiteral("delegatedSkillName")).toString();
+        if (!isDelegatedSkillAllowed(ctx.player, delegatedSkillName))
+            return nullptr;
+
+        const ViewAsSkill *delegatedSkill = Sanguosha->getViewAsSkill(delegatedSkillName);
+        if (!isDelegatedSkillAvailable(delegatedSkill, ctx))
+            return nullptr;
+
+        JsonObject delegatedExtra = extra;
+        delegatedExtra.remove(QStringLiteral("delegatedSkillName"));
+        const Card *card = delegatedSkill->buildServerCard(selected, ctx, delegatedExtra);
+        if (card != nullptr && card->isVirtualCard())
+            const_cast<Card *>(card)->setShowSkill(objectName());
+        return card;
+    }
+
     bool isEnabledAtNullification(const ServerPlayer *player) const override
     {
-        if (!player->canShowHiddenSkill())
+        if (player == nullptr || !player->canShowHiddenSkill())
             return false;
         foreach (const QString &hidden, player->getHiddenGenerals()) {
             const General *g = Sanguosha->getGeneral(hidden);
+            if (g == nullptr)
+                continue;
             foreach (const Skill *skill, g->getSkillList()) {
-                const ViewAsSkill *vs = Sanguosha->getViewAsSkill(skill->objectName());
-                if (vs != nullptr) {
-                    if (vs->isEnabledAtNullification(player))
-                        return true;
-                }
+                const ViewAsSkill *vs = anyunDelegatedViewAsSkill(player, skill->objectName());
+                if (vs != nullptr && vs->isEnabledAtNullification(player))
+                    return true;
             }
         }
         return false;
@@ -5955,6 +6168,50 @@ public:
             return nullptr;
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "XianshiCard";
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        if (ctx.player == nullptr || to_select == nullptr)
+            return false;
+        if (!to_select->isNDTrick() && to_select->getTypeId() != Card::TypeBasic)
+            return false;
+
+        if (ctx.reason == CardUseStruct::CARD_USE_REASON_PLAY)
+            return to_select->isAvailable(ctx.player);
+
+        const CardPattern *cardPattern = Sanguosha->getPattern(ctx.pattern);
+        return cardPattern != nullptr && cardPattern->match(ctx.player, to_select);
+    }
+
+    bool isGeneratedCardValid(const QList<const Card *> &selected, const Card *to_validate, const CardUseGrant &grant, const ClientActionContext &ctx) const override
+    {
+        Q_UNUSED(grant)
+        if (selected.length() != 1 || to_validate == nullptr || to_validate->getClassName() != "XianshiCard")
+            return false;
+
+        const SkillCard *skillCard = qobject_cast<const SkillCard *>(to_validate);
+        return skillCard != nullptr && isSelectedEffectValid(selected.first(), skillCard->getUserString(), ctx);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() != 1 || extra.keys() != QStringList(QStringLiteral("selectedEffect")))
+            return nullptr;
+
+        const QString selectedEffect = extra.value(QStringLiteral("selectedEffect")).toString();
+        if (!isSelectedEffectValid(selected.first(), selectedEffect, ctx))
+            return nullptr;
+
+        XianshiCard *card = new XianshiCard;
+        card->setUserString(selectedEffect);
+        card->addSubcard(selected.first());
+        return card;
+    }
+
     bool isEnabledAtNullification(const ServerPlayer *player) const override
     {
         if (player->hasFlag("xianshi_used"))
@@ -5984,6 +6241,30 @@ public:
             }
         }
         return false;
+    }
+
+private:
+    bool isSelectedEffectValid(const Card *card, const QString &selectedEffect, const ClientActionContext &ctx) const
+    {
+        if (ctx.player == nullptr || card == nullptr || selectedEffect.isEmpty())
+            return false;
+
+        const QString xianshiRecord = ctx.player->property("xianshi_record").toString();
+        if (xianshiRecord.isEmpty() || !xianshiRecord.split(QStringLiteral("+")).contains(selectedEffect))
+            return false;
+
+        if (!serverViewFilter(card, ctx))
+            return false;
+
+        if (selectedEffect.contains(QStringLiteral("slash")))
+            return !card->isKindOf("Slash");
+        if (selectedEffect.contains(QStringLiteral("jink")))
+            return !card->isKindOf("Jink");
+        if (selectedEffect.contains(QStringLiteral("analeptic")))
+            return !card->isKindOf("Analeptic");
+        if (selectedEffect.contains(QStringLiteral("peach")))
+            return !card->isKindOf("Peach");
+        return card->objectName() != selectedEffect;
     }
 };
 
@@ -6186,11 +6467,33 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() == 2) {
-            WenyueCard *card = new WenyueCard;
-            card->addSubcards(cards);
-            return card;
+            return createViewAsCard<WenyueCard>(cards);
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 2 || !extra.isEmpty())
+            return nullptr;
+
+        const QList<int> temp = StringList2IntList(ctx.player->property("wenyue_temp").toString().split("+"));
+        bool hasTemp = false;
+        bool hasNonEquip = false;
+        foreach (const Card *card, selected) {
+            if (card == nullptr)
+                return nullptr;
+            if (temp.contains(card->getId()))
+                hasTemp = true;
+            else if (card->getTypeId() != Card::TypeEquip && !ctx.player->isJilei(card))
+                hasNonEquip = true;
+            else
+                return nullptr;
+        }
+        if (!hasTemp || !hasNonEquip)
+            return nullptr;
+
+        return createViewAsCard<WenyueCard>(selected);
     }
 };
 
@@ -6468,12 +6771,29 @@ public:
             typeIds << xiuyecard->getTypeId();
         }
 
-        foreach (const Card *c, ClientInstance->discarded_list) {
-            if (c->getSuit() == Card::Club && (c->getTypeId() == Card::TypeBasic || c->isNDTrick()) && !typeIds.contains(c->getTypeId())) {
-                const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
-                if (cardPattern != nullptr && cardPattern->match(player, c))
+        const CardPattern *cardPattern = Sanguosha->getPattern(pattern);
+        if (cardPattern == nullptr)
+            return false;
+
+        const ServerPlayer *serverPlayer = qobject_cast<const ServerPlayer *>(player);
+        if (serverPlayer != nullptr) {
+            Room *room = serverPlayer->getRoom();
+            if (room == nullptr)
+                return false;
+
+            foreach (int id, room->getDiscardPile()) {
+                const Card *c = Sanguosha->getCard(id);
+                if (c->getSuit() == Card::Club && (c->getTypeId() == Card::TypeBasic || c->isNDTrick()) && !typeIds.contains(c->getTypeId())
+                    && cardPattern->match(player, c))
                     return true;
             }
+            return false;
+        }
+
+        foreach (const Card *c, ClientInstance->discarded_list) {
+            if (c->getSuit() == Card::Club && (c->getTypeId() == Card::TypeBasic || c->isNDTrick()) && !typeIds.contains(c->getTypeId())
+                && cardPattern->match(player, c))
+                return true;
         }
         return false;
     }
@@ -6485,6 +6805,20 @@ public:
         foreach (int id, xiuyePile) {
             const Card *xiuyecard = Sanguosha->getCard(id);
             typeIds << xiuyecard->getTypeId();
+        }
+
+        const ServerPlayer *serverPlayer = qobject_cast<const ServerPlayer *>(player);
+        if (serverPlayer != nullptr) {
+            Room *room = serverPlayer->getRoom();
+            if (room == nullptr)
+                return false;
+
+            foreach (int id, room->getDiscardPile()) {
+                const Card *c = Sanguosha->getCard(id);
+                if (c->getSuit() == Card::Club && (c->getTypeId() == Card::TypeBasic || c->isNDTrick()) && !typeIds.contains(c->getTypeId()))
+                    return true;
+            }
+            return false;
         }
 
         foreach (const Card *c, ClientInstance->discarded_list) {
@@ -6517,11 +6851,74 @@ public:
         return false;
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "XiuyeCard";
+    }
+
+    CardUseGrant makeGrant(const Player *player, const ClientActionContext &ctx) const override
+    {
+        CardUseGrant grant = ViewAsSkill::makeGrant(player, ctx);
+        const ServerPlayer *serverPlayer = qobject_cast<const ServerPlayer *>(ctx.player);
+        if (!grant.isValid() || serverPlayer == nullptr)
+            return grant;
+
+        Room *room = serverPlayer->getRoom();
+        if (room == nullptr) {
+            grant.valid = false;
+            return grant;
+        }
+
+        grant.allowOtherPlayersCards = true;
+        grant.allowedPlaces << Player::DiscardPile;
+
+        QSet<Card::CardType> typeIds;
+        foreach (int id, serverPlayer->getPile("xiuye")) {
+            const Card *xiuyeCard = Sanguosha->getCard(id);
+            if (xiuyeCard != nullptr)
+                typeIds << xiuyeCard->getTypeId();
+        }
+
+        foreach (int id, room->getDiscardPile()) {
+            const Card *card = Sanguosha->getCard(id);
+            if (card != nullptr && card->getSuit() == Card::Club && (card->getTypeId() == Card::TypeBasic || card->isNDTrick()) && !typeIds.contains(card->getTypeId()))
+                grant.allowedCardIds << id;
+        }
+
+        return grant;
+    }
+
     const Card *viewAs(const Card *originalCard) const override
     {
         XiuyeCard *c = new XiuyeCard;
         c->addSubcard(originalCard);
         return c;
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        if (ctx.player == nullptr || to_select == nullptr)
+            return false;
+
+        foreach (int id, ctx.player->getPile("xiuye")) {
+            const Card *xiuyeCard = Sanguosha->getCard(id);
+            if (xiuyeCard != nullptr && xiuyeCard->getTypeId() == to_select->getTypeId())
+                return false;
+        }
+
+        Room *room = ctx.player->getRoom();
+        if (room == nullptr || to_select->getSuit() != Card::Club || room->getCardPlace(to_select->getEffectiveId()) != Player::DiscardPile)
+            return false;
+
+        if (ctx.reason == CardUseStruct::CARD_USE_REASON_PLAY)
+            return to_select->isAvailable(ctx.player);
+
+        const CardPattern *cardPattern = Sanguosha->getPattern(ctx.pattern);
+        Card *c = Sanguosha->cloneCard(to_select->objectName());
+        const bool matched = cardPattern != nullptr && c != nullptr && cardPattern->match(ctx.player, c);
+        if (c != nullptr)
+            c->deleteLater();
+        return matched;
     }
 
     bool isEnabledAtNullification(const ServerPlayer *player) const override

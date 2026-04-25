@@ -1,14 +1,18 @@
 #include "room.h"
+#include "actioncompiler.h"
 #include "ai.h"
 #include "audio.h"
 #include "engine.h"
 #include "gamerule.h"
+#include "general.h"
 #include "generalselector.h"
 #include "lua.hpp"
 #include "server.h"
 #include "settings.h"
+#include "skill.h"
 #include "standard.h"
 #include "structs.h"
+#include "util.h"
 #include "washout.h"
 
 #include <QDateTime>
@@ -31,6 +35,177 @@
 #endif
 
 using namespace QSanProtocol;
+
+static ActionRequestContext makeActionRequestContext(ServerPlayer *player, QSanProtocol::CommandType command, CardUseStruct::CardUseReason reason, Card::HandlingMethod method,
+    const QString &pattern = QString(), const QString &skillName = QString(), const QString &prompt = QString(), const QVariant &promptData = QVariant())
+{
+    ActionRequestContext ctx;
+    ctx.player = player;
+    ctx.command = command;
+    ctx.reason = reason;
+    ctx.method = method;
+    ctx.pattern = pattern;
+    ctx.requestSerial = player != nullptr ? int(player->m_lastRequestSerial) : -1;
+    ctx.fromClient = true;
+    ctx.skillName = skillName;
+    ctx.prompt = prompt;
+    ctx.promptData = promptData;
+    if (!skillName.isEmpty())
+        ctx.requestSkillNames << skillName;
+    const QString patternSkillName = ActionProposal::skillNameFromPattern(pattern);
+    if (!patternSkillName.isEmpty() && !ctx.requestSkillNames.contains(patternSkillName))
+        ctx.requestSkillNames << patternSkillName;
+    return ctx;
+}
+
+static QString actionProposalSkillNameForContext(const ActionRequestContext &ctx)
+{
+    const QString patternSkillName = ActionProposal::skillNameFromPattern(ctx.pattern);
+    if (!patternSkillName.isEmpty())
+        return patternSkillName;
+    return ctx.requestSkillNames.value(0);
+}
+
+static bool readActionProposalText(const QString &text, ActionProposal *proposal)
+{
+    if (proposal == nullptr || text.isEmpty() || text == QStringLiteral("."))
+        return false;
+
+    JsonDocument proposalDocument = JsonDocument::fromJson(text.toUtf8());
+    if (!proposalDocument.isValid() || !proposalDocument.isObject())
+        return false;
+
+    ActionProposal parsed;
+    if (!parsed.tryParse(proposalDocument.toVariant()))
+        return false;
+
+    *proposal = parsed;
+    return proposal->isValid();
+}
+
+static bool readActionProposal(const QVariant &reply, ActionProposal *proposal, const ActionRequestContext &ctx)
+{
+    if (proposal == nullptr)
+        return false;
+    if (reply.isNull()) {
+        *proposal = ActionProposal::makeCancel();
+        return true;
+    }
+    if (proposal->tryParse(reply))
+        return true;
+    if (JsonUtils::isString(reply) && readActionProposalText(reply.toString(), proposal))
+        return true;
+
+    const QString playerName = ctx.player != nullptr ? ctx.player->objectName() : QStringLiteral("<none>");
+    qWarning("Action proposal parse failed: player=%s command=%d serial=%d pattern=%s skill=%s invalid-action-proposal=1", qPrintable(playerName), int(ctx.command),
+        ctx.requestSerial, qPrintable(ctx.pattern), qPrintable(ctx.skillName));
+    return false;
+}
+
+static const Card *compileSingleCardSelection(Room *room, ServerPlayer *player, const QVariant &reply, QSanProtocol::CommandType command, Card::HandlingMethod method,
+    const QString &pattern, const QString &prompt = QString(), const QVariant &promptData = QVariant())
+{
+    ActionRequestContext ctx = makeActionRequestContext(player, command, CardUseStruct::CARD_USE_REASON_RESPONSE, method, pattern, QString(), prompt, promptData);
+    ctx.requireSingleCardSelection = true;
+
+    ActionProposal proposal;
+    if (!readActionProposal(reply, &proposal, ctx) || proposal.isCancel())
+        return nullptr;
+
+    ActionCompiler compiler(room);
+    ActionCompileResult result = compiler.compile(ctx, proposal);
+    if (!result.success || result.cardUse.card == nullptr)
+        return nullptr;
+
+    const Card *card = result.cardUse.card;
+    if (card->isKindOf("DummyCard")) {
+        if (card->subcardsLength() != 1)
+            return nullptr;
+        return Sanguosha->getCard(card->getEffectiveId());
+    }
+    if (card->isVirtualCard())
+        return nullptr;
+    return card;
+}
+
+static void appendCardId(QList<int> *ids, int id)
+{
+    if (ids != nullptr && id >= 0 && !ids->contains(id))
+        *ids << id;
+}
+
+static void appendCardIds(QList<int> *ids, const QList<int> &cardIds)
+{
+    foreach (int id, cardIds)
+        appendCardId(ids, id);
+}
+
+static void appendCardIdsFromProperty(QList<int> *ids, const Player *player, const QString &propertyName)
+{
+    if (player == nullptr || propertyName.isEmpty())
+        return;
+    appendCardIds(ids, StringList2IntList(player->property(propertyName.toUtf8().constData()).toString().split(QStringLiteral("+"))));
+}
+
+static void appendExplicitExpandPileIds(QList<int> *ids, const Player *player, const ClientActionContext &ctx, const QString &expandPile, const QString &skillName)
+{
+    if (ids == nullptr || player == nullptr || expandPile.isEmpty())
+        return;
+
+    if (expandPile == QStringLiteral("#judging_area")) {
+        appendCardIds(ids, player->getJudgingAreaID());
+    } else if (expandPile.startsWith(QStringLiteral("*"))) {
+        appendCardIdsFromProperty(ids, player, expandPile.mid(1));
+    } else if (expandPile.startsWith(QStringLiteral("+"))) {
+        if (ctx.player == nullptr)
+            return;
+        Room *room = ctx.player->getRoom();
+        ServerPlayer *target = room != nullptr ? room->findPlayerByObjectName(player->property(skillName.toUtf8().constData()).toString()) : nullptr;
+        if (target != nullptr)
+            appendCardIds(ids, target->getPile(expandPile.mid(1)));
+    } else if (expandPile.startsWith(QStringLiteral("%"))) {
+        foreach (const Player *other, player->getAliveSiblings()) {
+            if (expandPile == QStringLiteral("%shown_card"))
+                appendCardIds(ids, other->getShownHandcards());
+            else
+                appendCardIds(ids, other->getPile(expandPile.mid(1)));
+        }
+    } else {
+        appendCardIds(ids, player->getPile(expandPile));
+    }
+}
+
+static QString normalizedGrantSkillName(const QString &skillName)
+{
+    if (skillName.startsWith(QChar('_')))
+        return skillName.mid(1);
+    return skillName;
+}
+
+static bool grantSkillListContains(const QStringList &skillNames, const QString &skillName)
+{
+    const QString normalized = normalizedGrantSkillName(skillName);
+    foreach (const QString &candidate, skillNames) {
+        if (normalizedGrantSkillName(candidate) == normalized)
+            return true;
+    }
+    return false;
+}
+
+static bool grantAuthorizesClientSkill(const CardUseGrant &grant, const QString &skillName)
+{
+    if (skillName.isEmpty())
+        return true;
+
+    const QString normalized = normalizedGrantSkillName(skillName);
+    if (normalized.isEmpty())
+        return false;
+
+    if (grant.sourceKind == CardUseGrant::HiddenGeneralSkill && grant.sourceSkill == QStringLiteral("anyun"))
+        return normalized == QStringLiteral("anyun");
+
+    return normalizedGrantSkillName(grant.sourceSkill) == normalized || grantSkillListContains(grant.allowedSkillNames, normalized);
+}
 
 Room::Room(QObject *parent, const QString &mode)
     : QObject(parent)
@@ -796,6 +971,7 @@ bool Room::doRequest(ServerPlayer *player, QSanProtocol::CommandType command, co
 {
     Packet packet(S_SRC_ROOM | S_TYPE_REQUEST | S_DEST_CLIENT, command);
     packet.setMessageBody(arg);
+    clearExpiredCardUseGrants(player, packet.globalSerial);
     player->acquireLock(ServerPlayer::SEMA_MUTEX);
     player->m_isClientResponseReady = false;
     player->drainLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
@@ -803,6 +979,7 @@ bool Room::doRequest(ServerPlayer *player, QSanProtocol::CommandType command, co
     player->setClientReplyString(QString());
     player->m_isWaitingReply = true;
     player->m_expectedReplySerial = packet.globalSerial;
+    player->m_lastRequestSerial = packet.globalSerial;
     if (m_requestResponsePair.contains(command))
         player->m_expectedReplyCommand = m_requestResponsePair[command];
     else
@@ -1287,13 +1464,13 @@ bool Room::isCanceled(const CardEffectStruct &effect)
 
 bool Room::verifyNullificationResponse(ServerPlayer *player, const QVariant &response, void * /*unused*/)
 {
-    const Card *card = nullptr;
-    if (player != nullptr && response.canConvert<JsonArray>()) {
-        JsonArray responseArray = response.value<JsonArray>();
-        if (JsonUtils::isString(responseArray[0]))
-            card = Card::Parse(responseArray[0].toString());
-    }
-    return card != nullptr;
+    ActionRequestContext ctx = makeActionRequestContext(player, S_COMMAND_RESPONSE_CARD, CardUseStruct::CARD_USE_REASON_RESPONSE_USE, Card::MethodUse, QStringLiteral("nullification"));
+    ActionProposal proposal;
+    if (!readActionProposal(response, &proposal, ctx) || proposal.isCancel())
+        return false;
+
+    ActionCompiler compiler(this);
+    return compiler.compile(ctx, proposal).success;
 }
 
 bool Room::askForNullification(const Card *trick, ServerPlayer *from, ServerPlayer *to, bool positive)
@@ -1350,19 +1527,29 @@ bool Room::_askForNullification(const Card *trick, ServerPlayer *from, ServerPla
     }
     const Card *card = nullptr;
     if (repliedPlayer != nullptr) {
-        JsonArray clientReply = repliedPlayer->getClientReply().value<JsonArray>();
-        if (clientReply.size() > 0 && JsonUtils::isString(clientReply[0]))
-            card = Card::Parse(clientReply[0].toString());
+        ActionRequestContext ctx = makeActionRequestContext(repliedPlayer, S_COMMAND_RESPONSE_CARD, CardUseStruct::CARD_USE_REASON_RESPONSE_USE, Card::MethodUse,
+            QStringLiteral("nullification"));
+        ActionProposal proposal;
+        if (readActionProposal(repliedPlayer->getClientReply(), &proposal, ctx) && !proposal.isCancel()) {
+            ActionCompiler compiler(this);
+            ActionCompileResult result = compiler.compile(ctx, proposal);
+            if (result.success)
+                card = result.cardUse.card;
+        }
     }
     if (card == nullptr) {
         foreach (ServerPlayer *player, validAiPlayers) {
             AI *ai = player->getAI();
             if (ai == nullptr)
                 continue;
-            card = ai->askForNullification(aiHelper.m_trick, aiHelper.m_from, aiHelper.m_to, positive);
-            if ((card != nullptr) && player->isCardLimited(card, Card::MethodUse))
-                card = nullptr;
-            if (card != nullptr) {
+            const Card *aiCard = ai->askForNullification(aiHelper.m_trick, aiHelper.m_from, aiHelper.m_to, positive);
+            ActionRequestContext ctx = makeActionRequestContext(player, S_COMMAND_RESPONSE_CARD, CardUseStruct::CARD_USE_REASON_RESPONSE_USE, Card::MethodUse,
+                QStringLiteral("nullification"));
+            ActionProposal proposal = ActionProposal::fromCard(aiCard, QList<const Player *>(), actionProposalSkillNameForContext(ctx));
+            ActionCompiler compiler(this);
+            ActionCompileResult result = compiler.compile(ctx, proposal);
+            if (result.success) {
+                card = result.cardUse.card;
                 thread->delay();
                 repliedPlayer = player;
                 break;
@@ -1672,11 +1859,16 @@ const Card *Room::askForCard(ServerPlayer *player, const QString &pattern, const
     } else {
         AI *ai = player->getAI();
         if (ai != nullptr) {
-            card = ai->askForCard(pattern, prompt, data);
-            if ((card != nullptr) && card->isKindOf("DummyCard") && card->subcardsLength() == 1)
-                card = Sanguosha->getCard(card->getEffectiveId());
-            if ((card != nullptr) && player->isCardLimited(card, method))
-                card = nullptr;
+            const Card *aiCard = ai->askForCard(pattern, prompt, data);
+            if ((aiCard != nullptr) && aiCard->isKindOf("DummyCard") && aiCard->subcardsLength() == 1)
+                aiCard = Sanguosha->getCard(aiCard->getEffectiveId());
+            const CardUseStruct::CardUseReason validationReason = reason != CardUseStruct::CARD_USE_REASON_UNKNOWN ? reason : CardUseStruct::CARD_USE_REASON_RESPONSE;
+            ActionRequestContext ctx = makeActionRequestContext(player, S_COMMAND_RESPONSE_CARD, validationReason, method, pattern, skill_name, prompt, data);
+            ActionProposal proposal = ActionProposal::fromCard(aiCard, QList<const Player *>(), actionProposalSkillNameForContext(ctx));
+            ActionCompiler compiler(this);
+            ActionCompileResult result = compiler.compile(ctx, proposal);
+            if (result.success)
+                card = result.cardUse.card;
             if (card != nullptr)
                 thread->delay();
         } else {
@@ -1688,9 +1880,15 @@ const Card *Room::askForCard(ServerPlayer *player, const QString &pattern, const
             arg << QString(skill_name);
 
             bool success = doRequest(player, S_COMMAND_RESPONSE_CARD, arg, true);
-            JsonArray clientReply = player->getClientReply().value<JsonArray>();
-            if (success && !clientReply.isEmpty())
-                card = Card::Parse(clientReply[0].toString());
+            const CardUseStruct::CardUseReason validationReason = reason != CardUseStruct::CARD_USE_REASON_UNKNOWN ? reason : CardUseStruct::CARD_USE_REASON_RESPONSE;
+            ActionRequestContext ctx = makeActionRequestContext(player, S_COMMAND_RESPONSE_CARD, validationReason, method, pattern, skill_name, prompt, data);
+            ActionProposal proposal;
+            if (success && readActionProposal(player->getClientReply(), &proposal, ctx) && !proposal.isCancel()) {
+                ActionCompiler compiler(this);
+                ActionCompileResult result = compiler.compile(ctx, proposal);
+                if (result.success)
+                    card = result.cardUse.card;
+            }
         }
     }
 
@@ -1878,10 +2076,17 @@ const Card *Room::askForUseCard(ServerPlayer *player, const QString &pattern, co
     if (ai != nullptr) {
         QString answer = ai->askForUseCard(pattern, prompt, method);
         if (answer != ".") {
-            isCardUsed = true;
-            card_use.from = player;
-            card_use.parse(answer, this);
-            thread->delay();
+            ActionProposal proposal;
+            ActionRequestContext ctx = makeActionRequestContext(player, S_COMMAND_RESPONSE_CARD, CardUseStruct::CARD_USE_REASON_RESPONSE_USE, method, pattern, skill_name, prompt);
+            if (readActionProposal(QVariant(answer), &proposal, ctx) && !proposal.isCancel()) {
+                ActionCompiler compiler(this);
+                ActionCompileResult result = compiler.compile(ctx, proposal);
+                if (result.success) {
+                    isCardUsed = true;
+                    card_use = result.cardUse;
+                    thread->delay();
+                }
+            }
         }
     } else {
         JsonArray ask_str;
@@ -1894,9 +2099,16 @@ const Card *Room::askForUseCard(ServerPlayer *player, const QString &pattern, co
         bool success = doRequest(player, S_COMMAND_RESPONSE_CARD, ask_str, true);
         if (success) {
             const QVariant &clientReply = player->getClientReply();
-            isCardUsed = !clientReply.isNull();
-            if (isCardUsed && card_use.tryParse(clientReply, this))
-                card_use.from = player;
+            ActionRequestContext ctx = makeActionRequestContext(player, S_COMMAND_RESPONSE_CARD, CardUseStruct::CARD_USE_REASON_RESPONSE_USE, method, pattern, skill_name, prompt);
+            ActionProposal proposal;
+            if (readActionProposal(clientReply, &proposal, ctx) && !proposal.isCancel()) {
+                ActionCompiler compiler(this);
+                ActionCompileResult result = compiler.compile(ctx, proposal);
+                if (result.success) {
+                    isCardUsed = true;
+                    card_use = result.cardUse;
+                }
+            }
         }
     }
     card_use.m_reason = CardUseStruct::CARD_USE_REASON_RESPONSE_USE;
@@ -1905,7 +2117,10 @@ const Card *Room::askForUseCard(ServerPlayer *player, const QString &pattern, co
     s.player = player;
     s.type = ChoiceMadeStruct::CardUsed;
     s.args << pattern << prompt;
-    if (isCardUsed && card_use.isValid(pattern)) {
+    bool validCardUse = false;
+    if (isCardUsed)
+        validCardUse = card_use.isStructurallyValid(pattern);
+    if (validCardUse) {
         s.args << card_use.toString();
         QVariant decisionData = QVariant::fromValue(s);
         thread->trigger(ChoiceMade, this, decisionData);
@@ -2044,9 +2259,10 @@ const Card *Room::askForCardShow(ServerPlayer *player, ServerPlayer *requester, 
             card = player->getHandcards().constFirst();
         else {
             bool success = doRequest(player, S_COMMAND_SHOW_CARD, requester->getGeneralName(), true);
-            JsonArray clientReply = player->getClientReply().value<JsonArray>();
-            if (success && clientReply.size() > 0 && JsonUtils::isString(clientReply[0]))
-                card = Card::Parse(clientReply[0].toString());
+            if (success)
+                card = compileSingleCardSelection(this, player, player->getClientReply(), S_COMMAND_SHOW_CARD, Card::MethodNone, QStringLiteral("."), reason);
+            if (card != nullptr && (getCardOwner(card->getEffectiveId()) != player || getCardPlace(card->getEffectiveId()) != Player::PlaceHand))
+                card = nullptr;
             if (card == nullptr)
                 card = player->getRandomHandCard();
         }
@@ -2066,6 +2282,8 @@ void Room::askForSinglePeach(ServerPlayer *player, ServerPlayer *dying, CardUseS
 {
     tryPause();
     notifyMoveFocus(player, S_COMMAND_ASK_PEACH);
+    const QString peachPattern = player == dying ? QStringLiteral("peach+analeptic") : QStringLiteral("peach");
+    _m_roomState.setCurrentCardUsePattern(peachPattern);
     _m_roomState.setCurrentCardUseReason(CardUseStruct::CARD_USE_REASON_RESPONSE_USE);
 
     use = CardUseStruct();
@@ -2074,9 +2292,13 @@ void Room::askForSinglePeach(ServerPlayer *player, ServerPlayer *dying, CardUseS
 
     AI *ai = player->getAI();
     if (ai != nullptr) {
-        use.card = ai->askForSinglePeach(dying);
-        if (use.card != nullptr)
-            use.to << dying;
+        const Card *aiCard = ai->askForSinglePeach(dying);
+        ActionRequestContext ctx = makeActionRequestContext(player, S_COMMAND_ASK_PEACH, CardUseStruct::CARD_USE_REASON_RESPONSE_USE, Card::MethodUse, peachPattern);
+        ActionProposal proposal = ActionProposal::fromCard(aiCard, QList<const Player *>(), actionProposalSkillNameForContext(ctx));
+        ActionCompiler compiler(this);
+        ActionCompileResult result = compiler.compile(ctx, proposal);
+        if (result.success)
+            use = result.cardUse;
     } else {
         int peaches = threshold - dying->getHp();
         if (dying->hasSkill("banling")) {
@@ -2090,17 +2312,23 @@ void Room::askForSinglePeach(ServerPlayer *player, ServerPlayer *dying, CardUseS
         arg << dying->objectName();
         arg << peaches;
         bool success = doRequest(player, S_COMMAND_ASK_PEACH, arg, true);
-        JsonArray clientReply = player->getClientReply().value<JsonArray>();
-        if (!success || clientReply.isEmpty() || !JsonUtils::isString(clientReply[0]))
+        if (!success)
             return;
-        if (!use.tryParse(clientReply, this)) {
-            use.card = nullptr;
+        ActionRequestContext ctx = makeActionRequestContext(player, S_COMMAND_ASK_PEACH, CardUseStruct::CARD_USE_REASON_RESPONSE_USE, Card::MethodUse, peachPattern);
+        ActionProposal proposal;
+        if (!readActionProposal(player->getClientReply(), &proposal, ctx) || proposal.isCancel())
             return;
-        }
+        ActionCompiler compiler(this);
+        ActionCompileResult result = compiler.compile(ctx, proposal);
+        if (!result.success)
+            return;
+        use = result.cardUse;
 
-        if (use.card != nullptr && use.to.isEmpty())
-            use.to << dying;
     }
+
+    use.m_reason = CardUseStruct::CARD_USE_REASON_RESPONSE_USE;
+    if (use.card != nullptr && use.to.isEmpty())
+        use.to << dying;
 
     if (use.card != nullptr && player->isCardLimited(use.card, use.card->getHandlingMethod()))
         use.card = nullptr;
@@ -3937,6 +4165,458 @@ void Room::processResponse(ServerPlayer *player, const Packet *packet)
 
         player->releaseLock(ServerPlayer::SEMA_MUTEX);
     }
+}
+
+void Room::grantCardUse(ServerPlayer *player, const CardUseGrant &grant)
+{
+    if (player == nullptr)
+        return;
+
+    CardUseGrant scopedGrant = grant;
+    scopedGrant.valid = true;
+    scopedGrant.player = player;
+    scopedGrant.sourceKind = CardUseGrant::RequestScopedGrant;
+    m_cardUseGrants << scopedGrant;
+}
+
+void Room::clearCardUseGrants(ServerPlayer *player)
+{
+    if (player == nullptr) {
+        m_cardUseGrants.clear();
+        return;
+    }
+
+    for (int i = m_cardUseGrants.length() - 1; i >= 0; --i) {
+        if (m_cardUseGrants.at(i).player == player)
+            m_cardUseGrants.removeAt(i);
+    }
+}
+
+bool Room::canCompileClientViewAsSkill(const ClientActionContext &ctx, const QString &skillName) const
+{
+    if (ctx.player == nullptr || skillName.isEmpty())
+        return false;
+
+    ClientActionContext grantCtx = ctx;
+    grantCtx.expectedSkillName = skillName;
+
+    QList<CardUseGrant> grants = collectLongTermCardUseGrants(grantCtx);
+    grants << collectRequestScopedCardUseGrants(grantCtx);
+    foreach (const CardUseGrant &grant, grants) {
+        if (grant.matchesContext(grantCtx) && grantAuthorizesClientSkill(grant, skillName))
+            return true;
+    }
+
+    return false;
+}
+
+QList<CardUseGrant> Room::collectLongTermCardUseGrants(const ClientActionContext &ctx) const
+{
+    QList<CardUseGrant> grants;
+    if (ctx.player == nullptr)
+        return grants;
+
+    QSet<QString> seenSkills;
+    auto addViewAsSkillGrant = [&](const ViewAsSkill *viewAsSkill, CardUseGrant::SourceKind sourceKind, const QString &sourceGeneral) {
+        if (viewAsSkill == nullptr || seenSkills.contains(viewAsSkill->objectName()))
+            return;
+
+        CardUseGrant grant = viewAsSkill->makeGrant(ctx.player, ctx);
+        if (!grant.isValid())
+            return;
+        if (grant.sourceKind == CardUseGrant::HiddenGeneralSkill)
+            return;
+
+        grant.sourceKind = sourceKind;
+        grant.sourceGeneral = sourceGeneral;
+        grants << grant;
+        seenSkills << viewAsSkill->objectName();
+    };
+    auto addSkillGrant = [&](const Skill *skill, CardUseGrant::SourceKind sourceKind, const QString &sourceGeneral) {
+        addViewAsSkillGrant(ViewAsSkill::parseViewAsSkill(skill), sourceKind, sourceGeneral);
+    };
+
+    foreach (const Skill *skill, ctx.player->getSkillList(true, false)) {
+        CardUseGrant::SourceKind sourceKind = CardUseGrant::OwnedSkill;
+        if (ctx.player->getAcquiredSkills().contains(skill->objectName()))
+            sourceKind = CardUseGrant::AcquiredSkill;
+        else if (ctx.player->hasEquipSkill(skill->objectName()))
+            sourceKind = CardUseGrant::EquipSkill;
+        addSkillGrant(skill, sourceKind, QString());
+    }
+
+    foreach (const QString &skillName, ctx.requestSkillNames) {
+        addViewAsSkillGrant(Sanguosha->getViewAsSkill(skillName), CardUseGrant::RequestScopedGrant, QString());
+    }
+
+    foreach (const ViewAsSkill *viewAsSkill, Sanguosha->getViewAsSkills()) {
+        if (seenSkills.contains(viewAsSkill->objectName()))
+            continue;
+        if (ctx.player->getMark("ViewAsSkill_" + viewAsSkill->objectName() + "Effect") > 0
+            || ctx.player->hasFlag("RoomScene_" + viewAsSkill->objectName() + "TempUse"))
+            addSkillGrant(viewAsSkill, CardUseGrant::ServerTrusted, QString());
+    }
+
+    foreach (const ViewAsSkill *viewAsSkill, Sanguosha->getViewAsSkills()) {
+        if (seenSkills.contains(viewAsSkill->objectName()))
+            continue;
+
+        const QString skillName = viewAsSkill->objectName();
+        const ViewHasSkill *provider = nullptr;
+        for (const QString &type : {
+                 QStringLiteral("weapon"),
+                 QStringLiteral("armor"),
+                 QStringLiteral("treasure"),
+             }) {
+            provider = Sanguosha->ViewHas(ctx.player, skillName, type, true);
+            if (provider != nullptr)
+                break;
+        }
+        if (provider == nullptr)
+            continue;
+
+        bool available = false;
+        switch (ctx.reason) {
+        case CardUseStruct::CARD_USE_REASON_PLAY:
+            available = viewAsSkill->isEnabledAtPlay(ctx.player);
+            break;
+        case CardUseStruct::CARD_USE_REASON_RESPONSE:
+        case CardUseStruct::CARD_USE_REASON_RESPONSE_USE:
+            if (ctx.pattern == "nullification" && viewAsSkill->isEnabledAtNullification(ctx.player))
+                available = true;
+            else
+                available = viewAsSkill->isEnabledAtResponse(ctx.player, ctx.pattern);
+            break;
+        default:
+            break;
+        }
+        if (!available)
+            continue;
+
+        CardUseGrant grant;
+        grant.valid = true;
+        grant.player = ctx.player;
+        grant.sourceKind = CardUseGrant::ViewHasSkillSource;
+        grant.sourceSkill = provider->objectName();
+        grant.allowedSkillNames << skillName;
+        grant.allowedCardClasses = viewAsSkill->producedCardClasses();
+        grant.reason = ctx.reason;
+        grant.method = ctx.method;
+        grant.pattern = ctx.pattern;
+        grant.allowNoSubcards = viewAsSkill->inherits("ZeroCardViewAsSkill");
+        grant.allowOtherPlayersCards = false;
+        grant.allowVirtualCard = true;
+        grant.allowRealCard = true;
+        grant.requireViewAsValidation = true;
+        grant.allowedPlaces << Player::PlaceHand << Player::PlaceEquip;
+        foreach (int id, ctx.player->getHandPile()) {
+            if (!grant.allowedSpecialCardIds.contains(id))
+                grant.allowedSpecialCardIds << id;
+        }
+        grants << grant;
+        seenSkills << skillName;
+    }
+
+    if (ctx.player->hasSkill("anyun", false, true) && ctx.player->canShowHiddenSkill()
+        && (ctx.reason == CardUseStruct::CARD_USE_REASON_PLAY || !ctx.player->hasFlag("Global_viewasHidden_Failed"))) {
+        foreach (const QString &generalName, ctx.player->getHiddenGenerals()) {
+            const General *general = Sanguosha->getGeneral(generalName);
+            if (general == nullptr)
+                continue;
+            foreach (const Skill *skill, general->getSkillList(false, false)) {
+                const ViewAsSkill *viewAsSkill = ViewAsSkill::parseViewAsSkill(skill);
+                if (viewAsSkill == nullptr || seenSkills.contains(viewAsSkill->objectName()) || viewAsSkill->objectName() == QStringLiteral("anyun")
+                    || skill->inherits("FilterSkill"))
+                    continue;
+                if (!viewAsSkill->isAvailable(ctx.player, ctx.reason, ctx.pattern))
+                    continue;
+
+                CardUseGrant grant;
+                grant.valid = true;
+                grant.player = ctx.player;
+                grant.sourceKind = CardUseGrant::HiddenGeneralSkill;
+                grant.sourceSkill = QStringLiteral("anyun");
+                grant.sourceGeneral = generalName;
+                grant.allowedSkillNames << viewAsSkill->objectName();
+                grant.allowedCardClasses = viewAsSkill->producedCardClasses();
+                grant.reason = ctx.reason;
+                grant.method = ctx.method;
+                grant.pattern = ctx.pattern;
+                grant.allowNoSubcards = viewAsSkill->inherits("ZeroCardViewAsSkill");
+                grant.allowOtherPlayersCards = false;
+                grant.allowVirtualCard = true;
+                grant.allowRealCard = true;
+                grant.requireViewAsValidation = true;
+                grant.allowedPlaces << Player::PlaceHand << Player::PlaceEquip;
+                appendCardIds(&grant.allowedSpecialCardIds, ctx.player->getHandPile());
+                appendExplicitExpandPileIds(&grant.allowedSpecialCardIds, ctx.player, ctx, viewAsSkill->getExpandPile(), viewAsSkill->objectName());
+
+                grants << grant;
+                seenSkills << viewAsSkill->objectName();
+            }
+        }
+    }
+
+    return grants;
+}
+
+QList<CardUseGrant> Room::collectRequestScopedCardUseGrants(const ClientActionContext &ctx) const
+{
+    QList<CardUseGrant> grants;
+    foreach (const CardUseGrant &grant, m_cardUseGrants) {
+        if (grant.matchesContext(ctx))
+            grants << grant;
+    }
+    return grants;
+}
+
+bool Room::validateClientCardUseStructure(const CardUseStruct &cardUse, const ClientActionContext &ctx) const
+{
+    if (ctx.player == nullptr || cardUse.from != ctx.player || cardUse.card == nullptr)
+        return false;
+
+    QList<ServerPlayer *> seenTargets;
+    foreach (ServerPlayer *target, cardUse.to) {
+        if (target == nullptr || seenTargets.contains(target))
+            return false;
+        seenTargets << target;
+    }
+
+    return true;
+}
+
+bool Room::findGrantThatExplains(const CardUseStruct &cardUse, const ClientActionContext &ctx, const QList<CardUseGrant> &grants, CardUseGrant *matchedGrant) const
+{
+    const Card *card = cardUse.card;
+    if (card == nullptr)
+        return false;
+
+    const QString cardClass = card->getClassName();
+    const QString skillName = card->getSkillName();
+    const bool isSkillCard = card->getTypeId() == Card::TypeSkill;
+
+    foreach (const CardUseGrant &grant, grants) {
+        if (!grant.matchesContext(ctx))
+            continue;
+        if (!grantAuthorizesClientSkill(grant, ctx.expectedSkillName))
+            continue;
+        if (card->isVirtualCard() && !grant.allowVirtualCard)
+            continue;
+        if (!card->isVirtualCard() && !grant.allowRealCard)
+            continue;
+        if (!grant.requireViewAsValidation && !grant.allowedSkillNames.isEmpty() && (skillName.isEmpty() || !grant.allowedSkillNames.contains(skillName)))
+            continue;
+        if (grant.allowedCardClasses.isEmpty() && !grant.requireViewAsValidation)
+            continue;
+        if (!grant.allowedCardClasses.isEmpty() && !grant.allowedCardClasses.contains(cardClass))
+            continue;
+        if (grant.sourceKind == CardUseGrant::HiddenGeneralSkill && grant.sourceSkill == QStringLiteral("anyun") && card->showSkill() != QStringLiteral("anyun"))
+            continue;
+        if (isSkillCard && card->subcardsLength() == 0 && !grant.allowNoSubcards && !ctx.serverBuiltCard)
+            continue;
+        if (!validateClientCardSubcards(cardUse, grant, ctx))
+            continue;
+        if (!validateClientCardGeneratedByGrant(cardUse, grant, ctx))
+            continue;
+
+        if (matchedGrant != nullptr)
+            *matchedGrant = grant;
+        return true;
+    }
+
+    return false;
+}
+
+bool Room::validateClientRealCardOwnership(const CardUseStruct &cardUse, const ClientActionContext &ctx) const
+{
+    const Card *card = cardUse.card;
+    if (ctx.player == nullptr || card == nullptr)
+        return false;
+    if (card->isVirtualCard())
+        return true;
+
+    const int id = card->getEffectiveId();
+    if (id < 0)
+        return false;
+    if (getCardOwner(id) != ctx.player)
+        return false;
+
+    const Player::Place place = getCardPlace(id);
+    const bool isHandPileCard = place == Player::PlaceSpecial && ctx.player->getHandPile().contains(id);
+    switch (ctx.method) {
+    case Card::MethodUse:
+    case Card::MethodResponse:
+    case Card::MethodRecast:
+        return place == Player::PlaceHand || isHandPileCard;
+    case Card::MethodPindian:
+        return place == Player::PlaceHand;
+    case Card::MethodDiscard:
+    case Card::MethodNone:
+        return place == Player::PlaceHand || place == Player::PlaceEquip || isHandPileCard;
+    }
+
+    return false;
+}
+
+bool Room::validateClientCardSubcards(const CardUseStruct &cardUse, const CardUseGrant &grant, const ClientActionContext &ctx) const
+{
+    const Card *card = cardUse.card;
+    if (card == nullptr)
+        return false;
+
+    QList<int> ids;
+    if (card->isVirtualCard())
+        ids = card->getSubcards();
+    else
+        ids << card->getEffectiveId();
+
+    if (ids.isEmpty())
+        return grant.allowNoSubcards || ctx.serverBuiltCard;
+
+    QList<int> seenIds;
+    foreach (int id, ids) {
+        if (id < 0)
+            return false;
+        if (seenIds.contains(id))
+            return false;
+        seenIds << id;
+        if (!grant.allowedCardIds.isEmpty() && !grant.allowedCardIds.contains(id))
+            return false;
+
+        ServerPlayer *owner = getCardOwner(id);
+        const Player::Place place = getCardPlace(id);
+        const bool isServerGrantedSpecialCard = grant.allowedSpecialCardIds.contains(id);
+        if (owner != cardUse.from && !grant.allowOtherPlayersCards && !isServerGrantedSpecialCard)
+            return false;
+        if (!grant.allowedPlaces.isEmpty() && !grant.allowedPlaces.contains(place) && !grant.allowedCardIds.contains(id) && !grant.allowedSpecialCardIds.contains(id))
+            return false;
+    }
+
+    return true;
+}
+
+bool Room::validateClientCardGeneratedByGrant(const CardUseStruct &cardUse, const CardUseGrant &grant, const ClientActionContext &ctx) const
+{
+    if (!grant.requireViewAsValidation)
+        return true;
+
+    QString skillName;
+    if (!grant.allowedSkillNames.isEmpty())
+        skillName = grant.allowedSkillNames.first();
+    else
+        skillName = grant.sourceSkill;
+
+    const ViewAsSkill *viewAsSkill = Sanguosha->getViewAsSkill(skillName);
+    if (viewAsSkill == nullptr && !grant.sourceSkill.isEmpty())
+        viewAsSkill = Sanguosha->getViewAsSkill(grant.sourceSkill);
+    if (viewAsSkill == nullptr)
+        return false;
+
+    return viewAsSkill->isCardUseValid(cardUse, grant, ctx);
+}
+
+bool Room::validateClientCardTargets(const CardUseStruct &cardUse) const
+{
+    const Card *card = cardUse.card;
+    if (card == nullptr)
+        return false;
+    if (card->targetFixed(cardUse.from))
+        return cardUse.to.isEmpty();
+
+    QList<const Player *> selectedTargets;
+    foreach (ServerPlayer *target, cardUse.to) {
+        if (target == nullptr)
+            return false;
+        if (isProhibited(cardUse.from, target, card, selectedTargets) != nullptr)
+            return false;
+        if (!card->targetFilter(selectedTargets, target, cardUse.from))
+            return false;
+        selectedTargets << target;
+    }
+
+    return card->targetsFeasible(selectedTargets, cardUse.from);
+}
+
+bool Room::validateClientCardUsageLimit(const CardUseStruct &cardUse, const ClientActionContext &ctx) const
+{
+    if (ctx.player == nullptr || cardUse.card == nullptr)
+        return false;
+    if (ctx.reason == CardUseStruct::CARD_USE_REASON_PLAY)
+        return cardUse.card->isAvailable(ctx.player);
+    return !ctx.player->isCardLimited(cardUse.card, ctx.method);
+}
+
+void Room::consumeCardUseGrant(const CardUseGrant &grant)
+{
+    if (grant.sourceKind != CardUseGrant::RequestScopedGrant)
+        return;
+
+    for (int i = 0; i < m_cardUseGrants.length(); ++i) {
+        CardUseGrant &storedGrant = m_cardUseGrants[i];
+        const bool sameGrant = !grant.grantId.isEmpty() ? storedGrant.grantId == grant.grantId
+                                                        : storedGrant.player == grant.player && storedGrant.sourceSkill == grant.sourceSkill
+                && storedGrant.allowedCardClasses == grant.allowedCardClasses && storedGrant.requestSerial == grant.requestSerial;
+        if (!sameGrant)
+            continue;
+
+        if (storedGrant.remainingUses > 0)
+            --storedGrant.remainingUses;
+        if (storedGrant.remainingUses == 0)
+            m_cardUseGrants.removeAt(i);
+        return;
+    }
+}
+
+void Room::clearExpiredCardUseGrants(ServerPlayer *player, int activeRequestSerial)
+{
+    for (int i = m_cardUseGrants.length() - 1; i >= 0; --i) {
+        const CardUseGrant &grant = m_cardUseGrants.at(i);
+        if (player != nullptr && grant.player != player)
+            continue;
+        if (!grant.isValid() || grant.remainingUses == 0 || (grant.requestSerial >= 0 && grant.requestSerial != activeRequestSerial))
+            m_cardUseGrants.removeAt(i);
+    }
+}
+
+bool Room::validateClientCardUse(CardUseStruct &cardUse, const ClientActionContext &ctx)
+{
+    if (!ctx.fromClient)
+        return true;
+    if (!validateClientCardUseStructure(cardUse, ctx))
+        return false;
+
+    const Card *card = cardUse.card;
+    const bool requiresGrant = card->getTypeId() == Card::TypeSkill || card->isVirtualCard() || !card->getSkillName().isEmpty()
+        || !ctx.expectedSkillName.isEmpty() || (ctx.serverBuiltCard && !ctx.requestSkillNames.isEmpty());
+    if (!requiresGrant) {
+        if (!ctx.pattern.isEmpty()) {
+            const QString normalizedPattern = normalizeCardUsePattern(ctx.pattern);
+            if (!normalizedPattern.isEmpty()) {
+                const CardPattern *pattern = Sanguosha->getPattern(normalizedPattern);
+                if (pattern == nullptr || !pattern->match(ctx.player, card))
+                    return false;
+            }
+        }
+        if (!validateClientRealCardOwnership(cardUse, ctx))
+            return false;
+        if (!validateClientCardUsageLimit(cardUse, ctx))
+            return false;
+        return ctx.method != Card::MethodUse || ctx.reason == CardUseStruct::CARD_USE_REASON_RESPONSE || validateClientCardTargets(cardUse);
+    }
+
+    QList<CardUseGrant> grants = collectLongTermCardUseGrants(ctx);
+    grants << collectRequestScopedCardUseGrants(ctx);
+
+    CardUseGrant matchedGrant;
+    if (!findGrantThatExplains(cardUse, ctx, grants, &matchedGrant))
+        return false;
+    if (!validateClientCardUsageLimit(cardUse, ctx))
+        return false;
+    if (ctx.method == Card::MethodUse && ctx.reason != CardUseStruct::CARD_USE_REASON_RESPONSE && !validateClientCardTargets(cardUse))
+        return false;
+
+    consumeCardUseGrant(matchedGrant);
+    return true;
 }
 
 bool Room::useCard(const CardUseStruct &use, bool add_history)
@@ -5824,8 +6504,21 @@ void Room::activate(ServerPlayer *player, CardUseStruct &card_use)
 
         card_use.from = player;
         ai->activate(card_use);
-        if ((card_use.card != nullptr) && !card_use.card->isVirtualCard())
-            card_use.card = card_use.card->getRealCard();
+        if (card_use.card != nullptr) {
+            QList<const Player *> targets;
+            foreach (ServerPlayer *target, card_use.to) {
+                if (target != nullptr)
+                    targets << target;
+            }
+            ActionRequestContext ctx = makeActionRequestContext(player, S_COMMAND_PLAY_CARD, CardUseStruct::CARD_USE_REASON_PLAY, Card::MethodUse);
+            ActionProposal proposal = ActionProposal::fromCard(card_use.card, targets, actionProposalSkillNameForContext(ctx));
+            ActionCompiler compiler(this);
+            ActionCompileResult result = compiler.compile(ctx, proposal);
+            if (result.success)
+                card_use = result.cardUse;
+            else
+                card_use.card = nullptr;
+        }
 
         qint64 diff = Config.AIDelay - timer.elapsed();
         if (diff > 0)
@@ -5839,15 +6532,18 @@ void Room::activate(ServerPlayer *player, CardUseStruct &card_use)
         if (!success || clientReply.isNull())
             return;
 
-        card_use.from = player;
-        if (!card_use.tryParse(clientReply, this)) {
-            JsonArray use = clientReply.value<JsonArray>();
-            emit room_message(tr("Card cannot be parsed:\n %1").arg(use[0].toString()));
+        ActionRequestContext ctx = makeActionRequestContext(player, S_COMMAND_PLAY_CARD, CardUseStruct::CARD_USE_REASON_PLAY, Card::MethodUse);
+        ActionProposal proposal;
+        if (!readActionProposal(clientReply, &proposal, ctx) || proposal.isCancel())
             return;
-        }
+        ActionCompiler compiler(this);
+        ActionCompileResult result = compiler.compile(ctx, proposal);
+        if (!result.success)
+            return;
+        card_use = result.cardUse;
     }
     card_use.m_reason = CardUseStruct::CARD_USE_REASON_PLAY;
-    if (!card_use.isValid(QString()))
+    if (!card_use.isStructurallyValid(QString()))
         return;
 
     ChoiceMadeStruct s;
@@ -6485,19 +7181,12 @@ const Card *Room::askForPindian(ServerPlayer *player, ServerPlayer *from, Server
 
     bool success = doRequest(player, S_COMMAND_PINDIAN, JsonArray() << from->objectName() << to->objectName(), true);
 
-    JsonArray clientReply = player->getClientReply().value<JsonArray>();
-    if (!success || clientReply.isEmpty() || !JsonUtils::isString(clientReply[0])) {
+    const Card *card = success ? compileSingleCardSelection(this, player, player->getClientReply(), S_COMMAND_PINDIAN, Card::MethodPindian, QStringLiteral("."), reason) : nullptr;
+    if (card == nullptr || getCardOwner(card->getEffectiveId()) != player || getCardPlace(card->getEffectiveId()) != Player::PlaceHand) {
         int card_id = player->getRandomHandCardId();
         return Sanguosha->getCard(card_id);
-    } else {
-        const Card *card = Card::Parse(clientReply[0].toString());
-        if (card->isVirtualCard()) {
-            const Card *real_card = Sanguosha->getCard(card->getEffectiveId());
-            delete card;
-            return real_card;
-        } else
-            return card;
     }
+    return card;
 }
 
 QList<const Card *> Room::askForPindianRace(ServerPlayer *from, ServerPlayer *to, const QString &reason)
@@ -6553,21 +7242,11 @@ QList<const Card *> Room::askForPindianRace(ServerPlayer *from, ServerPlayer *to
 
     foreach (ServerPlayer *player, players) {
         const Card *c = nullptr;
-        JsonArray clientReply = player->getClientReply().value<JsonArray>();
-        if (!player->m_isClientResponseReady || clientReply.isEmpty() || !JsonUtils::isString(clientReply[0])) {
+        if (player->m_isClientResponseReady)
+            c = compileSingleCardSelection(this, player, player->getClientReply(), S_COMMAND_PINDIAN, Card::MethodPindian, QStringLiteral("."), reason);
+        if (c == nullptr || getCardOwner(c->getEffectiveId()) != player || getCardPlace(c->getEffectiveId()) != Player::PlaceHand) {
             int card_id = player->getRandomHandCardId();
             c = Sanguosha->getCard(card_id);
-        } else {
-            const Card *card = Card::Parse(clientReply[0].toString());
-            if (card == nullptr) {
-                int card_id = player->getRandomHandCardId();
-                c = Sanguosha->getCard(card_id);
-            } else if (card->isVirtualCard()) {
-                const Card *real_card = Sanguosha->getCard(card->getEffectiveId());
-                delete card;
-                c = real_card;
-            } else
-                c = card;
         }
         if (player == from)
             from_card = c;

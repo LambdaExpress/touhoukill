@@ -735,26 +735,26 @@ void Client::fillRobots()
 
 void Client::onPlayerResponseCard(const Card *card, const QList<const Player *> &targets)
 {
+    const QString actionSkillName = ActionProposal::skillNameFromPattern(_m_roomState.getCurrentCardUsePattern());
     if (Self->hasFlag("Client_PreventPeach")) {
         Self->setFlags("-Client_PreventPeach");
         Self->removeCardLimitation("use", "Peach$0", "Global_PreventPeach");
     }
-    if ((status & ClientStatusBasicMask) == Responding)
-        _m_roomState.setCurrentCardUsePattern(QString());
     if (card == nullptr) {
-        replyToServer(S_COMMAND_RESPONSE_CARD);
+        replyToServer(S_COMMAND_RESPONSE_CARD, ActionProposal::makeCancel().toVariant());
     } else {
-        JsonArray targetNames;
-        if (!card->targetFixed(Self)) {
-            foreach (const Player *target, targets)
-                targetNames << target->objectName();
-        }
+        QList<const Player *> proposalTargets;
+        if (!card->targetFixed(Self))
+            proposalTargets = targets;
 
-        replyToServer(S_COMMAND_RESPONSE_CARD, JsonArray() << card->toString() << QVariant::fromValue(targetNames));
+        ActionProposal proposal = ActionProposal::fromCard(card, proposalTargets, actionSkillName);
+        replyToServer(S_COMMAND_RESPONSE_CARD, proposal.toVariant());
 
         if (card->isVirtualCard() && (card->parent() == nullptr))
             delete card;
     }
+    if ((status & ClientStatusBasicMask) == Responding)
+        _m_roomState.setCurrentCardUsePattern(QString());
 
     setStatus(NotActive);
 }

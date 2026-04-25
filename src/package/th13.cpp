@@ -641,6 +641,30 @@ public:
             return nullptr;
     }
 
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (!selected.isEmpty() || ctx.player == nullptr || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+
+        const QString name = extra.value(QStringLiteral("declaredCardName")).toString();
+        Card *declared = Sanguosha->cloneCard(name);
+        if (declared == nullptr)
+            return nullptr;
+        DELETE_OVER_SCOPE(Card, declared)
+        declared->setSkillName(objectName());
+
+        if ((!declared->isNDTrick() && !declared->isKindOf("BasicCard")) || Sanguosha->getBanPackages().contains(declared->getPackage()))
+            return nullptr;
+        if (XihuaClear::xihua_choice_limit(ctx.player, name, ctx.reason == CardUseStruct::CARD_USE_REASON_RESPONSE ? Card::MethodResponse : Card::MethodUse))
+            return nullptr;
+        if (!isDeclaredCardUseValid(declared, ctx))
+            return nullptr;
+
+        XihuaCard *card = new XihuaCard;
+        card->setUserString(name);
+        return card;
+    }
+
     QDialog *getDialog() const override
     {
         return XihuaDialog::getInstance("xihua");
@@ -915,6 +939,41 @@ public:
             return p->hasEquip(to_select);
 
         return false;
+    }
+
+    CardUseGrant makeGrant(const Player *player, const ClientActionContext &ctx) const override
+    {
+        CardUseGrant grant = ViewAsSkill::makeGrant(player, ctx);
+        if (!grant.isValid() || ctx.player == nullptr)
+            return grant;
+
+        Room *room = ctx.player->getRoom();
+        ServerPlayer *dyingPlayer = room != nullptr ? room->findPlayerByObjectName(ctx.player->property("currentdying").toString()) : nullptr;
+        if (dyingPlayer == nullptr) {
+            grant.valid = false;
+            return grant;
+        }
+
+        grant.allowOtherPlayersCards = true;
+        foreach (const Card *equip, dyingPlayer->getEquips()) {
+            if (equip != nullptr && !grant.allowedCardIds.contains(equip->getEffectiveId()))
+                grant.allowedCardIds << equip->getEffectiveId();
+        }
+
+        if (grant.allowedCardIds.isEmpty())
+            grant.valid = false;
+
+        return grant;
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        if (ctx.player == nullptr || to_select == nullptr)
+            return false;
+
+        Room *room = ctx.player->getRoom();
+        ServerPlayer *dyingPlayer = room != nullptr ? room->findPlayerByObjectName(ctx.player->property("currentdying").toString()) : nullptr;
+        return dyingPlayer != nullptr && dyingPlayer->hasEquip(to_select);
     }
 
     const Card *viewAs(const Card *originalCard) const override

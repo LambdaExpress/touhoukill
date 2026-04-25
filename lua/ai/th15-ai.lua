@@ -91,7 +91,7 @@ sgs.ai_skill_use["@@shayi"] = function(self, prompt)
 			for _, p in sgs.qlist(dummy_use.to) do
 				if self:isEnemy(p) then
 					table.insert(target_objectname, p:objectName())
-					return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+					return sgs.ai_card_action_proposal(dummy_use.card, target_objectname, "shayi")
 				end
 			end
 		end
@@ -190,7 +190,7 @@ sgs.ai_skill_use["BasicCard+^Jink,EquipCard|.|.|sqchuangshi"] = function(self, p
 
 		if #cards > 0 then
 			table.insert(target_objectname, target:objectName())
-			return cards[1]:toString() .. "->" .. table.concat(target_objectname, "+")
+			return sgs.ai_card_action_proposal(cards[1], target_objectname, "sqchuangshi")
 		end
 	elseif string.sub(prompt, 1, #"@bengluo-use") == "@bengluo-use" then
 		local cards =  self:getCards("sqchuangshi", "hs")
@@ -201,20 +201,20 @@ sgs.ai_skill_use["BasicCard+^Jink,EquipCard|.|.|sqchuangshi"] = function(self, p
 				self:useBasicCard(card, dummy_use)
 				if dummy_use.card then
 					if dummy_use.to:isEmpty() then
-						return dummy_use.card:toString()
+						return sgs.ai_card_action_proposal(dummy_use.card, nil, "sqchuangshi")
 					else
 						local target_objectname = {}
 						for _, p in sgs.qlist(dummy_use.to) do
 							table.insert(target_objectname, p:objectName())
 						end
-						return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+						return sgs.ai_card_action_proposal(dummy_use.card, target_objectname, "sqchuangshi")
 					end
 				end
 			elseif card:getTypeId() == sgs.Card_TypeEquip then
 				local dummy_use = { isDummy = true }
 				self:useEquipCard(card, dummy_use)
 				if dummy_use.card then
-					return dummy_use.card:toString()
+					return sgs.ai_card_action_proposal(dummy_use.card, nil, "sqchuangshi")
 				end
 			end
 		end
@@ -230,7 +230,6 @@ sgs.ai_skill_use["TrickCard+^Nullification,EquipCard|.|.|sqchuangshi"] = functio
 
 	--if #cards > 0 then
 	--    table.insert(target_objectname, target:objectName())
-	--  return cards[1]:toString() .. "->" .. table.concat(target_objectname, "+")
 	--end
 	return "."
 end
@@ -254,7 +253,7 @@ sgs.ai_skill_use["@@shenyan"] = function(self, prompt)
 			if #target_objectname==2 then break end
 		end
 		if #target_objectname>0 then
-			return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+			return sgs.ai_card_action_proposal(dummy_use.card, target_objectname, "shenyan")
 		end
 	end
 	return "."

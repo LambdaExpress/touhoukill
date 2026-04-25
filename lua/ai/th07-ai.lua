@@ -99,7 +99,7 @@ sgs.ai_skill_use["@@xijian"] = function(self, prompt)
 		end
 	end
 	if #targets == 2 then
-		return "@XijianCard=.->" .. table.concat(targets, "+")
+		return sgs.ai_skill_card_action_proposal("xijian", "XijianCard", nil, targets)
 	end
 	return "."
 end
@@ -154,7 +154,7 @@ sgs.ai_skill_use["@@shihui_hegemonyVS"] = function(self, prompt, method)
 	self:useTrickCard(card, dummy_use)
 
 	if not dummy_use.card then return "." end
-	return dummy_use.card:toString()
+	return sgs.ai_card_action_proposal(dummy_use.card, nil, "shihuiVS")
 end
 
 sgs.ai_choicemade_filter.cardExchange.shihui = function(self, player, args)
@@ -189,7 +189,7 @@ sgs.ai_skill_use["@@shihuiVS"] = function(self, prompt, method)
 	self:useTrickCard(card, dummy_use)
 
 	if not dummy_use.card then return "." end
-	return dummy_use.card:toString()
+	return sgs.ai_card_action_proposal(dummy_use.card, nil, "shihuiVS")
 end
 --sgs.ai_card_intention.ShihuiCard = -50
 
@@ -274,7 +274,7 @@ sgs.ai_skill_use["@@xiezou"] = function(self, prompt)
 		if card:isKindOf("IronChain") then
 			return "."
 		end
-		return dummy_use.card:toString()
+		return sgs.ai_card_action_proposal(dummy_use.card, nil, "xiezou")
 	else
 		local target_objectname = {}
 		if card:isKindOf("IronChain") then
@@ -309,7 +309,7 @@ sgs.ai_skill_use["@@xiezou"] = function(self, prompt)
 			end
 		end]]
 		if #target_objectname>0 then
-			return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+			return sgs.ai_card_action_proposal(dummy_use.card, target_objectname, "xiezou")
 		end
 	end
 	return "."
@@ -522,7 +522,7 @@ local useQimen = function(self, skillName)
 		card = sgs.cloneCard(cardname, sgs.Card_NoSuit, 0)
 		card:setSkillName(skillName)
 		card:deleteLater()
-		return card:toString() .. "->" .. table.concat(target_objectname, "+")
+		return sgs.ai_card_action_proposal(card, target_objectname, skillName)
 	end
 	return "."
 end
@@ -705,12 +705,12 @@ sgs.ai_skill_use["@@chunhen_hegemony"] = function(self, prompt)
 	if #cards == 0 then return "." end
 
 	local card, friend = self:getCardNeedPlayer(cards, self.friends_noself)--麻痹 死人不马上更新self.friends_noself
-	if card and friend and friend:isAlive() then return "@ChunhenHegemonyCard=" .. card:getEffectiveId() .. "->" .. friend:objectName() end
+	if card and friend and friend:isAlive() then return sgs.ai_skill_card_action_proposal("chunhen_hegemony", "ChunhenHegemonyCard", card:getEffectiveId(), { friend:objectName() }) end
 	if #self.friends_noself == 0 then return "." end
 	self:sort(self.friends_noself, "handcard")
 	for _, afriend in ipairs(self.friends_noself) do
 		if afriend:isAlive() and not self:needKongcheng(afriend, true) then
-			return "@ChunhenHegemonyCard=" .. cards[1]:getEffectiveId() .. "->" .. afriend:objectName()
+			return sgs.ai_skill_card_action_proposal("chunhen_hegemony", "ChunhenHegemonyCard", cards[1]:getEffectiveId(), { afriend:objectName() })
 		end
 	end
 	return "."

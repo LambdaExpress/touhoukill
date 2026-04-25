@@ -785,7 +785,7 @@ sgs.ai_skill_use.slash = function(self, prompt)
 
 		self:useCardSlash(slash, use)
 		for _, p in sgs.qlist(use.to) do table.insert(targets, p:objectName()) end
-		if table.contains(targets, target:objectName()) then return ret .. "->" .. table.concat(targets, "+") end
+		if table.contains(targets, target:objectName()) then return sgs.ai_card_action_proposal(slash, targets, slash:getSkillName(false)) end
 		return "."
 	end
 	local useslash, target
@@ -835,7 +835,7 @@ sgs.ai_skill_use.slash = function(self, prompt)
 
 		self:useCardSlash(useslash, use)
 		for _, p in sgs.qlist(use.to) do table.insert(targets, p:objectName()) end
-		if table.contains(targets, target:objectName()) then return useslash:toString() .. "->" .. table.concat(targets, "+") end
+		if table.contains(targets, target:objectName()) then return sgs.ai_card_action_proposal(useslash, targets, useslash:getSkillName(false)) end
 	end
 	return "."
 end
@@ -3702,15 +3702,14 @@ sgs.ai_skill_use["@@Triblade"] = function(self, prompt)
 	for _, target in sgs.qlist(targets) do
 		if self:isEnemy(target) and self:damageIsEffective(target, nil, self.player) and not self:getDamagedEffects(target, self.player)
 			and not self:needToLoseHp(target, self.player) then
-			--return "@TribladeSkillCard=" .. id .. "&tribladeskill->" .. target:objectName()
-			return "@TribladeCard=".. id .."->" .. target:objectName()
+			return sgs.ai_skill_card_action_proposal("Triblade", "TribladeCard", id, { target:objectName() })
 		end
 	end
 	--对友军部分暂时不做
 	--[[for _, target in sgs.qlist(targets) do
 		if self:isFriend(target) and self:damageIsEffective(target, nil, self.player)
 			and (self:getDamagedEffects(target, self.player) or self:needToLoseHp(target, self.player, nil, true)) then
-			return "@TribladeSkillCard=" .. id .. "&tribladeskill->" .. target:objectName()
+			return sgs.ai_skill_card_action_proposal("Triblade", "TribladeSkillCard", id, { target:objectName() })
 		end
 	end]]
 	return "."

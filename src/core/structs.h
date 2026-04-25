@@ -6,10 +6,16 @@ class TriggerSkill;
 class Card;
 class Slash;
 
+#include "card.h"
+#include "json.h"
 #include "player.h"
+#include "protocol.h"
 #include "serverplayer.h"
 
+#include <QList>
 #include <QVariant>
+
+QString normalizeCardUsePattern(const QString &pattern);
 
 struct DamageStruct
 {
@@ -91,6 +97,7 @@ struct CardUseStruct
     CardUseStruct();
     CardUseStruct(const Card *card, ServerPlayer *from, const QList<ServerPlayer *> &to = QList<ServerPlayer *>(), bool isOwnerUse = true);
     CardUseStruct(const Card *card, ServerPlayer *from, ServerPlayer *target, bool isOwnerUse = true);
+    bool isStructurallyValid(const QString &pattern) const;
     bool isValid(const QString &pattern) const;
     void parse(const QString &str, Room *room);
     bool tryParse(const QVariant &usage, Room *room);
@@ -107,6 +114,110 @@ struct CardUseStruct
     QList<int> m_showncards;
     QStringList nullified_list;
     QList<int> m_effectValue;
+};
+
+struct ActionProposal
+{
+    enum ActionType
+    {
+        Invalid,
+        Cancel,
+        RealCard,
+        SelectedCards,
+        ViewAsSkillCard,
+        SkillCard
+    };
+
+    ActionProposal();
+
+    bool isValid() const;
+    bool isCancel() const;
+    bool tryParse(const QVariant &value);
+    QVariant toVariant() const;
+    QString typeName() const;
+    QString diagnosticString() const;
+
+    static ActionProposal makeCancel();
+    static ActionProposal fromCard(const Card *card, const QList<const Player *> &targets = QList<const Player *>(), const QString &sourceSkillName = QString());
+    static QString skillNameFromPattern(const QString &pattern);
+
+    ActionType type;
+    QString skillName;
+    QString cardClass;
+    QString cardName;
+    QString declaredCardName;
+    QList<int> subcardIds;
+    QStringList targetNames;
+    JsonObject extra;
+};
+
+struct ActionRequestContext
+{
+    ActionRequestContext();
+
+    ServerPlayer *player;
+    QSanProtocol::CommandType command;
+    CardUseStruct::CardUseReason reason;
+    Card::HandlingMethod method;
+    QString pattern;
+    int requestSerial;
+    bool fromClient;
+    bool serverBuiltCard;
+    bool requireSingleCardSelection;
+    QString skillName;
+    QString expectedSkillName;
+    QString prompt;
+    QVariant promptData;
+    QStringList requestSkillNames;
+    QStringList requestGrantIds;
+};
+
+typedef ActionRequestContext ClientActionContext;
+
+struct CardUseGrant
+{
+    enum SourceKind
+    {
+        OwnedSkill,
+        AcquiredSkill,
+        EquipSkill,
+        ViewHasSkillSource,
+        HiddenGeneralSkill,
+        RequestScopedGrant,
+        ServerTrusted
+    };
+
+    CardUseGrant();
+
+    bool isValid() const;
+    bool matchesContext(const ClientActionContext &ctx) const;
+
+    bool valid;
+    ServerPlayer *player;
+    SourceKind sourceKind;
+    QString sourceSkill;
+    QString sourceGeneral;
+    QString grantId;
+
+    QStringList allowedCardClasses;
+    QStringList allowedSkillNames;
+
+    CardUseStruct::CardUseReason reason;
+    Card::HandlingMethod method;
+    QString pattern;
+
+    QList<Player::Place> allowedPlaces;
+    QList<int> allowedCardIds;
+    QList<int> allowedSpecialCardIds;
+
+    bool allowNoSubcards;
+    bool allowOtherPlayersCards;
+    bool allowVirtualCard;
+    bool allowRealCard;
+    bool requireViewAsValidation;
+
+    int requestSerial;
+    int remainingUses;
 };
 
 class CardMoveReason

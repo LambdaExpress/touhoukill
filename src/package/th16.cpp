@@ -57,9 +57,22 @@ public:
         if (Self->isChained() && cards.isEmpty())
             return nullptr;
 
-        MishenCard *c = new MishenCard;
-        c->addSubcards(cards);
-        return c;
+        return createViewAsCard<MishenCard>(cards);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() > 1 || !extra.isEmpty() || ctx.player == nullptr)
+            return nullptr;
+        if (ctx.player->isChained() && selected.isEmpty())
+            return nullptr;
+        if (!selected.isEmpty()) {
+            const Card *card = selected.first();
+            if (card == nullptr || !card->isEquipped() || ctx.player->isBrokenEquip(card->getEffectiveId()))
+                return nullptr;
+        }
+
+        return createViewAsCard<MishenCard>(selected);
     }
 };
 
@@ -925,13 +938,22 @@ public:
         if (Self->isChained() && cards.isEmpty())
             return nullptr;
 
-        Card *c = Sanguosha->cloneSkillCard(cardName);
-        if (c != nullptr) {
-            c->addSubcards(cards);
-            return c;
+        return prepareViewAsCard(Sanguosha->cloneSkillCard(cardName), cards);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() > 1 || !extra.isEmpty() || ctx.player == nullptr)
+            return nullptr;
+        if (ctx.player->isChained() && selected.isEmpty())
+            return nullptr;
+        if (!selected.isEmpty()) {
+            const Card *card = selected.first();
+            if (card == nullptr || !card->isEquipped() || ctx.player->isBrokenEquip(card->getEffectiveId()))
+                return nullptr;
         }
 
-        return nullptr;
+        return prepareViewAsCard(Sanguosha->cloneSkillCard(cardName), selected);
     }
 
 private:

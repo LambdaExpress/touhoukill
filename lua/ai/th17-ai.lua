@@ -84,7 +84,7 @@ sgs.ai_skill_use["@@LingshouOtherVS"] = function(self)
 		for _, s in sgs.qlist(use.to) do
 			table.insert(slist, s:objectName())
 		end
-		return slash:toString() .. "->" .. table.concat(slist, "+")
+		return sgs.ai_card_action_proposal(slash, slist, "LingshouOtherVS")
 	end
 
 	return "."
@@ -277,7 +277,7 @@ sgs.ai_skill_use["@@lunni"] = function(self)
 		local c = sgs.Sanguosha:cloneSkillCard("LunniCard")
 		c:addSubcard(id)
 		c:deleteLater()
-		return c:toString() .. "->."
+		return sgs.ai_card_action_proposal(c, nil, "lunni")
 	end
 
 	return "."
@@ -370,7 +370,7 @@ sgs.ai_skill_use["@@liaogu"] = function(self)
 			local card = sgs.Sanguosha:cloneSkillCard("LiaoguCard")
 			card:addSubcard(selected)
 			card:deleteLater()
-			return card:toString() .. "->."
+			return sgs.ai_card_action_proposal(card, nil, "liaogu")
 		end
 	end
 
@@ -398,7 +398,6 @@ sgs.ai_skill_use["@@liaogu"] = function(self)
 --					for _, to in sgs.qlist(use.to) do table.insert(targets, to:objectName()) end
 --					targetsStr = table.concat(targets, "+")
 --				end
---				return card:toString() .. "->" .. targetsStr
 --			end
 --		end
 --	end
@@ -664,10 +663,7 @@ sgs.ai_skill_use["@@weiyi"] = function(self)
 	viewAsSlash:deleteLater()
 	if use.card then
 		-- 杀！
-		local realUse = sgs.CardUseStruct()
-		realUse.card = viewAsSlash
-		realUse.to = use.to
-		return realUse:toString()
+		return sgs.ai_card_action_proposal(viewAsSlash, use.to, "weiyi")
 	end
 end
 sgs.ai_card_intention.WeiyiCard = function(self, card, from, to)
@@ -758,7 +754,7 @@ sgs.ai_skill_use["@@LingjunOtherVS"] = function(self)
 				viewAsSlash:deleteLater()
 				if use.card then
 					-- 杀！
-					return viewAsSlash:toString() .. "->" .. target:objectName()
+					return sgs.ai_card_action_proposal(viewAsSlash, { target:objectName() }, "LingjunOtherVS")
 				end
 			end
 
@@ -802,7 +798,7 @@ sgs.ai_skill_use["@@LingjunOtherVS"] = function(self)
 			viewAsSlash:deleteLater()
 			if use.card then
 				-- 杀！
-				return viewAsSlash:toString() .. "->" .. target:objectName()
+				return sgs.ai_card_action_proposal(viewAsSlash, { target:objectName() }, "LingjunOtherVS")
 			end
 		end
 	end
@@ -827,9 +823,6 @@ sgs.ai_skill_use["@@tianxing"] = function(self)
 	viewAsSlash:deleteLater()
 	if use.card then
 		-- 杀！
-		local realUse = sgs.CardUseStruct()
-		realUse.card = viewAsSlash
-		realUse.to = use.to
-		return realUse:toString()
+		return sgs.ai_card_action_proposal(viewAsSlash, use.to, "tianxing")
 	end
 end

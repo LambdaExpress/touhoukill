@@ -624,11 +624,26 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() > 0) {
-            DummyCard *dc = new DummyCard;
-            dc->addSubcards(cards);
-            return dc;
+            return createViewAsCard<DummyCard>(cards, objectName());
         }
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.isEmpty() || !extra.isEmpty())
+            return nullptr;
+
+        QList<const Card *> accepted;
+        foreach (const Card *card, selected) {
+            if (card == nullptr || !ctx.player->getPile("zhenli").contains(card->getEffectiveId()))
+                return nullptr;
+            if (!accepted.isEmpty() && card->getNumber() != accepted.first()->getNumber())
+                return nullptr;
+            accepted << card;
+        }
+
+        return createViewAsCard<DummyCard>(selected, objectName());
     }
 };
 
@@ -1032,11 +1047,22 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() == 2) {
-            DummyCard *dc = new DummyCard;
-            dc->addSubcards(cards);
-            return dc;
+            return createViewAsCard<DummyCard>(cards, objectName());
         }
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 2 || !extra.isEmpty())
+            return nullptr;
+
+        foreach (const Card *card, selected) {
+            if (card == nullptr || !ctx.player->getPile("dream").contains(card->getEffectiveId()))
+                return nullptr;
+        }
+
+        return createViewAsCard<DummyCard>(selected, objectName());
     }
 };
 
@@ -1794,11 +1820,20 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() == 1) {
-            ModianCard *card = new ModianCard;
-            card->addSubcards(cards);
-            return card;
+            return createViewAsCard<ModianCard>(cards);
         } else
             return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext & /*ctx*/, const JsonObject &extra) const override
+    {
+        if (selected.length() != 1 || !extra.isEmpty())
+            return nullptr;
+        const Card *card = selected.first();
+        if (card == nullptr || card->isEquipped() || (!card->isNDTrick() && !card->isKindOf("Slash")))
+            return nullptr;
+
+        return createViewAsCard<ModianCard>(selected);
     }
 };
 
@@ -1838,6 +1873,40 @@ public:
             return card;
         } else
             return originalCard;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() != 1 || !extra.isEmpty() || ctx.player == nullptr)
+            return nullptr;
+
+        const Card *card = selected.first();
+        if (card == nullptr)
+            return nullptr;
+
+        if (ctx.reason == CardUseStruct::CARD_USE_REASON_PLAY) {
+            if (card->isEquipped() || ctx.player->getPile("modian").contains(card->getEffectiveId()) || (!card->isNDTrick() && !card->isKindOf("Slash")))
+                return nullptr;
+            return createViewAsCard<ModianCard>(selected);
+        }
+
+        if (ctx.pattern == QStringLiteral("@@modian!") && ctx.player->getPile("modian").contains(card->getEffectiveId()))
+            return card;
+
+        return nullptr;
+    }
+
+    bool isSubcardSelectionValid(const QList<const Card *> &selected, const Card *to_select, const CardUseGrant &grant, const ClientActionContext &ctx) const override
+    {
+        Q_UNUSED(grant)
+        if (ctx.player == nullptr || to_select == nullptr || !selected.isEmpty())
+            return false;
+
+        if (ctx.reason == CardUseStruct::CARD_USE_REASON_PLAY)
+            return (to_select->isNDTrick() || to_select->isKindOf("Slash")) && !to_select->isEquipped()
+                && !ctx.player->getPile("modian").contains(to_select->getEffectiveId());
+
+        return ctx.player->getPile("modian").contains(to_select->getEffectiveId());
     }
 };
 
@@ -2009,9 +2078,48 @@ public:
         if (f == nullptr)
             return nullptr;
 
-        f->addSubcard(s);
-        f->setSkillName(objectName());
-        return f;
+        return prepareViewAsCard(f, QList<const Card *>() << s, objectName());
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+
+        foreach (const Card *card, selected) {
+            if (card == nullptr || !ctx.player->getPile("modian").contains(card->getEffectiveId()))
+                return nullptr;
+        }
+
+        Card *result = nullptr;
+        const Card *subcard = nullptr;
+        const QString declaredCardName = extra.value(QStringLiteral("declaredCardName")).toString();
+        if (selected.length() == 1 && selected.first()->isKindOf("TrickCard") && declaredCardName == QStringLiteral("slash")) {
+            result = new Slash(Card::SuitToBeDecided, -1);
+            subcard = selected.first();
+        } else if (selected.length() == 2) {
+            const Card *trick = nullptr;
+            const Card *slash = nullptr;
+            foreach (const Card *card, selected) {
+                if (card->isKindOf("TrickCard"))
+                    trick = card;
+                else if (card->isKindOf("Slash"))
+                    slash = card;
+            }
+            if (trick == nullptr || slash == nullptr || trick->objectName() != declaredCardName)
+                return nullptr;
+            result = Sanguosha->cloneCard(trick->objectName());
+            subcard = slash;
+        }
+
+        if (result == nullptr)
+            return nullptr;
+        Card *card = prepareViewAsCard(result, QList<const Card *>() << subcard, objectName());
+        if (!isDeclaredCardUseValid(card, ctx)) {
+            delete card;
+            return nullptr;
+        }
+        return card;
     }
 
     bool isEnabledAtNullification(const ServerPlayer *player) const override
@@ -2220,19 +2328,36 @@ public:
     {
         if (Sanguosha->getCurrentCardUsePattern() == "@@zongjiu-card1") {
             if (cards.length() == 1) {
-                Analeptic *analeptic = new Analeptic(Card::SuitToBeDecided, -1);
-                analeptic->addSubcards(cards);
-                analeptic->setSkillName(objectName());
-                analeptic->setShowSkill(objectName());
-                return analeptic;
+                return prepareViewAsCard(new Analeptic(Card::SuitToBeDecided, -1), cards, objectName(), objectName());
             }
         } else if (Sanguosha->getCurrentCardUsePattern() == "@@zongjiu-card2") {
             if (cards.length() == 0) {
-                Slash *slash = new Slash(Card::NoSuit, 0);
-                slash->setSkillName(objectName());
-                slash->setShowSkill(objectName());
-                return slash;
+                return prepareViewAsCard(new Slash(Card::NoSuit, 0), cards, objectName(), objectName());
             }
+        }
+
+        return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.pattern == QStringLiteral("@@zongjiu-card1")) {
+            if (selected.length() != 1)
+                return nullptr;
+            if (!acceptsDeclaredCardName(extra, QStringLiteral("analeptic")))
+                return nullptr;
+            const Card *card = selected.first();
+            if (card == nullptr || card->isEquipped())
+                return nullptr;
+            return prepareViewAsCard(new Analeptic(Card::SuitToBeDecided, -1), selected, objectName(), objectName());
+        }
+
+        if (ctx.pattern == QStringLiteral("@@zongjiu-card2")) {
+            if (!selected.isEmpty())
+                return nullptr;
+            if (!acceptsDeclaredCardName(extra, QStringLiteral("slash")))
+                return nullptr;
+            return prepareViewAsCard(new Slash(Card::NoSuit, 0), selected, objectName(), objectName());
         }
 
         return nullptr;
@@ -2602,9 +2727,15 @@ public:
         if (cards.length() != 2)
             return nullptr;
 
-        QirenCard *card = new QirenCard;
-        card->addSubcards(cards);
-        return card;
+        return createViewAsCard<QirenCard>(cards);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext & /*ctx*/, const JsonObject &extra) const override
+    {
+        if (selected.length() != 2 || !extra.isEmpty())
+            return nullptr;
+
+        return createViewAsCard<QirenCard>(selected);
     }
 };
 
@@ -2673,9 +2804,14 @@ public:
     {
         if (cards.isEmpty())
             return nullptr;
-        LuliCard *card = new LuliCard();
-        card->addSubcards(cards);
-        return card;
+        return createViewAsCard<LuliCard>(cards);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.isEmpty() || selected.length() > ctx.player->getMark("luli") || !extra.isEmpty())
+            return nullptr;
+        return createViewAsCard<LuliCard>(selected);
     }
 };
 

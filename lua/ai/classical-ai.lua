@@ -192,7 +192,7 @@
 				for _, id in ipairs(handcards) do
 					local suit = card:getSuit()
 					if suit == sgs.Card_Heart or (xiaoqiao:hasSkill("hongyan") and suit == sgs.Card_Spade) then
-						return "@TianxiangCard="..id.."->"..caocao:objectName()
+						return sgs.ai_skill_card_action_proposal("tianxiang", "TianxiangCard", id, { caocao:objectName() })
 					end
 				end
 			end

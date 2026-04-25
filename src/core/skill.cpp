@@ -5,8 +5,155 @@
 #include "room.h"
 #include "settings.h"
 #include "standard.h"
+#include "util.h"
 
 #include <QFile>
+
+namespace
+{
+QList<int> submittedSubcardIds(const Card *card)
+{
+    if (card == nullptr)
+        return QList<int>();
+    if (card->isVirtualCard())
+        return card->getSubcards();
+    return QList<int>() << card->getEffectiveId();
+}
+
+bool sameValidationCard(const Card *expected, const Card *actual)
+{
+    return expected != nullptr && actual != nullptr && expected->getClassName() == actual->getClassName() && expected->getSkillName(false) == actual->getSkillName(false)
+        && expected->canRecast() == actual->canRecast() && expected->toString() == actual->toString();
+}
+
+void disposeValidationCard(const Card *card)
+{
+    if (card != nullptr && card->parent() == nullptr)
+        delete card;
+}
+
+bool skillNameMatchesGrant(const QString &skillName, const QStringList &allowedSkillNames)
+{
+    if (allowedSkillNames.isEmpty() || skillName.isEmpty())
+        return true;
+    if (allowedSkillNames.contains(skillName))
+        return true;
+    if (skillName.startsWith("_") && allowedSkillNames.contains(skillName.mid(1)))
+        return true;
+    return false;
+}
+
+void appendCardId(QList<int> *ids, int id)
+{
+    if (ids != nullptr && id >= 0 && !ids->contains(id))
+        *ids << id;
+}
+
+void appendCardIds(QList<int> *ids, const QList<int> &cardIds)
+{
+    foreach (int id, cardIds)
+        appendCardId(ids, id);
+}
+
+void appendCardIdsFromProperty(QList<int> *ids, const Player *player, const QString &propertyName)
+{
+    if (player == nullptr || propertyName.isEmpty())
+        return;
+    appendCardIds(ids, StringList2IntList(player->property(propertyName.toUtf8().constData()).toString().split(QStringLiteral("+"))));
+}
+
+void appendExplicitExpandPileIds(QList<int> *ids, const Player *player, const ClientActionContext &ctx, const QString &expandPile, const QString &skillName)
+{
+    if (ids == nullptr || player == nullptr || expandPile.isEmpty())
+        return;
+
+    if (expandPile == QStringLiteral("#judging_area")) {
+        appendCardIds(ids, player->getJudgingAreaID());
+    } else if (expandPile.startsWith(QStringLiteral("*"))) {
+        appendCardIdsFromProperty(ids, player, expandPile.mid(1));
+    } else if (expandPile.startsWith(QStringLiteral("+"))) {
+        if (ctx.player == nullptr)
+            return;
+        Room *room = ctx.player->getRoom();
+        ServerPlayer *target = room != nullptr ? room->findPlayerByObjectName(player->property(skillName.toUtf8().constData()).toString()) : nullptr;
+        if (target != nullptr)
+            appendCardIds(ids, target->getPile(expandPile.mid(1)));
+    } else if (expandPile.startsWith(QStringLiteral("%"))) {
+        foreach (const Player *other, player->getAliveSiblings()) {
+            if (expandPile == QStringLiteral("%shown_card"))
+                appendCardIds(ids, other->getShownHandcards());
+            else
+                appendCardIds(ids, other->getPile(expandPile.mid(1)));
+        }
+    } else {
+        appendCardIds(ids, player->getPile(expandPile));
+    }
+}
+
+bool usesClientSideViewAsState(const QString &skillName)
+{
+    static const QStringList unsafeSkills = QStringList()
+        << "fsu0413gainian"
+        << "toushi"
+        << "modian"
+        << "zhanzhen"
+        << "qiji"
+        << "lingbai"
+        << "yidan"
+        << "xianshi"
+        << "xiezou"
+        << "chuangshi"
+        << "nianli"
+        << "yucan"
+        << "xihua"
+        << "liuneng";
+    return unsafeSkills.contains(skillName);
+}
+
+bool matchesGeneratedCard(const Card *expected, const Card *actual)
+{
+    const bool matched = sameValidationCard(expected, actual);
+    disposeValidationCard(expected);
+    return matched;
+}
+
+const Card *attachSkillNameToDummyCard(const Card *card, const QString &skillName)
+{
+    if (card != nullptr && card->isKindOf("DummyCard") && card->getSkillName(false).isEmpty() && !skillName.isEmpty())
+        const_cast<Card *>(card)->setSkillName(skillName);
+    return card;
+}
+
+bool declaredCardNameMatches(const JsonObject &extra, const Card *card)
+{
+    if (extra.isEmpty())
+        return true;
+    if (card == nullptr || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+        return false;
+    const QString declaredCardName = extra.value(QStringLiteral("declaredCardName")).toString();
+    return declaredCardName.isEmpty() || card->objectName() == declaredCardName;
+}
+
+QString declaredCardNameFromExtra(const JsonObject &extra)
+{
+    if (extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+        return QString();
+    return extra.value(QStringLiteral("declaredCardName")).toString();
+}
+
+void appendPropertyCardNames(QStringList *names, const Player *player, const QString &propertyName)
+{
+    if (names == nullptr || player == nullptr || propertyName.isEmpty())
+        return;
+
+    const QString value = player->property(propertyName.toUtf8().constData()).toString();
+    foreach (const QString &name, value.split(QStringLiteral("+"), QString::SkipEmptyParts)) {
+        if (!names->contains(name))
+            *names << name;
+    }
+}
+
+}
 
 Skill::Skill(const QString &name, const QString &showType)
     : frequent(false)
@@ -241,6 +388,9 @@ ViewAsSkill::ViewAsSkill(const QString &name)
 
 bool ViewAsSkill::isAvailable(const Player *invoker, CardUseStruct::CardUseReason reason, const QString &pattern) const
 {
+    if (invoker == nullptr)
+        return false;
+
     if (!invoker->hasSkill(objectName()) && !invoker->hasLordSkill(objectName())
         && invoker->getMark("ViewAsSkill_" + objectName() + "Effect") == 0 // For skills like Shuangxiong(ViewAsSkill effect remains even if the player has lost the skill)
         && !invoker->hasFlag("RoomScene_" + objectName() + "TempUse")) // for RoomScene Temp Use
@@ -250,10 +400,209 @@ bool ViewAsSkill::isAvailable(const Player *invoker, CardUseStruct::CardUseReaso
         return isEnabledAtPlay(invoker);
     case CardUseStruct::CARD_USE_REASON_RESPONSE:
     case CardUseStruct::CARD_USE_REASON_RESPONSE_USE:
+        if (pattern == "nullification") {
+            const ServerPlayer *serverPlayer = qobject_cast<const ServerPlayer *>(invoker);
+            if (serverPlayer != nullptr && isEnabledAtNullification(serverPlayer))
+                return true;
+        }
         return isEnabledAtResponse(invoker, pattern);
+    case CardUseStruct::CARD_USE_REASON_UNKNOWN:
+        if (pattern.startsWith(QStringLiteral("@@")))
+            return isEnabledAtResponse(invoker, pattern);
+        break;
     default:
         return false;
     }
+    return false;
+}
+
+QStringList ViewAsSkill::producedCardClasses() const
+{
+    return QStringList();
+}
+
+CardUseGrant ViewAsSkill::makeGrant(const Player *player, const ClientActionContext &ctx) const
+{
+    CardUseGrant grant;
+    if (player == nullptr || ctx.player == nullptr || player != ctx.player)
+        return grant;
+
+    const bool isMethodNoneRequest = ctx.method == Card::MethodNone && ctx.pattern.startsWith("@@") && isEnabledAtResponse(player, ctx.pattern);
+    const bool isRequestScopedResponse = ctx.requestSkillNames.contains(objectName()) && ctx.pattern.startsWith(QStringLiteral("@@")) && isEnabledAtResponse(player, ctx.pattern);
+    if (!isMethodNoneRequest && !isRequestScopedResponse && !isAvailable(player, ctx.reason, ctx.pattern))
+        return grant;
+
+    grant.valid = true;
+    grant.player = ctx.player;
+    grant.sourceSkill = objectName();
+    grant.allowedSkillNames << objectName();
+    grant.allowedCardClasses = producedCardClasses();
+    grant.reason = ctx.reason;
+    grant.method = ctx.method;
+    grant.pattern = ctx.pattern;
+    grant.requestSerial = -1;
+    grant.allowNoSubcards = inherits("ZeroCardViewAsSkill");
+    grant.allowOtherPlayersCards = false;
+    grant.allowVirtualCard = true;
+    grant.allowRealCard = true;
+    grant.requireViewAsValidation = true;
+    grant.allowedPlaces << Player::PlaceHand << Player::PlaceEquip;
+    appendCardIds(&grant.allowedSpecialCardIds, player->getHandPile());
+    appendExplicitExpandPileIds(&grant.allowedSpecialCardIds, player, ctx, expand_pile, objectName());
+
+    if (player->getAcquiredSkills().contains(objectName()))
+        grant.sourceKind = CardUseGrant::AcquiredSkill;
+    else if (player->hasEquipSkill(objectName()))
+        grant.sourceKind = CardUseGrant::EquipSkill;
+    else if (player->ownSkill(objectName()))
+        grant.sourceKind = CardUseGrant::OwnedSkill;
+    else
+        grant.sourceKind = CardUseGrant::HiddenGeneralSkill;
+
+    return grant;
+}
+
+bool ViewAsSkill::isCardUseValid(const CardUseStruct &cardUse, const CardUseGrant &grant, const ClientActionContext &ctx) const
+{
+    if (cardUse.card == nullptr)
+        return false;
+
+    if (!grant.allowedCardClasses.isEmpty() && !grant.allowedCardClasses.contains(cardUse.card->getClassName()))
+        return false;
+
+    const QString skillName = cardUse.card->getSkillName();
+    if (!skillNameMatchesGrant(skillName, grant.allowedSkillNames))
+        return false;
+
+    QList<const Card *> subcards;
+    QList<int> seenIds;
+    const QList<int> ids = submittedSubcardIds(cardUse.card);
+    if (ids.isEmpty())
+        return (grant.allowNoSubcards || ctx.serverBuiltCard) && isGeneratedCardValid(subcards, cardUse.card, grant, ctx);
+
+    foreach (int id, ids) {
+        if (seenIds.contains(id))
+            return false;
+        const Card *card = Sanguosha->getCard(id);
+        if (card == nullptr)
+            return false;
+        if (!isSubcardSelectionValid(subcards, card, grant, ctx))
+            return false;
+        seenIds << id;
+        subcards << card;
+    }
+    return isGeneratedCardValid(subcards, cardUse.card, grant, ctx);
+}
+
+const Card *ViewAsSkill::buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const
+{
+    Q_UNUSED(selected)
+    Q_UNUSED(ctx)
+    Q_UNUSED(extra)
+    return nullptr;
+}
+
+Card *ViewAsSkill::prepareViewAsCard(Card *card, const QList<const Card *> &subcards, const QString &skillName, const QString &showSkill) const
+{
+    if (card == nullptr)
+        return nullptr;
+    card->addSubcards(subcards);
+    if (!skillName.isEmpty())
+        card->setSkillName(skillName);
+    if (!showSkill.isEmpty())
+        card->setShowSkill(showSkill);
+    return card;
+}
+
+Card *ViewAsSkill::cloneViewAsCard(const QString &cardName, const QList<const Card *> &subcards, const QString &skillName, const QString &showSkill, Card::Suit suit,
+    int number, bool canRecast) const
+{
+    Card *card = Sanguosha->cloneCard(cardName, suit, number);
+    if (card == nullptr)
+        return nullptr;
+    prepareViewAsCard(card, subcards, skillName, showSkill);
+    if (!canRecast)
+        card->setCanRecast(false);
+    return card;
+}
+
+bool ViewAsSkill::acceptsDeclaredCardName(const JsonObject &extra, const QString &cardName) const
+{
+    return extra.isEmpty() || (extra.keys() == QStringList(QStringLiteral("declaredCardName")) && extra.value(QStringLiteral("declaredCardName")).toString() == cardName);
+}
+
+bool ViewAsSkill::isDeclaredCardNameAccepted(const QString &cardName, const QList<const Card *> &selected, const ActionRequestContext &ctx) const
+{
+    Q_UNUSED(selected)
+    if (ctx.player == nullptr || cardName.isEmpty())
+        return false;
+
+    QStringList names;
+    appendPropertyCardNames(&names, ctx.player, objectName() + QStringLiteral("_card"));
+    appendPropertyCardNames(&names, ctx.player, objectName());
+    return names.contains(cardName);
+}
+
+bool ViewAsSkill::isDeclaredCardUseValid(const Card *card, const ActionRequestContext &ctx) const
+{
+    if (card == nullptr || ctx.player == nullptr)
+        return false;
+
+    if (ctx.reason == CardUseStruct::CARD_USE_REASON_PLAY)
+        return card->isAvailable(ctx.player);
+
+    if (!ctx.pattern.isEmpty() && !ctx.pattern.startsWith(QStringLiteral("@@"))) {
+        const QString normalizedPattern = normalizeCardUsePattern(ctx.pattern);
+        const CardPattern *pattern = Sanguosha->getPattern(normalizedPattern);
+        if (pattern == nullptr || !pattern->match(ctx.player, card))
+            return false;
+    }
+
+    return !ctx.player->isCardLimited(card, ctx.method);
+}
+
+Card *ViewAsSkill::buildDeclaredCardForServer(
+    const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra, bool inheritSelectedCardSuitNumber, const QString &showSkill) const
+{
+    const QString cardName = declaredCardNameFromExtra(extra);
+    if (cardName.isEmpty() || !isDeclaredCardNameAccepted(cardName, selected, ctx))
+        return nullptr;
+
+    Card::Suit suit = Card::SuitToBeDecided;
+    int number = -1;
+    if (inheritSelectedCardSuitNumber && selected.length() == 1 && selected.first() != nullptr) {
+        suit = selected.first()->getSuit();
+        number = selected.first()->getNumber();
+    }
+
+    Card *card = cloneViewAsCard(cardName, selected, objectName(), showSkill, suit, number);
+    if (!isDeclaredCardUseValid(card, ctx)) {
+        disposeValidationCard(card);
+        return nullptr;
+    }
+
+    return card;
+}
+
+bool ViewAsSkill::isGeneratedCardValid(const QList<const Card *> &selected, const Card *to_validate, const CardUseGrant &grant, const ClientActionContext &ctx) const
+{
+    Q_UNUSED(selected)
+    Q_UNUSED(to_validate)
+    Q_UNUSED(grant)
+    Q_UNUSED(ctx)
+    return true;
+}
+
+bool ViewAsSkill::isSubcardSelectionValid(const QList<const Card *> &selected, const Card *to_select, const CardUseGrant &grant, const ClientActionContext &ctx) const
+{
+    Q_UNUSED(selected)
+    Q_UNUSED(grant)
+    if (to_select == nullptr || to_select->hasFlag("using"))
+        return false;
+    if (!expand_pile.isEmpty() && !expand_pile.startsWith("*") && !expand_pile.startsWith("#") && !expand_pile.startsWith("+")
+        && (ctx.player == nullptr || !ctx.player->getPile(expand_pile).contains(to_select->getEffectiveId())))
+        return false;
+    return true;
 }
 
 bool ViewAsSkill::isEnabledAtPlay(const Player * /*unused*/) const
@@ -325,9 +674,43 @@ ZeroCardViewAsSkill::ZeroCardViewAsSkill(const QString &name)
 const Card *ZeroCardViewAsSkill::viewAs(const QList<const Card *> &cards) const
 {
     if (cards.isEmpty())
-        return viewAs();
+        return attachSkillNameToDummyCard(viewAs(), objectName());
     else
         return nullptr;
+}
+
+bool ZeroCardViewAsSkill::isCardUseValid(const CardUseStruct &cardUse, const CardUseGrant &grant, const ClientActionContext &ctx) const
+{
+    if (cardUse.card == nullptr || cardUse.card->subcardsLength() != 0)
+        return false;
+
+    return ViewAsSkill::isCardUseValid(cardUse, grant, ctx);
+}
+
+const Card *ZeroCardViewAsSkill::buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const
+{
+    if (!selected.isEmpty())
+        return nullptr;
+    if (usesClientSideViewAsState(objectName()))
+        return buildDeclaredCardForServer(selected, ctx, extra, false);
+    const Card *card = attachSkillNameToDummyCard(viewAs(), objectName());
+    if (!declaredCardNameMatches(extra, card)) {
+        disposeValidationCard(card);
+        return nullptr;
+    }
+    return card;
+}
+
+bool ZeroCardViewAsSkill::isGeneratedCardValid(const QList<const Card *> &selected, const Card *to_validate, const CardUseGrant &grant, const ClientActionContext &ctx) const
+{
+    if (!ViewAsSkill::isGeneratedCardValid(selected, to_validate, grant, ctx))
+        return false;
+    if (to_validate == nullptr)
+        return false;
+    if (ctx.serverBuiltCard && usesClientSideViewAsState(objectName()))
+        return true;
+
+    return matchesGeneratedCard(viewAs(), to_validate);
 }
 
 bool ZeroCardViewAsSkill::viewFilter(const QList<const Card *> & /*selected*/, const Card * /*to_select*/) const
@@ -368,7 +751,106 @@ const Card *OneCardViewAsSkill::viewAs(const QList<const Card *> &cards) const
     if (cards.length() != 1)
         return nullptr;
     else
-        return viewAs(cards.first());
+        return attachSkillNameToDummyCard(viewAs(cards.first()), objectName());
+}
+
+bool OneCardViewAsSkill::isCardUseValid(const CardUseStruct &cardUse, const CardUseGrant &grant, const ClientActionContext &ctx) const
+{
+    if (cardUse.card == nullptr)
+        return false;
+    if (!grant.allowedCardClasses.isEmpty() && !grant.allowedCardClasses.contains(cardUse.card->getClassName()))
+        return false;
+
+    const QString skillName = cardUse.card->getSkillName();
+    const bool skilllessDummy = cardUse.card->isKindOf("DummyCard") && skillName.isEmpty();
+    if (!skilllessDummy && !skillNameMatchesGrant(skillName, grant.allowedSkillNames))
+        return false;
+
+    QList<const Card *> subcards;
+    QList<int> seenIds;
+    const QList<int> ids = submittedSubcardIds(cardUse.card);
+    if (ids.length() != 1)
+        return false;
+
+    foreach (int id, ids) {
+        if (seenIds.contains(id))
+            return false;
+        const Card *card = Sanguosha->getCard(id);
+        if (card == nullptr || !isSubcardSelectionValid(subcards, card, grant, ctx))
+            return false;
+        seenIds << id;
+        subcards << card;
+    }
+
+    if (skilllessDummy) {
+        const Card *expected = viewAs(subcards.first());
+        const bool matched = sameValidationCard(expected, cardUse.card);
+        disposeValidationCard(expected);
+        if (!matched)
+            return false;
+    }
+
+    return isGeneratedCardValid(subcards, cardUse.card, grant, ctx);
+}
+
+const Card *OneCardViewAsSkill::buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const
+{
+    if (selected.length() != 1)
+        return nullptr;
+    if (!isSubcardSelectionValid(QList<const Card *>(), selected.first(), CardUseGrant(), ctx))
+        return nullptr;
+    if (usesClientSideViewAsState(objectName()))
+        return buildDeclaredCardForServer(selected, ctx, extra, true);
+    const Card *card = attachSkillNameToDummyCard(viewAs(selected.first()), objectName());
+    if (!declaredCardNameMatches(extra, card)) {
+        disposeValidationCard(card);
+        return nullptr;
+    }
+    return card;
+}
+
+bool OneCardViewAsSkill::isGeneratedCardValid(const QList<const Card *> &selected, const Card *to_validate, const CardUseGrant &grant, const ClientActionContext &ctx) const
+{
+    if (!ViewAsSkill::isGeneratedCardValid(selected, to_validate, grant, ctx))
+        return false;
+    if (to_validate == nullptr || selected.length() != 1)
+        return false;
+    if (ctx.serverBuiltCard && usesClientSideViewAsState(objectName()))
+        return true;
+    return matchesGeneratedCard(viewAs(selected.first()), to_validate);
+}
+
+bool OneCardViewAsSkill::isSubcardSelectionValid(const QList<const Card *> &selected, const Card *to_select, const CardUseGrant &grant, const ClientActionContext &ctx) const
+{
+    Q_UNUSED(grant)
+    if (to_select == nullptr || !selected.isEmpty() || to_select->hasFlag("using"))
+        return false;
+    if (!filter_pattern.isEmpty() && !inherits("FilterSkill")) {
+        QString pattern = filter_pattern;
+        if (pattern.endsWith("!")) {
+            if (ctx.player == nullptr || ctx.player->isJilei(to_select))
+                return false;
+            pattern.chop(1);
+        } else if (response_or_use && pattern.contains("hand"))
+            pattern.replace("hand", "hand,wooden_ox");
+
+        ExpPattern exp(pattern);
+        if (!exp.match(ctx.player, to_select))
+            return false;
+    }
+    return serverViewFilter(to_select, ctx);
+}
+
+bool OneCardViewAsSkill::serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const
+{
+    if (ctx.player == nullptr || to_select == nullptr)
+        return false;
+
+    if (!expand_pile.isEmpty() && !expand_pile.startsWith("*") && !expand_pile.startsWith("#") && !expand_pile.startsWith("+")
+        && !ctx.player->getPile(expand_pile).contains(to_select->getEffectiveId()))
+        return false;
+
+    return true;
 }
 
 FilterSkill::FilterSkill(const QString &name)

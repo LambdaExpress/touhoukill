@@ -151,7 +151,7 @@ sgs.ai_skill_use["@@zhence"] = function(self, prompt)
 			for _, p in sgs.qlist(dummy_use.to) do
 				table.insert(target_objectname, p:objectName())
 			end
-			return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+			return sgs.ai_card_action_proposal(dummy_use.card, target_objectname, "zhence")
 		end
 	end
 	return "."
@@ -182,14 +182,14 @@ sgs.ai_skill_use["@@shiqu"] = function(self, prompt)
 	self:sortByKeepValue(cards)
 
 	if choice == "shiqu_discard" and self:isEnemy(current) then
-		return "@ShiquCard=" ..cards[1]:getEffectiveId().. "->" .. current:objectName()
+		return sgs.ai_skill_card_action_proposal("shiqu", "ShiquCard", cards[1]:getEffectiveId(), { current:objectName() })
 	end
 	if choice == "shiqu_play" and self:isFriend(current) and current:getHandcardNum() > 3 then
-		return "@ShiquCard=" ..cards[1]:getEffectiveId().. "->" .. current:objectName()
+		return sgs.ai_skill_card_action_proposal("shiqu", "ShiquCard", cards[1]:getEffectiveId(), { current:objectName() })
 	end
 	if choice == "shiqu_draw" then
 		local target = (self:isFriend(current) and self:isWeak(current))  and current or self.player
-		return "@ShiquCard=" ..cards[1]:getEffectiveId().. "->" .. target:objectName()
+		return sgs.ai_skill_card_action_proposal("shiqu", "ShiquCard", cards[1]:getEffectiveId(), { target:objectName() })
 	end
 	return "."
 end
@@ -500,7 +500,7 @@ sgs.ai_skill_use["@@lianmu"] = function(self, prompt)
 	end
 
 	if #targets >0 then
-		return "@LianmuCard=.->" .. table.concat(targets, "+")
+		return sgs.ai_skill_card_action_proposal("lianmu", "LianmuCard", nil, targets)
 	end
 	return "."
 end
@@ -524,7 +524,7 @@ sgs.ai_skill_use["@@sqchuangshi"] = function(self, prompt)
 		table.insert(targets,p:objectName())
 	end
 	if #targets >1 then
-		return "@SqChuangshiCard=.->" .. table.concat(targets, "+")
+		return sgs.ai_skill_card_action_proposal("sqchuangshi", "SqChuangshiCard", nil, targets)
 	end
 	return "."
 end
@@ -542,13 +542,13 @@ sgs.ai_skill_use["BasicCard+^Jink,TrickCard+^Nullification,EquipCard|.|.|sqchuan
 					if card:isKindOf("IronChain") then
 						return "."
 					end
-					return dummy_use.card:toString()
+					return sgs.ai_card_action_proposal(dummy_use.card, nil, "sqchuangshi")
 				else
 					local target_objectname = {}
 					for _, p in sgs.qlist(dummy_use.to) do
 						table.insert(target_objectname, p:objectName())
 					end
-					return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+					return sgs.ai_card_action_proposal(dummy_use.card, target_objectname, "sqchuangshi")
 				end
 			end
 		elseif card:getTypeId() == sgs.Card_TypeBasic and not card:isKindOf("Jink") then
@@ -556,20 +556,20 @@ sgs.ai_skill_use["BasicCard+^Jink,TrickCard+^Nullification,EquipCard|.|.|sqchuan
 			self:useBasicCard(card, dummy_use)
 			if dummy_use.card then
 				if dummy_use.to:isEmpty() then
-					return dummy_use.card:toString()
+					return sgs.ai_card_action_proposal(dummy_use.card, nil, "sqchuangshi")
 				else
 					local target_objectname = {}
 					for _, p in sgs.qlist(dummy_use.to) do
 						table.insert(target_objectname, p:objectName())
 					end
-					return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+					return sgs.ai_card_action_proposal(dummy_use.card, target_objectname, "sqchuangshi")
 				end
 			end
 		elseif card:getTypeId() == sgs.Card_TypeEquip then
 			local dummy_use = { isDummy = true }
 			self:useEquipCard(card, dummy_use)
 			if dummy_use.card then
-				return dummy_use.card:toString()
+				return sgs.ai_card_action_proposal(dummy_use.card, nil, "sqchuangshi")
 			end
 		end
 	end
@@ -820,7 +820,7 @@ sgs.ai_skill_use["@@baosi"] = function(self, prompt)
 		end
 	end
 	if #enemies==0 then return "." end
-	return "@BaosiCard=.->" .. table.concat(enemies, "+")
+	return sgs.ai_skill_card_action_proposal("baosi", "BaosiCard", nil, enemies)
 end
 
 --[魔眼]
@@ -866,12 +866,7 @@ sgs.ai_skill_use["@@zongjiu-card1"] = function(self)
 	s:setShowSkill("zongjiu")
 	self:useCardAnaleptic(self,s, use)
 	if use.card then
-		local realUse = sgs.CardUseStruct()
-		realUse.card = use.card
-		for _, to in use.to do
-			realUse.to:append(to)
-		end
-		return realUse:toString()
+		return sgs.ai_card_action_proposal(use.card, use.to, "zongjiu")
 	end
 end
 sgs.ai_skill_use["@@zongjiu-card2"] = function(self)
@@ -881,12 +876,7 @@ sgs.ai_skill_use["@@zongjiu-card2"] = function(self)
 	s:setShowSkill("zongjiu")
 	self:useCardSlash(self,s, use)
 	if use.card then
-		local realUse = sgs.CardUseStruct()
-		realUse.card = use.card
-		for _, to in use.to do
-			realUse.to:append(to)
-		end
-		return realUse:toString()
+		return sgs.ai_card_action_proposal(use.card, use.to, "zongjiu")
 	end
 end
 
@@ -1018,7 +1008,7 @@ sgs.ai_skill_use["@@luli"] = function(self, prompt)
 		for _,id in sgs.qlist(ids) do
 			table.insert(recast, tostring(id))
 		end
-		return "@LuliCard=" ..table.concat(recast, "+").."->."
+		return sgs.ai_skill_card_action_proposal("luli", "LuliCard", recast)
 	end
 	return "."
 end
@@ -1162,7 +1152,7 @@ sgs.ai_skill_use["@@huosui"] = function(self, prompt)
 		end
 	end
 	if #target_objectname>0 then
-		return dummy_use.card:toString() .. "->" .. table.concat(target_objectname, "+")
+		return sgs.ai_card_action_proposal(dummy_use.card, target_objectname, "huosui")
 	end
 	return "."
 end

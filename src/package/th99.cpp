@@ -32,6 +32,11 @@ public:
         return !player->hasUsed("QiuwenCard");
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "QiuwenCard";
+    }
+
     const Card *viewAs() const override
     {
         return new QiuwenCard;
@@ -341,6 +346,82 @@ public:
             return viewAs(cards.first());
 
         return nullptr;
+    }
+
+    CardUseGrant makeGrant(const Player *player, const ClientActionContext &ctx) const override
+    {
+        CardUseGrant grant = ViewAsSkill::makeGrant(player, ctx);
+        const ServerPlayer *serverPlayer = qobject_cast<const ServerPlayer *>(player);
+        if (!grant.isValid() || serverPlayer == nullptr)
+            return grant;
+
+        if (serverIsXiufuAvailable(serverPlayer)) {
+            grant.allowNoSubcards = true;
+        } else if (ctx.player != nullptr) {
+            grant.allowOtherPlayersCards = true;
+            grant.allowedPlaces << Player::DiscardPile;
+            Room *room = ctx.player->getRoom();
+            foreach (int id, room->getDiscardPile()) {
+                const Card *card = room->getCard(id);
+                if (card != nullptr && card->getTypeId() == Card::TypeEquip)
+                    grant.allowedCardIds << id;
+            }
+        }
+
+        return grant;
+    }
+
+    bool isCardUseValid(const CardUseStruct &card_use, const CardUseGrant &grant, const ClientActionContext &ctx) const override
+    {
+        if (card_use.card == nullptr || card_use.card->getClassName() != "XiufuCard")
+            return false;
+
+        const ServerPlayer *serverPlayer = qobject_cast<const ServerPlayer *>(ctx.player);
+        if (serverPlayer == nullptr)
+            return false;
+
+        const bool draw = serverIsXiufuAvailable(serverPlayer);
+        if (draw && card_use.card->subcardsLength() != 0)
+            return false;
+        if (!draw && card_use.card->subcardsLength() != 1)
+            return false;
+
+        return ViewAsSkill::isCardUseValid(card_use, grant, ctx);
+    }
+
+    bool isSubcardSelectionValid(const QList<const Card *> &selected, const Card *to_select, const CardUseGrant &grant, const ClientActionContext &ctx) const override
+    {
+        Q_UNUSED(grant)
+        if (ctx.player == nullptr || to_select == nullptr || !selected.isEmpty())
+            return false;
+
+        const ServerPlayer *serverPlayer = qobject_cast<const ServerPlayer *>(ctx.player);
+        if (serverPlayer == nullptr || serverIsXiufuAvailable(serverPlayer))
+            return false;
+
+        Room *room = ctx.player->getRoom();
+        return to_select->getTypeId() == Card::TypeEquip && room->getCardPlace(to_select->getEffectiveId()) == Player::DiscardPile;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (!extra.isEmpty())
+            return nullptr;
+
+        const ServerPlayer *serverPlayer = qobject_cast<const ServerPlayer *>(ctx.player);
+        if (serverPlayer == nullptr)
+            return nullptr;
+
+        if (serverIsXiufuAvailable(serverPlayer)) {
+            if (!selected.isEmpty())
+                return nullptr;
+            return new XiufuCard;
+        }
+
+        if (selected.length() != 1 || !isSubcardSelectionValid(QList<const Card *>(), selected.first(), CardUseGrant(), ctx))
+            return nullptr;
+
+        return viewAs(selected.first());
     }
 
 private: // previous OneCardViewAsSkill interface
@@ -726,6 +807,11 @@ public:
         expand_pile = "jingjie";
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "DummyCard";
+    }
+
     bool viewFilter(const Card *to_select) const override
     {
         if (!Self->getPile("jingjie").contains(to_select->getId()))
@@ -741,6 +827,15 @@ public:
     const Card *viewAs(const Card *originalCard) const override
     {
         return new DummyCard({originalCard->getId()});
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        if (ctx.player == nullptr || to_select == nullptr || !ctx.player->getPile("jingjie").contains(to_select->getEffectiveId()))
+            return false;
+
+        const QString property = ctx.player->property("luanying").toString();
+        return property == "black" ? to_select->isBlack() : to_select->isRed();
     }
 };
 
@@ -2270,6 +2365,11 @@ public:
         return to_select->isKindOf("BasicCard");
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "AwaitExhausted";
+    }
+
     const Card *viewAs(const Card *originalCard) const override
     {
         AwaitExhausted *c = new AwaitExhausted(Card::SuitToBeDecided, -1);
@@ -2277,6 +2377,12 @@ public:
         c->setSkillName(objectName());
         c->setShowSkill(objectName());
         return c;
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        Q_UNUSED(ctx)
+        return to_select != nullptr && to_select->isKindOf("BasicCard");
     }
 };
 
@@ -2506,11 +2612,21 @@ public:
         return to_select->isEquipped() && !Self->isBrokenEquip(to_select->getId());
     }
 
+    QStringList producedCardClasses() const override
+    {
+        return QStringList() << "XieliCard";
+    }
+
     const Card *viewAs(const Card *originalCard) const override
     {
         XieliCard *c = new XieliCard;
         c->addSubcard(originalCard);
         return c;
+    }
+
+    bool serverViewFilter(const Card *to_select, const ClientActionContext &ctx) const override
+    {
+        return ctx.player != nullptr && to_select != nullptr && to_select->isEquipped() && !ctx.player->isBrokenEquip(to_select->getEffectiveId());
     }
 };
 

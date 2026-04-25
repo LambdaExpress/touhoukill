@@ -807,19 +807,64 @@ public:
         return selected.length() < 2 && !to_select->isEquipped();
     }
 
+    bool isSubcardSelectionValid(const QList<const Card *> &selected, const Card *to_select, const CardUseGrant &grant, const ClientActionContext &ctx) const override
+    {
+        Q_UNUSED(grant)
+        Q_UNUSED(ctx)
+        return to_select != nullptr && selected.length() < 2 && !to_select->isEquipped();
+    }
+
+    bool isCardUseValid(const CardUseStruct &card_use, const CardUseGrant &grant, const ClientActionContext &ctx) const override
+    {
+        if (card_use.card == nullptr || !card_use.card->isVirtualCard() || card_use.card->getClassName() != "Slash" || card_use.card->objectName() != "slash")
+            return false;
+
+        const QString expectedSkillName = grant.sourceSkill.contains("shenbao") ? QStringLiteral("shenbao") : objectName();
+        if (card_use.card->getSkillName() != expectedSkillName)
+            return false;
+
+        QList<const Card *> selected;
+        QList<int> seenIds;
+        foreach (int id, card_use.card->getSubcards()) {
+            if (seenIds.contains(id))
+                return false;
+            const Card *card = Sanguosha->getCard(id);
+            if (card == nullptr || !isSubcardSelectionValid(selected, card, grant, ctx))
+                return false;
+            seenIds << id;
+            selected << card;
+        }
+
+        return selected.length() == 2;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() != 2)
+            return nullptr;
+        if (!acceptsDeclaredCardName(extra, QStringLiteral("slash")))
+            return nullptr;
+
+        QList<const Card *> accepted;
+        foreach (const Card *card, selected) {
+            if (!isSubcardSelectionValid(accepted, card, CardUseGrant(), ctx))
+                return nullptr;
+            accepted << card;
+        }
+
+        const ViewHasSkill *viewHas = Sanguosha->ViewHas(ctx.player, objectName(), "weapon", true);
+        const QString skillName = viewHas != nullptr && viewHas->objectName().contains("shenbao") ? QStringLiteral("shenbao") : objectName();
+        return prepareViewAsCard(new Slash(Card::SuitToBeDecided, 0), selected, skillName);
+    }
+
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() != 2)
             return nullptr;
 
-        Slash *slash = new Slash(Card::SuitToBeDecided, 0);
-        slash->setSkillName(objectName());
-
         const ViewHasSkill *v = Sanguosha->ViewHas(Self, objectName(), "weapon", true);
-        if ((v != nullptr) && v->objectName().contains("shenbao"))
-            slash->setSkillName("shenbao");
-        slash->addSubcards(cards);
-        return slash;
+        const QString skillName = (v != nullptr) && v->objectName().contains("shenbao") ? QStringLiteral("shenbao") : objectName();
+        return prepareViewAsCard(new Slash(Card::SuitToBeDecided, 0), cards, skillName);
     }
 };
 
@@ -845,15 +890,37 @@ public:
         return selected.length() < 2 && !Self->isJilei(to_select);
     }
 
+    bool isSubcardSelectionValid(const QList<const Card *> &selected, const Card *to_select, const CardUseGrant &grant, const ClientActionContext &ctx) const override
+    {
+        Q_UNUSED(grant)
+        if (ctx.player == nullptr || to_select == nullptr || selected.length() >= 2)
+            return false;
+        if (ctx.player->hasWeapon(objectName(), true) && to_select == ctx.player->getWeapon())
+            return false;
+        return !ctx.player->isJilei(to_select);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() != 2 || !extra.isEmpty())
+            return nullptr;
+
+        QList<const Card *> accepted;
+        foreach (const Card *card, selected) {
+            if (!isSubcardSelectionValid(accepted, card, CardUseGrant(), ctx))
+                return nullptr;
+            accepted << card;
+        }
+
+        return createViewAsCard<DummyCard>(selected, objectName());
+    }
+
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() != 2)
             return nullptr;
 
-        DummyCard *card = new DummyCard;
-        card->setSkillName(objectName());
-        card->addSubcards(cards);
-        return card;
+        return createViewAsCard<DummyCard>(cards, objectName());
     }
 };
 

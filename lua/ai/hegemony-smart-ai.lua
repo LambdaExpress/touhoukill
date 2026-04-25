@@ -22,6 +22,7 @@
 
 -- "middleclass" is the Lua OOP library written by kikito
 -- more information see: https://github.com/kikito/middleclass
+local actionProposalJson = require "json"
 
 -- initialize the random seed for later use
 math.randomseed(os.time())
@@ -121,6 +122,121 @@ sgs.RolesTable =            {
 	"rebel",
 	"careerist"
 }
+
+local function is_action_proposal_json(value)
+	if type(value) ~= "string" then return false end
+	local proposal = actionProposalJson.decode(value)
+	return type(proposal) == "table" and type(proposal.type) == "string"
+end
+
+function sgs.ai_action_proposal(proposal)
+	if type(proposal) == "table" then return actionProposalJson.encode(proposal) end
+	if is_action_proposal_json(proposal) then return proposal end
+	return "."
+end
+
+local function ai_action_target_names(targets)
+	if not targets then return nil end
+	if type(targets) == "string" then
+		if targets == "" or targets == "." then return nil end
+		return string.split(targets, "+")
+	end
+
+	local names = {}
+	if targets.objectName then
+		table.insert(names, targets:objectName())
+		return names
+	end
+	if targets.length or targets.size then
+		for _, target in sgs.qlist(targets) do
+			if target then table.insert(names, target:objectName()) end
+		end
+		return names
+	end
+	for _, target in ipairs(targets) do
+		if type(target) == "string" then
+			if target ~= "" and target ~= "." then table.insert(names, target) end
+		elseif target and target.objectName then
+			table.insert(names, target:objectName())
+		end
+	end
+	return names
+end
+
+local function ai_action_card_ids(card_ids)
+	if not card_ids then return nil end
+	if type(card_ids) == "number" then return { card_ids } end
+	if type(card_ids) == "string" then
+		if card_ids == "" or card_ids == "." then return nil end
+		local ids = {}
+		for _, id in ipairs(string.split(card_ids, "+")) do
+			table.insert(ids, tonumber(id) or id)
+		end
+		return ids
+	end
+	local ids = {}
+	for _, id in ipairs(card_ids) do
+		table.insert(ids, tonumber(id) or id)
+	end
+	return ids
+end
+
+local function ai_action_card_subcards(card)
+	local ids = {}
+	if not card then return ids end
+	for _, id in sgs.qlist(card:getSubcards()) do
+		table.insert(ids, id)
+	end
+	return ids
+end
+
+function sgs.ai_cancel_action_proposal()
+	return sgs.ai_action_proposal({ type = "cancel" })
+end
+
+function sgs.ai_real_card_action_proposal(card_id, targets)
+	targets = ai_action_target_names(targets)
+	local proposal = {
+		type = "real_card",
+		subcards = { card_id }
+	}
+	if targets and #targets > 0 then proposal.targets = targets end
+	return sgs.ai_action_proposal(proposal)
+end
+
+function sgs.ai_selected_cards_action_proposal(card_ids)
+	return sgs.ai_action_proposal({
+		type = "selected_cards",
+		subcards = ai_action_card_ids(card_ids)
+	})
+end
+
+function sgs.ai_view_as_action_proposal(skill_name, card_class, card_name, subcards, targets, extra, declared_card_name)
+	subcards = ai_action_card_ids(subcards)
+	targets = ai_action_target_names(targets)
+	local proposal = {
+		type = "view_as",
+		skillName = skill_name,
+		cardClass = card_class,
+		cardName = card_name
+	}
+	if declared_card_name and declared_card_name ~= "" then proposal.declaredCardName = declared_card_name end
+	if subcards and #subcards > 0 then proposal.subcards = subcards end
+	if targets and #targets > 0 then proposal.targets = targets end
+	if extra then proposal.extra = extra end
+	return sgs.ai_action_proposal(proposal)
+end
+
+function sgs.ai_skill_card_action_proposal(skill_name, card_class, subcards, targets, extra, declared_card_name)
+	return sgs.ai_view_as_action_proposal(skill_name, card_class, nil, subcards, targets, extra, declared_card_name)
+end
+
+function sgs.ai_card_action_proposal(card, targets, skill_name, extra, declared_card_name)
+	if not card then return "." end
+	if not card:isVirtualCard() then return sgs.ai_real_card_action_proposal(card:getEffectiveId(), targets) end
+	return sgs.ai_view_as_action_proposal(skill_name or card:getSkillName(false), card:getClassName(), card:objectName(), ai_action_card_subcards(card), targets, extra, declared_card_name)
+end
+
 sgs.KingdomsTable =         {
 	"wei",
 	"shu",
@@ -3222,19 +3338,17 @@ function SmartAI:askForUseCard(pattern, prompt, method)
 		if not c:targetFixed() then dummy_use.to = sgs.SPlayerList() end
 		self:useCardByClassName(c,dummy_use)
 		if dummy_use.card == nil then return "." end
-		local str = c:toString()
+		local target_objectname = {}
 		if not c:targetFixed() then
-			local target_objectname = {}
 			for _, p in sgs.qlist(dummy_use.to) do
 				table.insert(target_objectname, p:objectName())
 			end
-			str = str .. "->" .. table.concat(target_objectname, "+")
 		end
-		return str
+		return sgs.ai_real_card_action_proposal(c:getEffectiveId(), target_objectname)
 	else
 		local use_func = sgs.ai_skill_use[pattern]
 		if use_func then
-			return use_func(self, prompt, method) or "."
+			return sgs.ai_action_proposal(use_func(self, prompt, method))
 		else
 			return "."
 		end

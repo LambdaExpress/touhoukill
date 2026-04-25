@@ -848,14 +848,24 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() == 0)
-            return new YuanfeiCard;
+            return createViewAsCard<YuanfeiCard>();
         if (cards.length() != 1)
             return nullptr;
 
-        YuanfeiCard *card = new YuanfeiCard;
-        card->addSubcards(cards);
+        return createViewAsCard<YuanfeiCard>(cards);
+    }
 
-        return card;
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() > 1 || !extra.isEmpty())
+            return nullptr;
+        if (selected.length() == 1) {
+            const Card *card = selected.first();
+            if (card == nullptr || card->isEquipped() || (ctx.player != nullptr && ctx.player->isJilei(card)))
+                return nullptr;
+        }
+
+        return createViewAsCard<YuanfeiCard>(selected);
     }
 };
 

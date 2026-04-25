@@ -545,7 +545,7 @@ sgs.ai_skill_use["@@buxian"] = function(self, prompt)
 		end
 	end
 	if #targets >1 then
-		return "@BuxianCard=".. handcards[1]:getId() .."->" .. table.concat(targets, "+")
+		return sgs.ai_skill_card_action_proposal("buxian", "BuxianCard", handcards[1]:getId(), targets)
 	end
 	return "."
 end
@@ -561,7 +561,7 @@ sgs.ai_skill_use["@@xingyun"] = function(self, prompt)
 		end
 	end
 	if #ids > 0 then
-		return "@XingyunCard=" .. table.concat(ids, "+")
+		return sgs.ai_skill_card_action_proposal("xingyun", "XingyunCard", ids)
 	end
 	return "."
 end
@@ -606,7 +606,7 @@ sgs.ai_skill_use["@@xingyun_hegemony"] = function(self, prompt)
 		end
 	end
 	if #ids > 0 then
-		return "@XingyunHegemonyCard=" .. ids[1]
+		return sgs.ai_skill_card_action_proposal("xingyun_hegemony", "XingyunHegemonyCard", ids[1])
 	end
 	return "."
 end
@@ -628,13 +628,13 @@ sgs.ai_skill_use["@@yege"] = function(self, prompt)
 			end
 			self:sortByUseValue(diamonds)
 			if #diamonds > 0 then
-				return "@YegeCard=".. diamonds[1]:getId() .."->" .. current:objectName()
+				return sgs.ai_skill_card_action_proposal("yege", "YegeCard", diamonds[1]:getId(), { current:objectName() })
 			end
 		end
 		cards = sgs.QList2Table(cards)
 		self:sortByUseValue(cards)
 		if #cards == 0 then return "." end
-		return "@YegeCard=".. cards[1]:getId() .."->" .. current:objectName()
+		return sgs.ai_skill_card_action_proposal("yege", "YegeCard", cards[1]:getId(), { current:objectName() })
 	end
 	return "."
 end
@@ -874,9 +874,9 @@ sgs.ai_skill_use["@@chuangshi"] = function(self, prompt)
 
 		self.player:setFlags("chuangshi")
 		if target then
-			return "@ChuangshiCard=.:" .. cardname .. "->" .. target:objectName()
+			return sgs.ai_skill_card_action_proposal("chuangshi", "ChuangshiCard", nil, { target:objectName() }, nil, cardname)
 		else
-			return "@ChuangshiCard=.:" .. cardname .. "->" .. user:objectName()
+			return sgs.ai_skill_card_action_proposal("chuangshi", "ChuangshiCard", nil, { user:objectName() }, nil, cardname)
 		end
 	end
 	return "."

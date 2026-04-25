@@ -86,14 +86,29 @@ public:
 
         QString cardname = Self->tag.value("shende").toString();
 
-        Card *peach = Sanguosha->cloneCard(cardname);
-        if (peach != nullptr) {
-            peach->addSubcards(cards);
-            peach->setSkillName("shende");
-            return peach;
+        return cloneViewAsCard(cardname, cards, objectName());
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 2 || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+
+        foreach (const Card *card, selected) {
+            if (card == nullptr || !ctx.player->getPile("shende").contains(card->getEffectiveId()))
+                return nullptr;
         }
 
-        return nullptr;
+        Card *card = cloneViewAsCard(extra.value(QStringLiteral("declaredCardName")).toString(), selected, objectName());
+        if (card == nullptr || card->getTypeId() != Card::TypeBasic) {
+            delete card;
+            return nullptr;
+        }
+        if (!isDeclaredCardUseValid(card, ctx)) {
+            delete card;
+            return nullptr;
+        }
+        return card;
     }
 };
 
@@ -473,12 +488,25 @@ public:
     const Card *viewAs(const QList<const Card *> &cards) const override
     {
         if (cards.length() == 2) {
-            DummyCard *c = new DummyCard;
-            c->addSubcards(cards);
-            return c;
+            return createViewAsCard<DummyCard>(cards, objectName());
         }
 
         return nullptr;
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() != 2 || !extra.isEmpty())
+            return nullptr;
+
+        QList<const Card *> accepted;
+        foreach (const Card *card, selected) {
+            if (card == nullptr || !isSubcardSelectionValid(accepted, card, CardUseGrant(), ctx))
+                return nullptr;
+            accepted << card;
+        }
+
+        return createViewAsCard<DummyCard>(selected, objectName());
     }
 };
 
@@ -840,6 +868,40 @@ public:
         }
 
         return nullptr;
+    }
+
+    bool isDeclaredCardNameAccepted(const QString &cardName, const QList<const Card *> &selected, const ActionRequestContext &ctx) const override
+    {
+        if (ctx.player == nullptr || selected.length() != 1)
+            return false;
+
+        Card *card = Sanguosha->cloneCard(cardName);
+        if (card == nullptr)
+            return false;
+        DELETE_OVER_SCOPE(Card, card)
+        card->setSkillName(objectName());
+        card->addSubcard(selected.first());
+
+        if ((!card->isNDTrick() && !card->isKindOf("BasicCard")) || Sanguosha->getBanPackages().contains(card->getPackage()))
+            return false;
+        if (card->isKindOf("Peach") && ctx.player->getMark("Global_PreventPeach") > 0)
+            return false;
+
+        return isDeclaredCardUseValid(card, ctx);
+    }
+
+    const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
+    {
+        if (selected.length() != 1 || extra.keys() != QStringList(QStringLiteral("declaredCardName")))
+            return nullptr;
+        if (!isSubcardSelectionValid(QList<const Card *>(), selected.first(), CardUseGrant(), ctx))
+            return nullptr;
+
+        const QString name = extra.value(QStringLiteral("declaredCardName")).toString();
+        if (!isDeclaredCardNameAccepted(name, selected, ctx))
+            return nullptr;
+
+        return cloneViewAsCard(name, selected, objectName(), QString(), Card::SuitToBeDecided, -1, false);
     }
 
     bool isEnabledAtNullification(const ServerPlayer *player) const override
