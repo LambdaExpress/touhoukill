@@ -201,6 +201,7 @@ struct CardUseGrant
 
     QStringList allowedCardClasses;
     QStringList allowedSkillNames;
+    QStringList allowedCardSkillNames;
 
     CardUseStruct::CardUseReason reason;
     Card::HandlingMethod method;

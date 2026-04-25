@@ -2019,11 +2019,17 @@ public:
         response_or_use = true;
     }
 
+    QStringList producedSkillNames() const override
+    {
+        return QStringList() << "xiaoyin";
+    }
+
     const Card *viewAs(const Card *c) const override
     {
         LureTiger *lure = new LureTiger(Card::SuitToBeDecided, 0);
         lure->addSubcard(c);
         lure->setSkillName("_xiaoyin");
+        lure->setShowSkill(objectName());
         return lure;
     }
 };

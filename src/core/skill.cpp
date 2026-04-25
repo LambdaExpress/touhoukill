@@ -34,8 +34,10 @@ void disposeValidationCard(const Card *card)
 
 bool skillNameMatchesGrant(const QString &skillName, const QStringList &allowedSkillNames)
 {
-    if (allowedSkillNames.isEmpty() || skillName.isEmpty())
+    if (skillName.isEmpty())
         return true;
+    if (allowedSkillNames.isEmpty())
+        return false;
     if (allowedSkillNames.contains(skillName))
         return true;
     if (skillName.startsWith("_") && allowedSkillNames.contains(skillName.mid(1)))
@@ -117,10 +119,15 @@ bool matchesGeneratedCard(const Card *expected, const Card *actual)
     return matched;
 }
 
-const Card *attachSkillNameToDummyCard(const Card *card, const QString &skillName)
+const Card *attachDefaultSkillNameToCard(const Card *card, const QString &skillName)
 {
-    if (card != nullptr && card->isKindOf("DummyCard") && card->getSkillName(false).isEmpty() && !skillName.isEmpty())
-        const_cast<Card *>(card)->setSkillName(skillName);
+    if (card != nullptr && !skillName.isEmpty()) {
+        Card *mutableCard = const_cast<Card *>(card);
+        if (card->getSkillName(false).isEmpty())
+            mutableCard->setSkillName(skillName);
+        if (card->showSkill().isEmpty())
+            mutableCard->setShowSkill(skillName);
+    }
     return card;
 }
 
@@ -421,6 +428,11 @@ QStringList ViewAsSkill::producedCardClasses() const
     return QStringList();
 }
 
+QStringList ViewAsSkill::producedSkillNames() const
+{
+    return QStringList() << objectName();
+}
+
 CardUseGrant ViewAsSkill::makeGrant(const Player *player, const ClientActionContext &ctx) const
 {
     CardUseGrant grant;
@@ -436,6 +448,7 @@ CardUseGrant ViewAsSkill::makeGrant(const Player *player, const ClientActionCont
     grant.player = ctx.player;
     grant.sourceSkill = objectName();
     grant.allowedSkillNames << objectName();
+    grant.allowedCardSkillNames = producedSkillNames();
     grant.allowedCardClasses = producedCardClasses();
     grant.reason = ctx.reason;
     grant.method = ctx.method;
@@ -456,6 +469,8 @@ CardUseGrant ViewAsSkill::makeGrant(const Player *player, const ClientActionCont
         grant.sourceKind = CardUseGrant::EquipSkill;
     else if (player->ownSkill(objectName()))
         grant.sourceKind = CardUseGrant::OwnedSkill;
+    else if (isRequestScopedResponse)
+        grant.sourceKind = CardUseGrant::RequestScopedGrant;
     else
         grant.sourceKind = CardUseGrant::HiddenGeneralSkill;
 
@@ -471,7 +486,7 @@ bool ViewAsSkill::isCardUseValid(const CardUseStruct &cardUse, const CardUseGran
         return false;
 
     const QString skillName = cardUse.card->getSkillName();
-    if (!skillNameMatchesGrant(skillName, grant.allowedSkillNames))
+    if (!skillNameMatchesGrant(skillName, grant.allowedCardSkillNames))
         return false;
 
     QList<const Card *> subcards;
@@ -674,7 +689,7 @@ ZeroCardViewAsSkill::ZeroCardViewAsSkill(const QString &name)
 const Card *ZeroCardViewAsSkill::viewAs(const QList<const Card *> &cards) const
 {
     if (cards.isEmpty())
-        return attachSkillNameToDummyCard(viewAs(), objectName());
+        return attachDefaultSkillNameToCard(viewAs(), objectName());
     else
         return nullptr;
 }
@@ -693,7 +708,7 @@ const Card *ZeroCardViewAsSkill::buildServerCard(const QList<const Card *> &sele
         return nullptr;
     if (usesClientSideViewAsState(objectName()))
         return buildDeclaredCardForServer(selected, ctx, extra, false);
-    const Card *card = attachSkillNameToDummyCard(viewAs(), objectName());
+    const Card *card = attachDefaultSkillNameToCard(viewAs(), objectName());
     if (!declaredCardNameMatches(extra, card)) {
         disposeValidationCard(card);
         return nullptr;
@@ -710,7 +725,11 @@ bool ZeroCardViewAsSkill::isGeneratedCardValid(const QList<const Card *> &select
     if (ctx.serverBuiltCard && usesClientSideViewAsState(objectName()))
         return true;
 
-    return matchesGeneratedCard(viewAs(), to_validate);
+    const bool skilllessDummy = to_validate != nullptr && to_validate->isKindOf("DummyCard") && to_validate->getSkillName(false).isEmpty();
+    const Card *expected = viewAs();
+    if (!skilllessDummy)
+        expected = attachDefaultSkillNameToCard(expected, objectName());
+    return matchesGeneratedCard(expected, to_validate);
 }
 
 bool ZeroCardViewAsSkill::viewFilter(const QList<const Card *> & /*selected*/, const Card * /*to_select*/) const
@@ -751,7 +770,7 @@ const Card *OneCardViewAsSkill::viewAs(const QList<const Card *> &cards) const
     if (cards.length() != 1)
         return nullptr;
     else
-        return attachSkillNameToDummyCard(viewAs(cards.first()), objectName());
+        return attachDefaultSkillNameToCard(viewAs(cards.first()), objectName());
 }
 
 bool OneCardViewAsSkill::isCardUseValid(const CardUseStruct &cardUse, const CardUseGrant &grant, const ClientActionContext &ctx) const
@@ -763,7 +782,7 @@ bool OneCardViewAsSkill::isCardUseValid(const CardUseStruct &cardUse, const Card
 
     const QString skillName = cardUse.card->getSkillName();
     const bool skilllessDummy = cardUse.card->isKindOf("DummyCard") && skillName.isEmpty();
-    if (!skilllessDummy && !skillNameMatchesGrant(skillName, grant.allowedSkillNames))
+    if (!skilllessDummy && !skillNameMatchesGrant(skillName, grant.allowedCardSkillNames))
         return false;
 
     QList<const Card *> subcards;
@@ -801,7 +820,7 @@ const Card *OneCardViewAsSkill::buildServerCard(const QList<const Card *> &selec
         return nullptr;
     if (usesClientSideViewAsState(objectName()))
         return buildDeclaredCardForServer(selected, ctx, extra, true);
-    const Card *card = attachSkillNameToDummyCard(viewAs(selected.first()), objectName());
+    const Card *card = attachDefaultSkillNameToCard(viewAs(selected.first()), objectName());
     if (!declaredCardNameMatches(extra, card)) {
         disposeValidationCard(card);
         return nullptr;
@@ -817,7 +836,11 @@ bool OneCardViewAsSkill::isGeneratedCardValid(const QList<const Card *> &selecte
         return false;
     if (ctx.serverBuiltCard && usesClientSideViewAsState(objectName()))
         return true;
-    return matchesGeneratedCard(viewAs(selected.first()), to_validate);
+    const bool skilllessDummy = to_validate != nullptr && to_validate->isKindOf("DummyCard") && to_validate->getSkillName(false).isEmpty();
+    const Card *expected = viewAs(selected.first());
+    if (!skilllessDummy)
+        expected = attachDefaultSkillNameToCard(expected, objectName());
+    return matchesGeneratedCard(expected, to_validate);
 }
 
 bool OneCardViewAsSkill::isSubcardSelectionValid(const QList<const Card *> &selected, const Card *to_select, const CardUseGrant &grant, const ClientActionContext &ctx) const

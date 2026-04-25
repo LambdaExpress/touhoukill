@@ -603,13 +603,19 @@ ActionProposal ActionProposal::fromCard(const Card *card, const QList<const Play
         inferredSkillName = inferredSkillName.toLower();
     }
 
+    QString shownSkillName = card->showSkill();
+    if (shownSkillName.startsWith(QChar('_')))
+        shownSkillName = shownSkillName.mid(1);
+
     ActionProposal proposal;
     proposal.skillName = sourceSkillName;
+    if (proposal.skillName.isEmpty())
+        proposal.skillName = shownSkillName;
     if (proposal.skillName.isEmpty())
         proposal.skillName = inferredSkillName;
     if (proposal.skillName.startsWith(QChar('_')))
         proposal.skillName = proposal.skillName.mid(1);
-    const bool delegatedByAnyun = card->isVirtualCard() && (sourceSkillName == QStringLiteral("anyun") || card->showSkill() == QStringLiteral("anyun"))
+    const bool delegatedByAnyun = card->isVirtualCard() && (proposal.skillName == QStringLiteral("anyun") || shownSkillName == QStringLiteral("anyun"))
         && !inferredSkillName.isEmpty() && inferredSkillName != QStringLiteral("anyun");
     if (delegatedByAnyun) {
         proposal.skillName = QStringLiteral("anyun");

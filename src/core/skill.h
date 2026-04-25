@@ -87,6 +87,7 @@ public:
 
     bool isAvailable(const Player *invoker, CardUseStruct::CardUseReason reason, const QString &pattern) const;
     virtual QStringList producedCardClasses() const;
+    virtual QStringList producedSkillNames() const;
     virtual CardUseGrant makeGrant(const Player *player, const ClientActionContext &ctx) const;
     virtual const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const;
     virtual bool isCardUseValid(const CardUseStruct &card_use, const CardUseGrant &grant, const ClientActionContext &ctx) const;

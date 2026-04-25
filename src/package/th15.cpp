@@ -1655,6 +1655,11 @@ public:
         filter_pattern = "BasicCard";
     }
 
+    QStringList producedSkillNames() const override
+    {
+        return QStringList() << "yidan";
+    }
+
     bool isEnabledAtPlay(const Player * /*player*/) const override
     {
         return false;
@@ -1669,6 +1674,7 @@ public:
     {
         Jink *jink = new Jink(Card::SuitToBeDecided, -1);
         jink->setSkillName("_yidan");
+        jink->setShowSkill(objectName());
         jink->addSubcard(originalCard);
         return jink;
     }

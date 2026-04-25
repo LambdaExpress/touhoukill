@@ -4299,6 +4299,7 @@ QList<CardUseGrant> Room::collectLongTermCardUseGrants(const ClientActionContext
         grant.sourceKind = CardUseGrant::ViewHasSkillSource;
         grant.sourceSkill = provider->objectName();
         grant.allowedSkillNames << skillName;
+        grant.allowedCardSkillNames = viewAsSkill->producedSkillNames();
         grant.allowedCardClasses = viewAsSkill->producedCardClasses();
         grant.reason = ctx.reason;
         grant.method = ctx.method;
@@ -4338,6 +4339,7 @@ QList<CardUseGrant> Room::collectLongTermCardUseGrants(const ClientActionContext
                 grant.sourceSkill = QStringLiteral("anyun");
                 grant.sourceGeneral = generalName;
                 grant.allowedSkillNames << viewAsSkill->objectName();
+                grant.allowedCardSkillNames = viewAsSkill->producedSkillNames();
                 grant.allowedCardClasses = viewAsSkill->producedCardClasses();
                 grant.reason = ctx.reason;
                 grant.method = ctx.method;
@@ -4404,7 +4406,7 @@ bool Room::findGrantThatExplains(const CardUseStruct &cardUse, const ClientActio
             continue;
         if (!card->isVirtualCard() && !grant.allowRealCard)
             continue;
-        if (!grant.requireViewAsValidation && !grant.allowedSkillNames.isEmpty() && (skillName.isEmpty() || !grant.allowedSkillNames.contains(skillName)))
+        if (!grant.requireViewAsValidation && !grant.allowedCardSkillNames.isEmpty() && (skillName.isEmpty() || !grantSkillListContains(grant.allowedCardSkillNames, skillName)))
             continue;
         if (grant.allowedCardClasses.isEmpty() && !grant.requireViewAsValidation)
             continue;
@@ -4555,7 +4557,8 @@ void Room::consumeCardUseGrant(const CardUseGrant &grant)
         CardUseGrant &storedGrant = m_cardUseGrants[i];
         const bool sameGrant = !grant.grantId.isEmpty() ? storedGrant.grantId == grant.grantId
                                                         : storedGrant.player == grant.player && storedGrant.sourceSkill == grant.sourceSkill
-                && storedGrant.allowedCardClasses == grant.allowedCardClasses && storedGrant.requestSerial == grant.requestSerial;
+                && storedGrant.allowedCardClasses == grant.allowedCardClasses && storedGrant.allowedCardSkillNames == grant.allowedCardSkillNames
+                && storedGrant.requestSerial == grant.requestSerial;
         if (!sameGrant)
             continue;
 

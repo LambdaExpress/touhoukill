@@ -722,6 +722,11 @@ public:
         response_or_use = true;
     }
 
+    QStringList producedSkillNames() const override
+    {
+        return QStringList() << "shihui";
+    }
+
     bool viewFilter(const QList<const Card *> &selected, const Card * /*to_select*/) const override
     {
         int maxnum = qMax(Self->getEquips().length(), 1);
@@ -732,7 +737,7 @@ public:
     {
         int maxnum = qMax(Self->getEquips().length(), 1);
         if (cards.length() == maxnum) {
-            return prepareViewAsCard(new ExNihilo(Card::SuitToBeDecided, -1), cards, "_shihui");
+            return prepareViewAsCard(new ExNihilo(Card::SuitToBeDecided, -1), cards, "_shihui", objectName());
         } else
             return nullptr;
     }
@@ -744,7 +749,7 @@ public:
         if (!acceptsDeclaredCardName(extra, QStringLiteral("ex_nihilo")))
             return nullptr;
 
-        return prepareViewAsCard(new ExNihilo(Card::SuitToBeDecided, -1), selected, "_shihui");
+        return prepareViewAsCard(new ExNihilo(Card::SuitToBeDecided, -1), selected, "_shihui", objectName());
     }
 };
 

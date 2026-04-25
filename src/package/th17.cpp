@@ -54,6 +54,11 @@ public:
         response_pattern = "@@LingshouOtherVS";
     }
 
+    QStringList producedSkillNames() const override
+    {
+        return QStringList() << "lingshou";
+    }
+
     bool viewFilter(const QList<const Card *> & /*selected*/, const Card *to_select) const override
     {
         bool ok = false;
@@ -99,7 +104,7 @@ public:
             }
         }
 
-        return prepareViewAsCard(new Slash(Card::SuitToBeDecided, -1), cards, "_lingshou");
+        return prepareViewAsCard(new Slash(Card::SuitToBeDecided, -1), cards, "_lingshou", objectName());
     }
 
     const Card *buildServerCard(const QList<const Card *> &selected, const ActionRequestContext &ctx, const JsonObject &extra) const override
@@ -142,7 +147,7 @@ public:
                 return nullptr;
         }
 
-        return prepareViewAsCard(new Slash(Card::SuitToBeDecided, -1), selected, "_lingshou");
+        return prepareViewAsCard(new Slash(Card::SuitToBeDecided, -1), selected, "_lingshou", objectName());
     }
 };
 
