@@ -7,6 +7,12 @@
 #include <QSequentialAnimationGroup>
 #include <QtMath>
 
+namespace {
+// Fraction of the source size that EmphasizeEffect::boundingRectFor() adds as padding on
+// each side. draw() has to undo exactly this to recover the source box.
+const qreal S_EMPHASIZE_PADDING = 0.1;
+} // namespace
+
 EffectAnimation::EffectAnimation(QObject *parent)
     : QObject(parent)
 {
@@ -116,24 +122,36 @@ EmphasizeEffect::EmphasizeEffect(bool stay)
 
 void EmphasizeEffect::draw(QPainter *painter)
 {
-    QSizeF s = sourceBoundingRect().size();
+    QPoint offset;
+    QPixmap pixmap = sourcePixmap(Qt::LogicalCoordinates, &offset);
+    if (pixmap.isNull())
+        return;
+
+    // The target is measured in the logical coordinates the painter draws in, which are
+    // the same ones boundingRect() is expressed in.
+    const QSizeF source = sourceBoundingRect().size();
     qreal scale = (-qAbs(index - 50) + 50) / 1000.0;
     scale = 0.1 - scale;
 
-    QPoint offset;
-    QPixmap pixmap = sourcePixmap(Qt::LogicalCoordinates, &offset);
-    const QRectF target = boundingRect().adjusted((s.width() * scale) - 1, s.height() * scale, -s.width() * scale, -s.height() * scale);
-    const QRectF source(s.width() * 0.1, s.height() * 0.1, s.width(), s.height());
+    const QRectF target = boundingRect().adjusted((source.width() * scale) - 1, source.height() * scale, -source.width() * scale, -source.height() * scale);
+    // An explicit source rectangle is in the pixmap's own pixels, not in the logical
+    // units used above: the pixmap holds the source grown by the padding on each side
+    // and then by the device pixel ratio. Reading the source size straight out of
+    // sourceBoundingRect() therefore cut a rectangle a few times too small out of the
+    // top left corner and stretched it over the whole target, so an emphasised card
+    // showed nothing but its number and suit. Only a device pixel ratio of 1 makes the
+    // two spaces agree, which is why this never showed on the desktop.
+    const qreal dpr = pixmap.devicePixelRatio();
+    const QRectF sourceRect(source.width() * S_EMPHASIZE_PADDING * dpr, source.height() * S_EMPHASIZE_PADDING * dpr, source.width() * dpr, source.height() * dpr);
 
     painter->setRenderHint(QPainter::SmoothPixmapTransform);
-    painter->drawPixmap(target, pixmap, source);
+    painter->drawPixmap(target, pixmap, sourceRect);
 }
 
 QRectF EmphasizeEffect::boundingRectFor(const QRectF &sourceRect) const
 {
-    qreal scale = 0.1;
     QRectF rect(sourceRect);
-    rect.adjust(-sourceRect.width() * scale, -sourceRect.height() * scale, sourceRect.width() * scale, sourceRect.height() * scale);
+    rect.adjust(-sourceRect.width() * S_EMPHASIZE_PADDING, -sourceRect.height() * S_EMPHASIZE_PADDING, sourceRect.width() * S_EMPHASIZE_PADDING, sourceRect.height() * S_EMPHASIZE_PADDING);
     return rect;
 }
 
