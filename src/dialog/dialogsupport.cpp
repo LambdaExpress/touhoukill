@@ -1,10 +1,12 @@
 #include "dialogsupport.h"
 
 #include <QApplication>
+#include <QAbstractScrollArea>
 #include <QDialog>
 #include <QEvent>
 #include <QFrame>
 #include <QGuiApplication>
+#include <QHeaderView>
 #include <QLayout>
 #include <QMouseEvent>
 #include <QScreen>
@@ -27,6 +29,20 @@ QSize availableScreenSize()
 }
 
 #ifdef Q_OS_ANDROID
+// Converts a drag distance in viewport pixels into the units this scroll bar counts
+// in, which differs by widget. A scroll area scrolls per pixel, so its page step is
+// the viewport extent and the ratio is one. An item view such as a table scrolls per
+// row by default, and its page step is the number of rows that fit, so the ratio
+// turns out to be one row per row height. Feeding pixels straight to the value of a
+// table therefore scrolls a row per pixel, which throws the list hundreds of entries
+// down the screen on the slightest drag.
+int pixelsToScrollUnits(const QScrollBar *bar, int pixels, int viewportExtent)
+{
+    if (bar->pageStep() <= 0 || viewportExtent <= 0)
+        return pixels;
+    return qRound(pixels * static_cast<qreal>(bar->pageStep()) / viewportExtent);
+}
+
 // Drag-to-scroll for the wrapped pages.
 //
 // QScroller was tried first and is not usable here: its gesture recogniser
@@ -37,7 +53,7 @@ QSize availableScreenSize()
 class DragScrollFilter : public QObject
 {
 public:
-    explicit DragScrollFilter(QScrollArea *area)
+    explicit DragScrollFilter(QAbstractScrollArea *area)
         : QObject(area)
         , m_area(area)
         , m_pressed(false)
@@ -79,10 +95,10 @@ protected:
             m_lastPosition = mouseEvent->pos();
 
             QScrollBar *vertical = m_area->verticalScrollBar();
-            vertical->setValue(vertical->value() - step.y());
+            vertical->setValue(vertical->value() - pixelsToScrollUnits(vertical, step.y(), m_area->viewport()->height()));
             if (m_area->horizontalScrollBarPolicy() != Qt::ScrollBarAlwaysOff) {
                 QScrollBar *horizontal = m_area->horizontalScrollBar();
-                horizontal->setValue(horizontal->value() - step.x());
+                horizontal->setValue(horizontal->value() - pixelsToScrollUnits(horizontal, step.x(), m_area->viewport()->width()));
             }
 
             return true; // consumed, otherwise the content would also pan itself
@@ -101,11 +117,34 @@ protected:
     }
 
 private:
-    QScrollArea *m_area;
+    QAbstractScrollArea *m_area;
     QPoint m_lastPosition;
     bool m_pressed;
     bool m_dragging;
 };
+
+// A scrollable widget that Qt drives like a mouse-driven one neither reacts to a
+// finger nor lets the gesture through, so a drag that starts on it is simply lost.
+// The overview dialogs show this plainly: dragging beside their table scrolls the
+// page, dragging the table itself does nothing. Every scroll area inside a dialog
+// therefore gets the filter, the wrapper included. A drag is consumed by the
+// innermost area under the finger, so nested areas do not scroll together.
+void attachDragScroll(QAbstractScrollArea *area)
+{
+    // A header has scroll bars it never uses; taking its drags would only interfere
+    // with resizing and reordering sections by hand.
+    if (qobject_cast<QHeaderView *>(area) != nullptr)
+        return;
+
+    // Dialogs are shown repeatedly, and one filter per viewport is enough: two of
+    // them would apply every drag twice.
+    QWidget *viewport = area->viewport();
+    if (viewport->property("sgsDragScroll").toBool())
+        return;
+
+    viewport->setProperty("sgsDragScroll", true);
+    new DragScrollFilter(area);
+}
 #endif // Q_OS_ANDROID
 
 class DialogScreenFilter : public QObject
@@ -156,6 +195,10 @@ private:
         if (available.isEmpty())
             return;
 
+#ifdef Q_OS_ANDROID
+        installDragScroll(dialog);
+#endif
+
         if (!m_wrapped.contains(dialog)) {
             const QSize wanted = dialog->sizeHint();
             if (wanted.width() <= available.width() && wanted.height() <= available.height()) {
@@ -198,7 +241,7 @@ private:
             // content itself has to work. Qt synthesises mouse events from touch,
             // which is what the filter consumes.
 #ifdef Q_OS_ANDROID
-            new DragScrollFilter(area);
+            attachDragScroll(area);
 #endif
 
             QVBoxLayout *outer = new QVBoxLayout(dialog);
@@ -225,6 +268,14 @@ private:
         if (grownWidth > dialog->width() && dialog->height() > 0)
             dialog->resize(grownWidth, dialog->height());
     }
+
+#ifdef Q_OS_ANDROID
+    void installDragScroll(QDialog *dialog)
+    {
+        foreach (QAbstractScrollArea *area, dialog->findChildren<QAbstractScrollArea *>())
+            attachDragScroll(area);
+    }
+#endif
 
     void clamp(QDialog *dialog)
     {
