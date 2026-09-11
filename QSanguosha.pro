@@ -21,8 +21,9 @@ lessThan(QT_MINOR_VERSION, 6) {
 CONFIG += c++11
 CONFIG += lua
 
-VERSION = 0.10.11
-VERSIONNUMBER = 20250705
+# Matches the released 20240727 server so that clients can connect to it.
+VERSION = 0.10.10
+VERSIONNUMBER = 20240727
 
 CONFIG += precompiled_header
 PRECOMPILED_HEADER = src/pch.h

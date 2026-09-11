@@ -80,7 +80,7 @@ config = {
 		"TH15",
 		"TH16",
 		"TH17",
-		"TH18",
+		-- "TH18", -- 尚未完成，与 20240727 服务端保持一致
 		-- "TH19",
 		-- "TH20",
 		"TH99",
@@ -89,7 +89,7 @@ config = {
 		"HegemonyGeneral",
 		"Standard", --此包内带pattern的定义 不能屏蔽。。。
 		"Test",
-		"Playground",
+		-- "Playground", -- 开发用测试包，发布前屏蔽
 	},
 
 	hulao_packages = {
