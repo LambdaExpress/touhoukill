@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+       android:shape="rectangle">
+    <!--
+        Stands in for Android's cursor handle, the blue teardrop the framework floats
+        above a text caret so it can be dragged, and which the theme below replaces.
+
+        Qt asks for one whenever a text field holds the cursor
+        (QtActivityDelegate.updateHandles) and the framework resolves it from
+        textSelectHandle on the current theme, which on Holo Light is that teardrop.
+        Three problems with it here:
+
+          * a game's name and chat fields do not need caret dragging, and the shape
+            reads as a stray artefact rather than as a control;
+          * it is drawn by a PopupWindow that outlives the dialog that opened it, so
+            it was left floating over the start scene once the connection dialog
+            closed;
+          * it sits on top of the scene, so a press meant for whatever is underneath
+            lands on the handle instead.
+
+        A transparent square keeps the code that measures it from meeting a null
+        drawable, while showing nothing. The caret, the keyboard and text selection
+        all still work; only the drag handle is gone.
+    -->
+    <size android:width="1dp" android:height="1dp"/>
+    <solid android:color="@android:color/transparent"/>
+</shape>

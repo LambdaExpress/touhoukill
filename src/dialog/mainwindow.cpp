@@ -147,8 +147,28 @@ public:
 
 #ifdef Q_OS_ANDROID
 private:
+    // A held press stands in for the right button, which a touch screen does not have,
+    // but only where the right button does something: a card, a player photo or the
+    // table background. A control that declares the left button alone -- the menu
+    // buttons, the skill dock -- is clicked with a single button, so substituting a
+    // right click there brings nothing and costs everything: the release is swallowed
+    // and the control never fires. A deliberate press easily outlasts the long-press
+    // interval, which is what made every button in the interface look dead.
+    bool rightClickIsMeaningful() const
+    {
+        const QGraphicsItem *item = itemAt(m_pressPosition);
+        if (item == nullptr)
+            return true;
+
+        const Qt::MouseButtons accepted = item->acceptedMouseButtons();
+        return (accepted & Qt::LeftButton) == 0 || (accepted & Qt::RightButton) != 0;
+    }
+
     void emitSyntheticRightClick()
     {
+        if (!rightClickIsMeaningful())
+            return;
+
         m_rightClickEmitted = true;
 
         const QPoint viewportPos = m_pressPosition;
@@ -175,7 +195,11 @@ private:
     QPoint m_pressPosition;
     bool m_rightClickEmitted = false;
 
-    static const int LONG_PRESS_INTERVAL = 500;
+    // Deliberately longer than the platform's 500 ms long press. The gesture is a
+    // secondary action here, so mistaking an ordinary press for it is worse than
+    // making the gesture itself slower; on a loaded device the press and the release
+    // arrive with enough of a gap between them to reach 500 ms on their own.
+    static const int LONG_PRESS_INTERVAL = 700;
     static const int DRAG_TOLERANCE = 10;
 #endif
 };

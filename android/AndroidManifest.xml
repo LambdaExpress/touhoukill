@@ -16,7 +16,15 @@
          (QtActivityLoader defaults to Theme_Holo_Light) while dropping the title bar
          and the status bar. QtActivityLoader derives its theme from this resource,
          and src/main.cpp additionally hides the action bar at runtime because Qt
-         requests that feature unconditionally. -->
+         requests that feature unconditionally.
+
+         It has to stay a framework style. QtActivityLoader picks the theme it sets by
+         looking the activity's theme resource up among the fields of android.R$style,
+         and an application-defined style is not one of them: the lookup fails, Qt's
+         setTheme call throws, and the window is left without the no-title flags this
+         one carries. TouhouKillTheme in res/values/styles.xml, which hides the
+         floating text cursor handle, is applied at runtime instead; see
+         configureAndroidWindow() in src/main.cpp. -->
     <!-- android:icon comes from res/mipmap-*/ic_launcher.png, generated from the
          desktop build's resource/icon/sgs.ico so the phone shows the same artwork as
          the Windows executable rather than Qt's default. -->

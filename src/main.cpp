@@ -22,6 +22,34 @@
 #ifdef Q_OS_ANDROID
 namespace {
 
+// Replaces Android's text cursor handle, the blue teardrop the framework floats above a
+// caret so it can be dragged, with a transparent square. It has no place in a game's
+// name and chat fields, and it was being left behind over the scene after the dialog
+// that opened it had closed.
+//
+// The handle is resolved from textSelectHandle on the activity theme, and that theme
+// stays the framework style the manifest declares: QtActivityLoader picks the theme it
+// sets by looking the activity's theme resource up among the fields of android.R$style,
+// which an application style is not among, so declaring one there costs the window its
+// no-title flags and an action bar appears. Setting it here instead leaves the window
+// exactly as it was -- the decor is already built, so only what is resolved from the
+// theme from now on changes -- and the popup Qt creates when a field gains the caret
+// picks the replacement up.
+void useCustomTheme(QAndroidJniObject &activity)
+{
+    QAndroidJniObject resources = activity.callObjectMethod("getResources", "()Landroid/content/res/Resources;");
+    QAndroidJniObject packageName = activity.callObjectMethod("getPackageName", "()Ljava/lang/String;");
+    if (!resources.isValid() || !packageName.isValid())
+        return;
+
+    QAndroidJniObject name = QAndroidJniObject::fromString(QStringLiteral("TouhouKillTheme"));
+    QAndroidJniObject kind = QAndroidJniObject::fromString(QStringLiteral("style"));
+    const jint id = resources.callMethod<jint>("getIdentifier", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I", name.object<jstring>(),
+                                               kind.object<jstring>(), packageName.object<jstring>());
+    if (id != 0)
+        activity.callMethod<void>("setTheme", "(I)V", id);
+}
+
 // Turns the Qt activity into a game window: no action bar, no status bar.
 //
 // Everything here must run on the Android UI thread. main() runs on Qt's
@@ -34,6 +62,8 @@ void configureAndroidWindow()
         QAndroidJniObject activity = QtAndroid::androidActivity();
         if (!activity.isValid())
             return;
+
+        useCustomTheme(activity);
 
         // QtActivityLoader requests Window.FEATURE_ACTION_BAR unconditionally, so a
         // bar can exist even when the activity theme asks for none; hiding it is

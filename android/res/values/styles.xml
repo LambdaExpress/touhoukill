@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Applied at runtime by configureAndroidWindow() in src/main.cpp, not declared in
+        the manifest.
+
+        It exists to hide Android's text cursor handle, the blue teardrop the framework
+        floats above a caret so it can be dragged, and which has no place over this
+        game's name and chat fields. Qt asks for a handle whenever a text field holds
+        the caret (QtActivityDelegate.updateHandles) and the framework resolves it from
+        textSelectHandle on the activity theme; the parent below carries the Holo Light
+        value, which is that teardrop.
+
+        The handle lives in the text appearance rather than in a widget style, so a
+        theme is the only way to replace it; there is no per-widget call.
+
+        The parent matches the manifest theme, so setting this one later changes nothing
+        else. It deliberately carries no window flags: the window is already built by
+        the time this is applied, and declaring a style here that the manifest used
+        instead would cost the window its no-title flags, because QtActivityLoader
+        looks the manifest theme up among the fields of android.R$style and does not
+        find an application style there.
+    -->
+    <style name="TouhouKillTheme"
+           parent="@android:style/Theme.Holo.Light.NoActionBar.Fullscreen">
+        <item name="android:textSelectHandle">@drawable/empty_cursor_handle</item>
+        <item name="android:textSelectHandleLeft">@drawable/empty_cursor_handle</item>
+        <item name="android:textSelectHandleRight">@drawable/empty_cursor_handle</item>
+    </style>
+</resources>
