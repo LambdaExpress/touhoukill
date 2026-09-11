@@ -167,21 +167,29 @@ ChooseGeneralDialog::ChooseGeneralDialog(const QStringList &general_names, QWidg
     dialog_layout->addLayout(layout);
 
     if (!view_only) {
+        QLabel *role_label = nullptr;
         if (isHegemonyGameMode(ServerInfo.GameMode) || ServerInfo.GameMode == "04_2v2") {
             //need a seat prompt
-            QLabel *seat_label = new QLabel(
+            role_label = new QLabel(
                 tr("Your seat is %1. role is %2").arg(Sanguosha->translate("CAPITAL(" + QString::number(Self->getSeat()) + ")")).arg(Sanguosha->translate(Self->getRole())));
-            dialog_layout->addWidget(seat_label);
         } else {
             // role prompt
-            QLabel *role_label = new QLabel(tr("Your role is %1").arg(Sanguosha->translate(Self->getRole())));
+            role_label = new QLabel(tr("Your role is %1").arg(Sanguosha->translate(Self->getRole())));
             if (lord_name.size() != 0)
                 role_label->setText(tr("The lord has chosen %1. Your seat is %2. %3")
                                         .arg(Sanguosha->translate(lord_name))
                                         .arg(Sanguosha->translate("CAPITAL(" + QString::number(Self->getSeat()) + ")"))
                                         .arg(role_label->text()));
-            dialog_layout->addWidget(role_label);
         }
+#ifdef Q_OS_ANDROID
+        // The card grid is taller than a phone screen, so the dialog scrolls and a line
+        // placed under the grid is only visible after scrolling down. Which general to
+        // pick depends on the role, so on a phone the prompt goes above the grid, where
+        // it is on screen from the moment the dialog opens.
+        dialog_layout->insertWidget(0, role_label);
+#else
+        dialog_layout->addWidget(role_label);
+#endif
     }
 
     // progress bar & free choose button

@@ -262,20 +262,28 @@ void Dashboard::_createRight()
     _paintPixmap(_m_rightFrameBg, QRect(0, 0, rect.width(), rect.height()), _getPixmap(QSanRoomSkin::S_SKIN_KEY_RIGHTFRAME), _m_rightFrame);
     _m_rightFrame->setZValue(-1000); // nobody should be under me.
 
+    // A dock is positioned on the bottom edge of its lowest row of buttons: the row
+    // extends upwards from there, one row height per row. The offset below is measured
+    // from the bottom edge rather than from the row height, so that a skin which asks
+    // for taller buttons grows them upwards instead of pushing them off the dashboard.
+    // For the default 26 unit artwork this is the same position as the original
+    // expression, avatar.bottom() + 26 - 25.
+    const int skillDockBaseline = 1;
+
     _m_skillDock = new QSanInvokeSkillDock(_m_rightFrame);
     QRect avatar = G_DASHBOARD_LAYOUT.m_avatarArea; //(ServerInfo.Enable2ndGeneral) ? G_DASHBOARD_LAYOUT.m_avatarAreaDouble : G_DASHBOARD_LAYOUT.m_avatarArea; // m_headAvatarArea;
 
     if (ServerInfo.Enable2ndGeneral) {
-        _m_skillDock->setPos(avatar.left() + 5, avatar.bottom() + G_DASHBOARD_LAYOUT.m_skillButtonsSize[0].height() - 25);
+        _m_skillDock->setPos(avatar.left() + 5, avatar.bottom() + skillDockBaseline);
         _m_skillDock->setWidth(avatar.width() / 2);
     } else {
-        _m_skillDock->setPos(avatar.left() + 25, avatar.bottom() + G_DASHBOARD_LAYOUT.m_skillButtonsSize[0].height() - 25);
+        _m_skillDock->setPos(avatar.left() + 25, avatar.bottom() + skillDockBaseline);
         _m_skillDock->setWidth(avatar.width() - 50);
     }
 
     _m_rightSkillDock = new QSanInvokeSkillDock(_m_rightFrame);
     QRect avatar2 = G_DASHBOARD_LAYOUT.m_smallAvatarArea; //m_smallAvatarArea;//G_DASHBOARD_LAYOUT.;
-    _m_rightSkillDock->setPos(avatar2.left() - 10, avatar2.bottom() + G_DASHBOARD_LAYOUT.m_skillButtonsSize[0].height() - 25);
+    _m_rightSkillDock->setPos(avatar2.left() - 10, avatar2.bottom() + skillDockBaseline);
     _m_rightSkillDock->setWidth(avatar2.width() - 50);
 
     _m_skillDock->setObjectName("left");

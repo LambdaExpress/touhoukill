@@ -20,6 +20,8 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QCommandLinkButton>
+#include <QContextMenuEvent>
+#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDesktopServices>
 #include <QDialogButtonBox>
@@ -35,6 +37,7 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QProcess>
@@ -44,6 +47,7 @@
 #include <QStatusBar>
 #include <QSystemTrayIcon>
 #include <QTime>
+#include <QTimer>
 #include <QToolButton>
 #include <QVariant>
 #include <QtMath>
@@ -61,7 +65,54 @@ public:
     {
         setSceneRect(Config.Rect);
         setRenderHints(QPainter::TextAntialiasing | QPainter::Antialiasing);
+#ifdef Q_OS_ANDROID
+        // Touch input arrives as left-button mouse events, while the game relies on
+        // the right button to cancel a selected card and to open the scene's context
+        // menus. A press that is held without moving becomes a right click.
+        m_longPressTimer.setSingleShot(true);
+        m_longPressTimer.setInterval(LONG_PRESS_INTERVAL);
+        connect(&m_longPressTimer, &QTimer::timeout, this, [this]() { emitSyntheticRightClick(); });
+        viewport()->installEventFilter(this);
+#endif
     }
+
+#ifdef Q_OS_ANDROID
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (watched != viewport())
+            return QGraphicsView::eventFilter(watched, event);
+
+        switch (event->type()) {
+        case QEvent::MouseButtonPress: {
+            const QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() != Qt::LeftButton)
+                break;
+            m_pressPosition = mouseEvent->pos();
+            m_longPressTimer.start();
+            break;
+        }
+        case QEvent::MouseMove: {
+            const QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (m_longPressTimer.isActive() && (mouseEvent->pos() - m_pressPosition).manhattanLength() > DRAG_TOLERANCE)
+                m_longPressTimer.stop();
+            break;
+        }
+        case QEvent::MouseButtonRelease:
+            m_longPressTimer.stop();
+            if (m_rightClickEmitted) {
+                // The long press already delivered its own right click, so the real
+                // release must not additionally act as a left click.
+                m_rightClickEmitted = false;
+                return true;
+            }
+            break;
+        default:
+            break;
+        }
+
+        return QGraphicsView::eventFilter(watched, event);
+    }
+#endif
 
     void resizeEvent(QResizeEvent *event) override
     {
@@ -84,12 +135,49 @@ public:
             QRectF newSceneRect(-event->size().width() / 2, -event->size().height() / 2, event->size().width(), event->size().height());
             start_scene->setSceneRect(newSceneRect);
             setSceneRect(start_scene->sceneRect());
-            if (newSceneRect != start_scene->sceneRect())
-                fitInView(start_scene->sceneRect(), Qt::KeepAspectRatio);
+            // The start scene is laid out in viewport coordinates, so it is shown one to
+            // one. The transform has to be cleared explicitly because a room scene may
+            // have left its own fitInView transform behind.
+            resetTransform();
+            start_scene->adjustItems();
         }
         if (main_window != nullptr)
             main_window->setBackgroundBrush(true);
     }
+
+#ifdef Q_OS_ANDROID
+private:
+    void emitSyntheticRightClick()
+    {
+        m_rightClickEmitted = true;
+
+        const QPoint viewportPos = m_pressPosition;
+        const QPoint globalPos = viewport()->mapToGlobal(viewportPos);
+
+        QMouseEvent press(QEvent::MouseButtonPress, viewportPos, globalPos, Qt::RightButton, Qt::RightButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(viewport(), &press);
+        QMouseEvent release(QEvent::MouseButtonRelease, viewportPos, globalPos, Qt::RightButton, Qt::NoButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(viewport(), &release);
+
+        // A real right click is followed by a context menu event, which is the only
+        // way to reach the room's miscellaneous menu. It is delivered to the
+        // viewport just like the real one: the scroll area's filter routes it to
+        // QGraphicsView::contextMenuEvent, which converts the viewport position to
+        // scene coordinates itself. Calling QWidget::mapFrom here instead would be
+        // wrong -- it requires the argument to be an ancestor of the widget, while
+        // the viewport is a child of the view, and it dereferences null in release
+        // builds once the walk runs off the top of the parent chain.
+        QContextMenuEvent contextMenuEvent(QContextMenuEvent::Mouse, viewportPos, globalPos);
+        QCoreApplication::sendEvent(viewport(), &contextMenuEvent);
+    }
+
+    QTimer m_longPressTimer;
+    QPoint m_pressPosition;
+    bool m_rightClickEmitted = false;
+
+    static const int LONG_PRESS_INTERVAL = 500;
+    static const int DRAG_TOLERANCE = 10;
+#endif
 };
 
 MainWindow::MainWindow(QWidget *parent)

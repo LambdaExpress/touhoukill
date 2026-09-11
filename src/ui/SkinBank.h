@@ -241,6 +241,11 @@ public:
         QSize m_skillButtonsSize[3];
         QRect m_skillTextArea[3];
         QRect m_skillTextAreaDown[3];
+        // A skill button takes its size from its background pixmap, not from a rectangle
+        // the layout could compute, so a skin that needs taller buttons has to stretch
+        // the artwork. The text areas are authored against the stretched artwork.
+        qreal m_skillButtonWidthScale = 1.0;
+        qreal m_skillButtonHeightScale = 1.0;
         QPoint m_equipBorderPos;
         QPoint m_equipSelectedOffset;
         int m_disperseWidth;
@@ -469,6 +474,7 @@ public:
 
     QString S_DEFAULT_SKIN_NAME;
     QString S_COMPACT_SKIN_NAME;
+    QString S_PHONE_SKIN_NAME;
 
 protected:
     explicit QSanSkinFactory(const char *fileName);

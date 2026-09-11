@@ -47,9 +47,6 @@ GeneralCardItem::GeneralCardItem(const QString &generalName) //, const int skinI
     setOuterGlowEffectEnabled(true);
     setOuterGlowColor(Sanguosha->getKingdomColor(general->getKingdom()));
     //setOuterGlowColor(Sanguosha->getKingdomColor("wei"));
-#ifdef Q_OS_ANDROID
-    moveRange = 1.0;
-#endif
 }
 
 void GeneralCardItem::changeGeneral(const QString &generalName)
@@ -102,39 +99,10 @@ void GeneralCardItem::hideCompanion()
     update();
 }
 
-#ifdef Q_OS_ANDROID
-void GeneralCardItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
-{
-    pressPos = event->pos();
-    timerLongPress.setInterval(1000);
-    timerLongPress.setSingleShot(true);
-    outOfRange = false;
-    timerLongPress.start();
-}
-
-void GeneralCardItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
-{
-    qreal curX = event->pos().x(), curY = event->pos().y();
-    qreal pressX = pressPos.x(), pressY = pressPos.y();
-
-    if (curX < pressX - moveRange || curX > pressX + moveRange || curY < pressY - moveRange || curY > pressY + moveRange)
-        outOfRange = true;
-    CardItem::mouseMoveEvent(event);
-}
-
-#endif
-
 void GeneralCardItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-#ifdef Q_OS_ANDROID
-    qreal releaseX = event->pos().x(), releaseY = event->pos().y();
-    qreal pressX = pressPos.x(), pressY = pressPos.y();
-
-    if (ServerInfo.FreeChoose && !outOfRange && !timerLongPress.isActive() && releaseX >= pressX - moveRange && releaseX <= pressX + moveRange && releaseY >= pressY - moveRange
-        && releaseY <= pressY + moveRange) {
-#else
+    // On Android the right button is produced by FitView's long-press handler.
     if (ServerInfo.FreeChoose && Qt::RightButton == event->button()) {
-#endif
         FreeChooseDialog *general_changer = new FreeChooseDialog(QApplication::focusWidget());
         connect(general_changer, &FreeChooseDialog::general_chosen, this, &GeneralCardItem::changeGeneral);
         general_changer->exec();

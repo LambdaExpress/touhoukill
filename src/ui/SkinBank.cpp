@@ -262,7 +262,15 @@ QPixmap QSanRoomSkin::getSkillButtonPixmap(QSanButton::ButtonState state, QSanIn
             arg2 = "2";
         else if (width == QSanInvokeSkillButton::S_WIDTH_WIDE)
             arg2 = "1";
-        return getPixmapFromFileName(path.arg(arg2));
+        QPixmap pixmap = getPixmapFromFileName(path.arg(arg2));
+        const qreal widthScale = _m_dashboardLayout.m_skillButtonWidthScale;
+        const qreal heightScale = _m_dashboardLayout.m_skillButtonHeightScale;
+        // A phone skin stretches the artwork to reach a tappable height. The two axes
+        // scale independently because the horizontal extent is fixed by how many
+        // buttons the dock packs into a row.
+        if (!qFuzzyCompare(widthScale, static_cast<qreal>(1.0)) || !qFuzzyCompare(heightScale, static_cast<qreal>(1.0)))
+            pixmap = pixmap.scaled(QSize(qMax(1, qRound(pixmap.width() * widthScale)), qMax(1, qRound(pixmap.height() * heightScale))), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        return pixmap;
     }
 }
 
@@ -1055,6 +1063,16 @@ bool QSanRoomSkin::_loadLayoutConfig(const QVariant &layout)
     JsonArray configTextArea = config["textArea"].value<JsonArray>();
     JsonArray configTextAreaDown = config["textAreaDown"].value<JsonArray>();
     JsonArray configTextFont = config["textFont"].value<JsonArray>();
+    // Always reassigned so that switching to a skin without these keys restores the
+    // unscaled state; the layout object is reused across skin switches.
+    qreal widthScale = 1.0;
+    if (!JsonUtils::tryParse(config["pixmapWidthScale"], widthScale) || widthScale <= 0)
+        widthScale = 1.0;
+    qreal heightScale = 1.0;
+    if (!JsonUtils::tryParse(config["pixmapHeightScale"], heightScale) || heightScale <= 0)
+        heightScale = 1.0;
+    _m_dashboardLayout.m_skillButtonWidthScale = widthScale;
+    _m_dashboardLayout.m_skillButtonHeightScale = heightScale;
     for (int i = 0; i < 3; i++) {
         int height = 0;
         if (tryParse(config["height"], height))
@@ -1180,11 +1198,19 @@ QSanSkinFactory::QSanSkinFactory(const char *fileName)
 {
     S_DEFAULT_SKIN_NAME = "default";
     S_COMPACT_SKIN_NAME = "compact";
+    S_PHONE_SKIN_NAME = "phone";
 
     JsonDocument doc = JsonDocument::fromFilePath(fileName);
     _m_skinList = doc.object();
     _m_skinName = "";
+#ifdef Q_OS_ANDROID
+    // The phone skin is selected for the device rather than for the window size: touch
+    // targets and font sizes have to suit a finger on a small screen, which the
+    // desktop-oriented default and compact skins do not.
+    switchSkin(S_PHONE_SKIN_NAME);
+#else
     switchSkin(S_DEFAULT_SKIN_NAME);
+#endif
 }
 
 const QString &QSanSkinFactory::getCurrentSkinName() const

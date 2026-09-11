@@ -1,0 +1,178 @@
+{
+// Phone skin. Loaded on Android instead of the size driven default/compact pair, because
+// neither of those is designed for a touch screen: the view here is roughly 845x400
+// logical pixels, which the room scene scales down to about 0.73, so every measurement
+// below is worth 0.73 logical pixels on the device and the values are chosen to land on
+// finger sized targets. The file is a superset of compactSkinAlt.layout.json: keys the
+// phone skin does not mention fall through to defaultSkinAlt.layout.json.
+"common":
+{
+    "chooseGeneralBoxSwitchIconSizeThreshold": 10,
+    "chooseGeneralBoxSwitchIconEachRow": 5,
+    "chooseGeneralBoxSwitchIconEachRowForTooManyGenerals": 6,
+    "chooseGeneralBoxNoIconThreshold": 24,
+    // These two are in logical pixels, not scene units: they are handed straight to
+    // QAbstractButton::setIconSize by ChooseGeneralDialog, which is an unscaled dialog.
+    // Five columns of 124 plus the lord's card fit inside the 845 pixel wide screen.
+    "chooseGeneralBoxSparseIconSize": [124, 174],
+    "chooseGeneralBoxDenseIconSize": [96, 96],
+
+    "cardFootnoteFont": ["DroidSansFallback", [18, 18, 3], 0, [255, 255, 255, 255], 1, 10, [0, 0], [20, 20, 20, 255]],
+    "graphicsBoxTitleFont": ["DroidSansFallback", 22, 2, [228, 213, 160]],
+    "optionButtonText": ["DroidSansFallback", [23, 23, 0], 0, [255, 255, 255, 255], 1, 10, [0, 0], [50, 50, 50, 200]],
+    "magatamaFont": [
+        ["DroidSansFallback", [21, 21, -2], 80, [233, 0, 0, 255], 2, 10, [0, 0], [20, 20, 20, 155]],
+        ["DroidSansFallback", [21, 21, -2], 80, [233, 34, 34, 255], 2, 10, [0, 0], [20, 20, 20, 155]],
+        ["DroidSansFallback", [21, 21, -2], 80, [233, 116, 34, 255], 2, 10, [0, 0], [20, 20, 20, 155]],
+        ["DroidSansFallback", [21, 21, -2], 80, [195, 195, 34, 255], 2, 10, [0, 0], [20, 20, 20, 155]],
+        ["DroidSansFallback", [21, 21, -2], 80, [141, 195, 34, 255], 2, 10, [0, 0], [20, 20, 20, 155]],
+        ["DroidSansFallback", [21, 21, -2], 80, [66, 174, 34, 255], 2, 10, [0, 0], [20, 20, 20, 155]]
+    ]
+},
+"room":
+{
+    "scenePadding": 0,
+    // 78 scene units is about 57 logical pixels: the role box carries the player's role
+    // and seat, and at the compact skin's 60 it was too small to read at a glance.
+    "roleBoxHeight": 78,
+    "chatTextBoxHeight": 60,
+    "logBoxHeightPercentage": 0.6,
+    "chatBoxHeightPercentage": 0.4,
+    "infoPlaneWidthPercentage": 0.19,
+    "photoRoomPadding": 10,
+    "photoHDistance": 24,
+    "photoVDistance": 12,
+    "discardPileMinWidth": 400,
+    "discardPilePadding": 36,
+    "maximumSceneSize": [1180, 660],
+    // Left at the compact skin's values on purpose. Lowering them would stop the scene
+    // from being scaled up, which would make the dashboard and the player photos fill
+    // the screen instead of the table.
+    "minimumSceneSize": [930, 550],
+    "maximumSceneSize-10player": [1080, 810],
+    "minimumSceneSize-10player": [1020, 680]
+},
+"photo":
+{
+    "normalWidth": 131,
+    "normalHeight": 152,
+    "mainFrameArea": [0, 0, 131, 152],
+    "canvasArea": [0, 0, 131, 152],
+    "handCardNumIconArea": [-8, 76, 30, 18],
+    "handCardFont": ["DroidSansFallback", [19, 19, -1], 20, [255, 255, 255, 255], 1, 30, [0, 0], [20, 20, 20, 200]],
+    "equipAreas": [[1, 90, 150, 21], [1, 102, 150, 21], [1, 114, 150, 21], [1, 126, 150, 21], [1, 138, 150, 21]],
+    "equipImageArea": [0, 1, 114, 19],
+    "equipSuitArea": [94, 2, 21, 17],
+    "equipPointArea": [88, -4, 25, 25],
+    "equipPointFont": ["DroidSansFallback", [19, 19, 3], 20, [0, 0, 0, 255], 1, 1, [0, 0], [255, 255, 190, 128]],
+    "delayedTrickFirstRegion": [-13, 16, 28, 28],
+    "delayedTrickStep": [0, 19],
+    "roleComboBoxPos": [104, 1],
+    "borderWidth": 13,
+    "avatarImageType": 1,
+    "secondaryAvatarImageType": 4,
+    "primaryAvatarImageType": 6,
+    "circleImageType": 0,
+    "avatarArea": [1, 1, 129, 150],
+    "secondaryAvatarArea": [65, 1, 64, 150],
+    "circleArea": [1, 1, 129, 150],
+    "avatarNameArea": [1, 18, 40, 50],
+    "avatarNameFont": ["@simli", [22, 22, 0], 0, [255, 255, 255, 255], 4, 10, [0, 0], [50, 50, 50, 200]],
+    "smallAvatarNameArea": [65, 24, 40, 50],
+    "smallAvatarNameFont": ["@simli", [22, 22, 0], 0, [255, 255, 255, 255], 4, 10, [0, 0], [50, 50, 50, 200]],
+    "kingdomIconArea": [0, 0, 28, 28],
+    "kingdomMaskArea": [-4, 8, 36, 68],
+    "screenNameArea": [0, 0, 131, 15],
+    "screenNameFont": ["DroidSansFallback", 19, 0, [255, 255, 255, 255], 0, 10, [0, 0], [20, 20, 20, 155]],
+    "magatamasHorizontal": false,
+    "magatamaSize": [18, 17],
+    "magatamaImageArea": [2, 2, 14, 17],
+    "magatamaImageSubArea": [2, 2, 14, 17],
+    "magatamasBgVisible": true,
+    "magatamasAnchor": ["bottomRight", [130, 165]],
+    "magatamasSubAnchor": ["topRight", [130, 20]],
+    "cardMoveArea": [-25, 35, 200, 130],
+    "phaseArea": [5, 147, 140, 12],
+    "onlineStatusArea": [93, 20, 30, 25],
+    "onlineStatusBgColor": [0, 0, 0, 0],
+    "onlineStatusFont": ["DroidSansFallback", 19, 0, [255, 255, 255, 255], 3, 10, [0, 0], [20, 20, 20, 155]],
+    "skillNameArea": [25, 20, 300, 50],
+    "skillNameFont": ["simli", 34, 0, [255, 255, 255, 255], 2, 20, [0, 0], [255, 20, 255, 128]],
+    "progressBarArea": ["topLeft", "bottomLeft", [0, 8], [133, 10]],
+    "progressBarHorizontal": true,
+    "privatePileStartPos": [24, 15],
+    "privatePileStep": [0, 16],
+    "privatePileButtonSize": [60, 16],
+    "actionedIconRegion": [72, 45, 52, 21],
+    "saveMeIconRegion": [16, 24, 122, 50],
+    "votesIconRegion": [41, 51, 50, 50],
+    "chainedIconRegion": [0, 66, 131, 19],
+    "deathIconRegion": [0, 34, 131, 85],
+    "drankMaskColor": [250, 0, 0, 115],
+    "deathEffectColor": [50, 50, 50, 255],
+    "extraSkillArea": [28, 75, 48, 17],
+    "extraSkillFont": ["simli", [19, 19, 3], 0, [255, 255, 255, 255], 2, 100, [0, 0], [102, 16, 120, 255]],
+    "extraSkillTextArea": [28, 73, 48, 17],
+    "seatIconRegion": [54, 154, 23, 16]
+},
+// The compact skin leaves this section to the default skin, but the fonts still have to
+// be enlarged on a phone, so the section is repeated here. No size key is copied over:
+// the hand card row is positioned from the default dashboard geometry and moving any of
+// it would put the cards in the wrong place.
+"dashboard":
+{
+    "handCardFont": ["DroidSansFallback", [19, 19, -1], 20, [255, 255, 255, 255], 1, 30, [0, 0], [20, 20, 20, 200]],
+    "equipFont": ["simli", 16, 60, [0, 0, 0, 255], 3, 8, [0, 0], [240, 240, 240, 200]],
+    "equipPointFont": ["DroidSansFallback", [20, 20, 3], 20, [0, 0, 0, 255], 1, 0, [0, 0], [240, 240, 240, 200]],
+    "avatarNameFont": ["simli", [24, 24, 0], 0, [255, 255, 255, 255], 4, 10, [0, 0], [50, 50, 50, 200]],
+    "smallAvatarNameFont": ["simli", [24, 24, 0], 0, [255, 255, 255, 255], 4, 10, [0, 0], [50, 50, 50, 200]],
+    "screenNameFont": ["DroidSansFallback", 19, 0, [255, 255, 255, 255], 2, 10, [0, 0], [0, 0, 0, 224]],
+    "skillNameFont": ["simli", 34, 0, [255, 255, 255, 255], 2, 20, [0, 0], [255, 20, 255, 128]]
+},
+"skillButton":
+{
+    // The button is sized by its background artwork, so reaching a tappable height means
+    // stretching the artwork: 26 units becomes 60, which is about 44 logical pixels.
+    // Only the height is stretched; the width stays put because the dock packs buttons
+    // into a row at a fixed pitch and a wider button would overlap its neighbour.
+    "height": 60,
+    "pixmapWidthScale": 1.0,
+    "pixmapHeightScale": 2.31,
+    "width": [136, 67, 45],
+    "textArea": [[19, 17, 112, 26], [20, 17, 44, 26], [9, 17, 40, 26]],
+    "textAreaDown": [[20, 18, 112, 26], [21, 18, 44, 26], [10, 18, 40, 26]],
+    "textFont": [["fzktf", [21, 21, 2], 50, [0, 0, 0, 255], 1, 1, [0, 0], [255, 255, 190, 128]],
+                 ["fzktf", [21, 21, 1], 50, [0, 0, 0, 255], 1, 1, [0, 0], [255, 255, 190, 128]],
+                 ["fzktf", [21, 21, 0], 50, [0, 0, 0, 255], 1, 1, [0, 0], [255, 255, 190, 128]]],
+    "awakenFontColor": [[[255, 255, 255, 255], [0, 0, 0, 120]],
+                        [[255, 255, 255, 255], [0, 0, 0, 120]],
+                        [[255, 255, 255, 255], [0, 0, 0, 120]],
+                        [[255, 255, 255, 255], [0, 0, 0, 120]],
+                        [[255, 255, 255, 255], [0, 0, 0, 120]]],
+    "compulsoryFontColor": [[[255, 255, 255, 255], [0, 0, 0, 120]],
+                            [[255, 255, 255, 255], [0, 0, 0, 120]],
+                            [[255, 255, 255, 255], [0, 0, 0, 120]],
+                            [[255, 255, 255, 255], [0, 0, 0, 120]],
+                            [[255, 255, 255, 255], [0, 0, 0, 120]]],
+    "frequentFontColor": [[[255, 255, 255, 255], [0, 0, 0, 120]],
+                          [[255, 255, 255, 255], [0, 0, 0, 120]],
+                          [[255, 255, 255, 255], [0, 0, 0, 120]],
+                          [[255, 255, 255, 255], [0, 0, 0, 120]],
+                          [[255, 255, 255, 255], [0, 0, 0, 120]]],
+    "oneoffFontColor": [[[255, 255, 255, 255], [0, 0, 0, 120]],
+                        [[255, 255, 255, 255], [0, 0, 0, 120]],
+                        [[255, 255, 255, 255], [0, 0, 0, 120]],
+                        [[255, 255, 255, 255], [0, 0, 0, 120]],
+                        [[255, 255, 255, 255], [0, 0, 0, 120]]],
+    "proactiveFontColor": [[[255, 255, 255, 255], [0, 0, 0, 120]],
+                           [[255, 255, 255, 255], [0, 0, 0, 120]],
+                           [[255, 255, 255, 255], [0, 0, 0, 120]],
+                           [[255, 255, 255, 255], [0, 0, 0, 120]],
+                           [[255, 255, 255, 255], [0, 0, 0, 120]]],
+    "attachedlordFontColor": [[[255, 255, 255, 255], [0, 0, 0, 120]],
+                              [[255, 255, 255, 255], [0, 0, 0, 120]],
+                              [[255, 255, 255, 255], [0, 0, 0, 120]],
+                              [[255, 255, 255, 255], [0, 0, 0, 120]],
+                              [[255, 255, 255, 255], [0, 0, 0, 120]]]
+}
+}

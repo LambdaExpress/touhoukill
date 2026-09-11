@@ -285,6 +285,7 @@ RoomScene::RoomScene(QMainWindow *main_window)
     connect(chat_edit, SIGNAL(returnPressed()), this, SLOT(speak()));
     chat_edit->setPlaceholderText(tr("Please enter text to chat ... "));
 
+
     chat_widget = new ChatWidget();
     chat_widget->setZValue(-0.1);
     addItem(chat_widget);
@@ -303,6 +304,17 @@ RoomScene::RoomScene(QMainWindow *main_window)
     log_box_widget->setObjectName("log_box_widget");
     log_box_widget->setZValue(-1.0);
     connect(ClientInstance, SIGNAL(log_received(QStringList)), log_box, SLOT(appendLog(QStringList)));
+#ifdef Q_OS_ANDROID
+    // The info plane widgets live in the scene, which the phone view scales down to fit
+    // the screen, so their text has to be sized for the scene rather than for the
+    // screen. Config.UIFont is left alone because it also reaches the unscaled dialogs.
+    QFont info_plane_font = Config.UIFont;
+    if (info_plane_font.pixelSize() < 24)
+        info_plane_font.setPixelSize(24);
+    log_box->setFont(info_plane_font);
+    chat_box->setFont(info_plane_font);
+    chat_edit->setFont(info_plane_font);
+#endif
 
     prompt_box = new Window(tr("TouhouSatsu"), QSize(480, 200));
     prompt_box->setOpacity(0);
@@ -974,6 +986,9 @@ void RoomScene::adjustItems()
                 photo->repaintAll();
             dashboard->repaintAll();
         }
+    } else if (skinName == factory.S_PHONE_SKIN_NAME) {
+        // The phone skin was chosen for the device, not for the window size, so neither
+        // of the size driven branches may take it over.
     } else if (skinName == factory.S_COMPACT_SKIN_NAME) {
         if (displayRegion.width() > maxSize.width() && displayRegion.height() > maxSize.height()) {
             QThread *thread = QCoreApplication::instance()->thread();
@@ -1702,6 +1717,10 @@ void RoomScene::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
     QGraphicsScene::contextMenuEvent(event);
     QTransform transform;
     QGraphicsItem *item = itemAt(event->scenePos(), transform);
+    // Nothing under the cursor: on a touch screen a long press can easily land on
+    // empty space outside the table.
+    if (item == nullptr)
+        return;
     if (item->zValue() < -99999) { // @todo_P: tableBg?
         QMenu *menu = miscellaneous_menu;
         menu->clear();

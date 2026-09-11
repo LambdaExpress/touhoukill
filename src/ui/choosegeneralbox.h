@@ -43,21 +43,11 @@ public:
 protected:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
-#ifdef Q_OS_ANDROID
-    virtual void mousePressEvent(QGraphicsSceneMouseEvent *event);
-    virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
-#endif
 
 private:
     explicit GeneralCardItem(const QString &generalName); //, const int skinId
 
     bool hasCompanion;
-#ifdef Q_OS_ANDROID
-    QTimer timerLongPress;
-    QPointF pressPos;
-    qreal moveRange;
-    bool outOfRange;
-#endif
 
 public slots:
     virtual void changeGeneral(const QString &generalName);

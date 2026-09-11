@@ -10,5 +10,10 @@
 {
 "roomLayoutConfigFile": "skins/compactSkinAlt.layout.json",
 "roomImageConfigFile": "skins/compactSkin.image.json"
+},
+"phone":
+{
+"roomLayoutConfigFile": "skins/phoneSkin.layout.json",
+"roomImageConfigFile": "skins/compactSkin.image.json"
 }
 }
