@@ -87,6 +87,14 @@ void Settings::init()
 
         AppFont = value("AppFont", QApplication::font("QMainWindow")).value<QFont>();
         UIFont = value("UIFont", QApplication::font("QTextEdit")).value<QFont>();
+#ifdef Q_OS_ANDROID
+        // The platform default is sized for a large desktop window and is hard to read
+        // on a phone. Only the widget font is raised here: the room scene's own text is
+        // scaled by the view on top of whatever it is given, so it is sized where those
+        // widgets are created instead. A value the user raised is kept.
+        if (AppFont.pixelSize() < 15)
+            AppFont.setPixelSize(15);
+#endif
         TextEditColor = QColor(value("TextEditColor", "white").toString());
         ToolTipBackgroundColor = value("ToolTipBackgroundColor", "#000000").toString();
     }
@@ -173,7 +181,13 @@ void Settings::init()
     EnableAutoTarget = value("EnableAutoTarget", true).toBool();
     EnableIntellectualSelection = value("EnableIntellectualSelection", true).toBool();
     EnableDoubleClick = value("EnableDoubleClick", false).toBool();
+#ifdef Q_OS_ANDROID
+    // The updater replaces the executable and cannot install an APK; a development
+    // build must not reach out to the public update service on every launch.
+    EnableAutoUpdate = value("EnableAutoUpdate", false).toBool();
+#else
     EnableAutoUpdate = value("EnableAutoUpdate", true).toBool();
+#endif
     BubbleChatBoxDelaySeconds = value("BubbleChatBoxDelaySeconds", 2).toInt();
     DefaultHeroSkin = value("DefaultHeroSkin", true).toBool();
 

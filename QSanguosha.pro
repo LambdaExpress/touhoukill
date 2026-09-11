@@ -52,6 +52,7 @@ SOURCES += \
     src/dialog/configdialog.cpp \
     src/dialog/connectiondialog.cpp \
     src/dialog/distanceviewdialog.cpp \
+    src/dialog/dialogsupport.cpp \
     src/dialog/generaloverview.cpp \
     src/dialog/updatedialog.cpp \
     src/dialog/mainwindow.cpp \
@@ -162,6 +163,7 @@ HEADERS += \
     src/dialog/configdialog.h \
     src/dialog/connectiondialog.h \
     src/dialog/distanceviewdialog.h \
+    src/dialog/dialogsupport.h \
     src/dialog/generaloverview.h \
     src/dialog/updatedialog.h \
     src/dialog/mainwindow.h \
@@ -342,14 +344,21 @@ linux{
 
 CONFIG(audio){
     DEFINES += AUDIO_SUPPORT
-    INCLUDEPATH += include/fmod
-    CONFIG(debug, debug|release): LIBS += -lfmodexL
-    else:LIBS += -lfmodex
-    SOURCES += src/core/audio.cpp
 
     android{
-        CONFIG(debug, debug|release):ANDROID_EXTRA_LIBS += $$ANDROID_LIBPATH/libfmodexL.so
-        else:ANDROID_EXTRA_LIBS += $$ANDROID_LIBPATH/libfmodex.so
+        # FMOD Ex ships 32-bit Android libraries that link against the GNU STL,
+        # which the NDK no longer provides. Android plays Ogg Vorbis through Qt
+        # Multimedia instead; see src/core/audio_qt.cpp.
+        QT += multimedia
+        INCLUDEPATH += $$_PRO_FILE_PWD_/include/ogg $$_PRO_FILE_PWD_/include/vorbis
+        LIBS += -lvorbisfile -lvorbis -logg
+        SOURCES += src/core/audio_qt.cpp
+    }
+    else{
+        INCLUDEPATH += include/fmod
+        CONFIG(debug, debug|release): LIBS += -lfmodexL
+        else:LIBS += -lfmodex
+        SOURCES += src/core/audio.cpp
     }
 }
 
@@ -457,5 +466,13 @@ else:LIBS += -lfreetype
 INCLUDEPATH += $$_PRO_FILE_PWD_/include/freetype
 DEPENDPATH += $$_PRO_FILE_PWD_/include/freetype
 
-#ANDROID_PACKAGE_SOURCE_DIR = $$_PRO_FILE_PWD_/resource/android
+android{
+    ANDROID_PACKAGE_SOURCE_DIR = $$_PRO_FILE_PWD_/android
+
+    # Used to hide the action bar and go fullscreen from src/main.cpp.
+    QT += androidextras
+
+    SOURCES += src/util/androidassets.cpp
+    HEADERS += src/util/androidassets.h
+}
 
