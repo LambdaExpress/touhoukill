@@ -168,4 +168,5 @@ Write-Host ''
 Write-Host ('Staged {0} files, {1:N1} MB' -f $stagedFiles.Count, ($totalBytes / 1MB))
 Write-Host ('Manifest: {0} entries -> {1}' -f $sortedEntries.Count, $manifestPath)
 Write-Host ''
-Write-Host 'Next: pwsh tools/android/build-android.ps1'
+Write-Host 'Next: pwsh tools/android/build-android-debug.ps1'
+Write-Host '  or: pwsh tools/android/build-android-release.ps1'
