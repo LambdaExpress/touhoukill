@@ -3409,6 +3409,8 @@ function SmartAI:getCardNeedPlayer(cards, friends_table, skillname)
 	local keptslash = 0
 	local friends = {}
 	local cmpByAction = function(a,b)
+		-- Same strict-order requirement as in smart-ai.lua.
+		if a:objectName() == b:objectName() then return false end
 		return a:getRoom():getFront(a, b):objectName() == a:objectName()
 	end
 

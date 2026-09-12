@@ -1,10 +1,6 @@
 {
-// Phone skin. Loaded on Android instead of the size driven default/compact pair, because
-// neither of those is designed for a touch screen: the view here is roughly 845x400
-// logical pixels, which the room scene scales down to about 0.73, so every measurement
-// below is worth 0.73 logical pixels on the device and the values are chosen to land on
-// finger sized targets. The file is a superset of compactSkinAlt.layout.json: keys the
-// phone skin does not mention fall through to defaultSkinAlt.layout.json.
+// Android's landscape board uses a 540-unit canvas, a separate action row and paged
+// hand cards. Unspecified artwork keys inherit from defaultSkinAlt.layout.json.
 "common":
 {
     "chooseGeneralBoxSwitchIconSizeThreshold": 10,
@@ -32,9 +28,7 @@
 "room":
 {
     "scenePadding": 0,
-    // 78 scene units is about 57 logical pixels: the role box carries the player's role
-    // and seat, and at the compact skin's 60 it was too small to read at a glance.
-    "roleBoxHeight": 78,
+    "roleBoxHeight": 60,
     "chatTextBoxHeight": 60,
     "logBoxHeightPercentage": 0.6,
     "chatBoxHeightPercentage": 0.4,
@@ -45,12 +39,9 @@
     "discardPileMinWidth": 400,
     "discardPilePadding": 36,
     "maximumSceneSize": [1180, 660],
-    // Left at the compact skin's values on purpose. Lowering them would stop the scene
-    // from being scaled up, which would make the dashboard and the player photos fill
-    // the screen instead of the table.
-    "minimumSceneSize": [930, 550],
+    "minimumSceneSize": [960, 540],
     "maximumSceneSize-10player": [1080, 810],
-    "minimumSceneSize-10player": [1020, 680]
+    "minimumSceneSize-10player": [960, 540]
 },
 "photo":
 {
@@ -115,12 +106,59 @@
     "extraSkillTextArea": [28, 73, 48, 17],
     "seatIconRegion": [54, 154, 23, 16]
 },
-// The compact skin leaves this section to the default skin, but the fonts still have to
-// be enlarged on a phone, so the section is repeated here. No size key is copied over:
-// the hand card row is positioned from the default dashboard geometry and moving any of
-// it would put the cards in the wrong place.
 "dashboard":
 {
+    "leftWidth": 132,
+    "rightWidth": 168,
+    "rightWidthDouble": 272,
+    "normalHeight": 184,
+    "floatingAreaHeight": 66,
+    "equipAreas": [[4, 24, 124, 32], [4, 56, 124, 32], [4, 88, 124, 32], [4, 120, 124, 32], [4, 152, 124, 32]],
+    "equipImageArea": [0, 0, 124, 28],
+    "equipSuitArea": [99, 5, 21, 17],
+    "equipPointArea": [88, -3, 28, 30],
+    "avatarArea": [0, 0, 168, 224],
+    "avatarAreaDouble": [0, 0, 272, 224],
+    "primaryAvatarArea": [0, 0, 136, 224],
+    "secondaryAvatarArea": [136, 0, 136, 224],
+    "circleArea": [0, 0, 272, 224],
+    "focusFrameArea": [0, 0, 168, 224],
+    "focusFrameAreaDouble": [0, 0, 272, 224],
+    "avatarNameArea": [4, 1, 128, 28],
+    "headAvatarNameArea": [4, 1, 128, 28],
+    "smallAvatarNameArea": [140, 1, 128, 28],
+    "screenNameArea": [4, 29, 160, 22],
+    "screenNameAreaDouble": [4, 29, 264, 22],
+    "roleComboBoxPos": [138, 4],
+    "roleShownArea": [132, 2, 32, 32],
+    "kingdomIconArea": [4, 53, 24, 24],
+    "kingdomIconAreaDouble": [4, 53, 24, 24],
+    "seatIconRegion": [31, 54, 30, 22],
+    "seatIconRegionDouble": [31, 54, 30, 22],
+    "dashboardKingdomMaskArea": [0, 0, 168, 52],
+    "dashboardPrimaryKingdomMaskArea": [0, 0, 136, 52],
+    "dashboardSecondaryKingdomMaskArea": [136, 0, 136, 52],
+    "magatamasHorizontal": true,
+    "magatamaSize": [20, 22],
+    "magatamaImageArea": [0, 1, 18, 21],
+    "magatamaImageSubArea": [0, 1, 18, 21],
+    "magatamasAnchor": ["topLeft", [64, 53]],
+    "magatamasAnchorDouble": ["topLeft", [64, 53]],
+    "magatamasSubAnchor": ["topLeft", [64, 78]],
+    "privatePileStartPos": [4, 80],
+    "privatePileStartPosDouble": [4, 80],
+    "privatePileStep": [86, 0],
+    "privatePileButtonSize": [82, 28],
+    "handCardNumIconArea": [0, 2, 30, 20],
+    "phaseArea": ["topLeft", "topLeft", [0, 0], [230, 24]],
+    "progressBarArea": ["bottomCenter", "bottomCenter", [0, 0], [360, 12]],
+    "buttonSetSize": [300, 60],
+    "confirmButtonArea": [0, 0, 96, 60],
+    "cancelButtonArea": [102, 0, 96, 60],
+    "discardButtonArea": [204, 0, 96, 60],
+    "hiddenMarkRegion3": [0, 0, 168, 108],
+    "hiddenMarkRegion1": [0, 0, 136, 108],
+    "hiddenMarkRegion2": [136, 0, 136, 108],
     "handCardFont": ["DroidSansFallback", [19, 19, -1], 20, [255, 255, 255, 255], 1, 30, [0, 0], [20, 20, 20, 200]],
     "equipFont": ["simli", 16, 60, [0, 0, 0, 255], 3, 8, [0, 0], [240, 240, 240, 200]],
     "equipPointFont": ["DroidSansFallback", [20, 20, 3], 20, [0, 0, 0, 255], 1, 0, [0, 0], [240, 240, 240, 200]],

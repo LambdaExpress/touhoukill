@@ -1,6 +1,7 @@
 #ifndef _ROOM_THREAD_H
 #define _ROOM_THREAD_H
 
+#include <QAtomicInt>
 #include <QSemaphore>
 #include <QThread>
 #include <QVariant>
@@ -44,6 +45,8 @@ class RoomThread : public QThread
 
 public:
     explicit RoomThread(Room *room);
+    void requestStop();
+    bool isStopRequested() const;
     void constructTriggerTable();
     bool trigger(TriggerEvent triggerEvent, Room *room);
 
@@ -112,6 +115,7 @@ private:
 
     ServerPlayer *nextExtraTurn;
     ServerPlayer *extraTurnReturn;
+    QAtomicInt m_stopRequested;
 };
 
 #endif

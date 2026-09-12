@@ -373,7 +373,11 @@ void ChooseGeneralBox::chooseGeneral(const QStringList &_generals, bool view_onl
     if (single_result) {
         confirm->hide();
     } else {
+#ifdef Q_OS_ANDROID
+        confirm->setPos(boundingRect().center().x() - (confirm->boundingRect().width() / 2), boundingRect().height() - 84);
+#else
         confirm->setPos(boundingRect().center().x() - (confirm->boundingRect().width() / 2), boundingRect().height() - 60);
+#endif
         confirm->show();
     }
     if (!view_only && !single_result)

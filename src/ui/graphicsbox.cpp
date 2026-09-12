@@ -67,7 +67,17 @@ void GraphicsBox::stylize(QGraphicsObject *target)
 void GraphicsBox::moveToCenter(QGraphicsObject *target)
 {
     const QRectF rect = target->boundingRect();
+#ifdef Q_OS_ANDROID
+    const QRectF screen = RoomSceneInstance->sceneRect().adjusted(14, 14, -14, -14);
+    if (rect.isEmpty() || screen.isEmpty())
+        return;
+    const qreal scale = qMin<qreal>(1, qMin(screen.width() / rect.width(), screen.height() / rect.height()));
+    target->setScale(scale);
+    target->setPos(screen.center() - QPointF(rect.width() * scale / 2, rect.height() * scale / 2));
+    target->setFlag(QGraphicsItem::ItemIsMovable, false);
+#else
     target->setPos(RoomSceneInstance->tableCenterPos() - QPointF(rect.width() / 2, rect.height() / 2));
+#endif
 }
 
 void GraphicsBox::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)

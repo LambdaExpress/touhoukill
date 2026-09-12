@@ -18,9 +18,16 @@ Mogara
 #include "button.h"
 #include "client.h"
 #include "clientstruct.h"
+#include "dialogsupport.h"
 #include "engine.h"
+#include "roomscene.h"
 
+#include <QDialog>
 #include <QGraphicsProxyWidget>
+#include <QLabel>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QVBoxLayout>
 
 ChooseOptionsBox::ChooseOptionsBox()
     : progressBar(nullptr)
@@ -59,7 +66,23 @@ void ChooseOptionsBox::chooseOption(const QStringList &options)
     title = QString("%1").arg(Sanguosha->translate(skillName));
     prepareGeometryChange();
 
+#ifdef Q_OS_ANDROID
+    mobile_dialog = new QDialog(RoomSceneInstance->mainWindow());
+    mobile_dialog->setWindowTitle(title);
+    mobile_dialog->setProperty("sgsMobileLayout", true);
+    mobile_dialog->setModal(true);
+    QVBoxLayout *mobileLayout = new QVBoxLayout(mobile_dialog);
+    QLabel *heading = new QLabel(title);
+    heading->setProperty("sgsHeading", true);
+    mobileLayout->addWidget(heading);
+    QWidget *page = new QWidget;
+    QVBoxLayout *choicesLayout = new QVBoxLayout(page);
+    mobileLayout->addWidget(DialogSupport::createScrollArea(page), 1);
+    connect(mobile_dialog, &QDialog::rejected, this, &ChooseOptionsBox::reply);
+#endif
+#ifndef Q_OS_ANDROID
     const int buttonWidth = getButtonWidth();
+#endif
     QMap<Button *, QPoint> pos;
     int x = 0;
     int y = 0;
@@ -94,6 +117,18 @@ void ChooseOptionsBox::chooseOption(const QStringList &options)
                 }
             }
 
+#ifdef Q_OS_ANDROID
+            QPushButton *button = new QPushButton;
+            button->setAccessibleName(text);
+            QVBoxLayout *captionLayout = new QVBoxLayout(button);
+            QLabel *caption = new QLabel(text);
+            caption->setWordWrap(true);
+            caption->setAttribute(Qt::WA_TransparentForMouseEvents);
+            captionLayout->addWidget(caption);
+            button->setObjectName(choice);
+            choicesLayout->addWidget(button);
+            connect(button, &QPushButton::clicked, this, &ChooseOptionsBox::reply);
+#else
             Button *button = new Button(text, QSizeF(buttonWidth, defaultButtonHeight));
             //Button *button = new Button(translate(choice), QSizeF(500, defaultButtonHeight));
             //Button *button = new Button(translate(choice), QSizeF(buttonWidth, defaultButtonHeight), Config.UIFont);
@@ -112,9 +147,22 @@ void ChooseOptionsBox::chooseOption(const QStringList &options)
             connect(button, &Button::clicked, this, &ChooseOptionsBox::reply);
             if (tooltip != original_tooltip)
                 button->setToolTip(QString("<font color=yellow>%2</font>").arg(tooltip));
+#endif
         }
     }
 
+#ifdef Q_OS_ANDROID
+    choicesLayout->addStretch();
+    if (ServerInfo.OperationTimeout != 0) {
+        progressBar = new QSanCommandProgressBar;
+        progressBar->setTimerEnabled(true);
+        progressBar->setCountdown(QSanProtocol::S_COMMAND_MULTIPLE_CHOICE);
+        mobileLayout->addWidget(progressBar);
+        connect(progressBar, &QSanCommandProgressBar::timedOut, this, &ChooseOptionsBox::reply);
+    }
+    mobile_dialog->show();
+    return;
+#endif
     moveToCenter();
     show();
 
@@ -163,6 +211,10 @@ void ChooseOptionsBox::reply()
     QString choice = sender()->objectName();
     if (choice.isEmpty())
         choice = options.first();
+#ifdef Q_OS_ANDROID
+    if (mobile_dialog != nullptr)
+        mobile_dialog->accept();
+#endif
     //ClientInstance->onPlayerMakeChoice(choice);
     ClientInstance->onPlayerChooseOption(choice);
     //ClientInstance->onPlayerMakeChoice();
@@ -202,6 +254,13 @@ QString ChooseOptionsBox::translate(const QString &option) const
 
 void ChooseOptionsBox::clear()
 {
+#ifdef Q_OS_ANDROID
+    if (mobile_dialog != nullptr) {
+        mobile_dialog->hide();
+        mobile_dialog->deleteLater();
+        mobile_dialog = nullptr;
+    }
+#endif
     if (progressBar != nullptr) {
         progressBar->hide();
         progressBar->deleteLater();

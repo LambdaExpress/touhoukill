@@ -8,12 +8,15 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QScopedPointer>
 #include <QSet>
 #include <QStringList>
 #include <QTime>
+#include <QThread>
 
-#include <cstring>
+#include <atomic>
 
 #include <vorbis/vorbisfile.h>
 
@@ -36,10 +39,11 @@ namespace {
 
 size_t readFromQBuffer(void *ptr, size_t size, size_t nmemb, void *datasource)
 {
+    if (size == 0)
+        return 0;
     QIODevice *device = reinterpret_cast<QIODevice *>(datasource);
-    const QByteArray data = device->read(static_cast<qint64>(size * nmemb));
-    memcpy(ptr, data.constData(), static_cast<size_t>(data.size()));
-    return static_cast<size_t>(data.size());
+    const qint64 bytes = device->read(static_cast<char *>(ptr), static_cast<qint64>(size * nmemb));
+    return bytes > 0 ? static_cast<size_t>(bytes) / size : 0;
 }
 
 int seekQBuffer(void *datasource, ogg_int64_t offset, int whence)
@@ -78,6 +82,7 @@ public:
     void play(bool loop = false);
     void stop();
     bool isPlaying() const;
+    bool hasFinished() const { return m_finished; }
     void setVolume(float volume);
 
 private slots:
@@ -89,6 +94,7 @@ private:
     QBuffer m_buffer;
     QAudioOutput *m_output;
     bool m_loop;
+    bool m_finished = false;
     float m_volume;
 };
 
@@ -124,8 +130,11 @@ OggPlayer::OggPlayer(const QString &fileName, QObject *parent)
             m_buffer.write(data, bytesRead);
         else if (bytesRead == 0)
             break; // end of stream
-        // OV_HOLE, OV_EBADLINK and OV_EINVAL are skipped; a corrupt section must
-        // not abort the whole sound.
+        else if (bytesRead != OV_HOLE) {
+            qWarning("Audio: unable to decode %s (%ld)", qPrintable(fileName), bytesRead);
+            ov_clear(&vorbisFile);
+            return;
+        }
     }
 
     const vorbis_info *info = ov_info(&vorbisFile, -1);
@@ -189,28 +198,31 @@ void OggPlayer::handleStateChanged(QAudio::State state)
         m_buffer.seek(0);
         m_output->start(&m_buffer);
     } else {
-        // Releasing the device matters on Android, where only a handful of audio
-        // players exist in total.
-        m_output->stop();
+        m_finished = true;
+        // OpenSL's stop() retains the native player. reset() releases its track,
+        // while the decoded PCM remains cached for the next playback.
+        m_output->reset();
     }
 }
 
 void OggPlayer::play(bool loop)
 {
     m_loop = loop;
+    m_finished = false;
 
     if (m_output == nullptr)
         return;
 
-    m_output->stop();
+    m_output->reset();
     m_buffer.seek(0);
     m_output->start(&m_buffer);
 }
 
 void OggPlayer::stop()
 {
+    m_finished = false;
     if (m_output != nullptr)
-        m_output->stop();
+        m_output->reset();
 }
 
 bool OggPlayer::isPlaying() const
@@ -319,11 +331,14 @@ private:
     QStringList m_openings; //need play title/open at first
 };
 
+static std::atomic_bool BackgroundPlaying(false);
+
 class BackgroundMusicPlayer : public QObject
 {
 public:
-    BackgroundMusicPlayer()
-        : m_timer(0)
+    explicit BackgroundMusicPlayer(QObject *parent = nullptr)
+        : QObject(parent)
+        , m_timer(0)
         , m_count(0)
         , m_volume(1.0f)
     {
@@ -332,6 +347,7 @@ public:
     void play(const QString &fileNames, bool random, bool playAll = false, bool isGeneralName = false)
     {
         if (m_timer != 0) {
+            BackgroundPlaying.store(isPlaying());
             return;
         }
 
@@ -384,8 +400,10 @@ public:
         }
 
         // Nothing to play: an empty playlist would index out of range below.
-        if (m_count < 1)
+        if (m_count < 1) {
+            BackgroundPlaying.store(false);
             return;
+        }
 
         playNext();
         m_timer = startTimer(m_interval);
@@ -393,6 +411,7 @@ public:
 
     void stop()
     {
+        BackgroundPlaying.store(false);
         if (m_timer != 0) {
             killTimer(m_timer);
             m_timer = 0;
@@ -422,7 +441,9 @@ public:
 protected:
     void timerEvent(QTimerEvent *) override
     {
-        if (!m_sound.isNull() && !m_sound->isPlaying()) {
+        // A failed output is not the end of a track. Advancing on every failure
+        // decoded a whole BGM on the UI thread again every 500 ms.
+        if (!m_sound.isNull() && m_sound->hasFinished()) {
             playNext();
         }
     }
@@ -430,9 +451,12 @@ protected:
 private:
     void playNext()
     {
+        BackgroundPlaying.store(true);
+        m_sound.reset();
         m_sound.reset(new OggPlayer(m_playList->nextFileName()));
         m_sound->setVolume(m_volume);
         m_sound->play(1 == m_count);
+        BackgroundPlaying.store(m_sound->isPlaying());
     }
 
     Q_DISABLE_COPY(BackgroundMusicPlayer)
@@ -447,94 +471,128 @@ private:
     static const int m_interval = 500;
 };
 
-static QCache<QString, OggPlayer> SoundCache;
-static BackgroundMusicPlayer backgroundMusicPlayer;
-static float EffectVolume = 1.0f;
-static bool Ready = false;
+class AudioWorker : public QObject
+{
+public:
+    AudioWorker()
+        : music(new BackgroundMusicPlayer(this))
+    {
+    }
+
+    void play(const QString &fileName, bool restart)
+    {
+        OggPlayer *sound = sounds[fileName];
+        if (sound == nullptr) {
+            sound = new OggPlayer(fileName);
+            sounds.insert(fileName, sound);
+        } else if (!restart && sound->isPlaying()) {
+            return;
+        }
+        sound->setVolume(effectVolume);
+        sound->play();
+    }
+
+    void stopAll()
+    {
+        foreach (const QString &key, sounds.keys())
+            sounds[key]->stop();
+        music->stop();
+    }
+
+    QCache<QString, OggPlayer> sounds;
+    BackgroundMusicPlayer *music;
+    float effectVolume = 1.0f;
+};
+
+static QMutex AudioMutex;
+static QThread *AudioThread = nullptr;
+static AudioWorker *Worker = nullptr;
+
+template<typename Function>
+static bool dispatchAudio(Function function)
+{
+    QMutexLocker lock(&AudioMutex);
+    AudioWorker *worker = Worker;
+    if (worker == nullptr)
+        return false;
+    return QMetaObject::invokeMethod(worker, [worker, function]() { function(worker); }, Qt::QueuedConnection);
+}
+
 QString Audio::m_customBackgroundMusicFileName;
 
 void Audio::init()
 {
-    // Qt Multimedia needs no global setup; each OggPlayer opens its own output.
-    Ready = true;
+    QMutexLocker lock(&AudioMutex);
+    if (Worker != nullptr)
+        return;
+    AudioThread = new QThread;
+    AudioThread->setObjectName(QStringLiteral("AudioPlayback"));
+    Worker = new AudioWorker;
+    Worker->moveToThread(AudioThread);
+    QObject::connect(AudioThread, &QThread::finished, Worker, &QObject::deleteLater);
+    AudioThread->start();
 }
 
 void Audio::quit()
 {
-    if (!Ready)
+    QMutexLocker lock(&AudioMutex);
+    if (Worker == nullptr)
         return;
-
-    stopAll();
-
-    SoundCache.clear();
-    backgroundMusicPlayer.shutdown();
-    Ready = false;
+    QMetaObject::invokeMethod(Worker, []() {
+        Worker->stopAll();
+        Worker->sounds.clear();
+        Worker->music->shutdown();
+    }, Qt::BlockingQueuedConnection);
+    AudioThread->quit();
+    AudioThread->wait();
+    delete AudioThread;
+    AudioThread = nullptr;
+    Worker = nullptr;
+    resetCustomBackgroundMusicFileName();
 }
 
 void Audio::play(const QString &fileName, bool continuePlayWhenPlaying /* = false*/)
 {
-    if (!Ready)
-        return;
-
-    OggPlayer *sound = SoundCache[fileName];
-    if (sound == nullptr) {
-        sound = new OggPlayer(fileName);
-        SoundCache.insert(fileName, sound);
-    } else if (!continuePlayWhenPlaying && sound->isPlaying()) {
-        return;
-    }
-
-    sound->setVolume(EffectVolume);
-    sound->play();
+    dispatchAudio([fileName, continuePlayWhenPlaying](AudioWorker *worker) { worker->play(fileName, continuePlayWhenPlaying); });
 }
 
 void Audio::setEffectVolume(float volume)
 {
-    EffectVolume = volume;
-
-    foreach (const QString &key, SoundCache.keys()) {
-        OggPlayer *sound = SoundCache[key];
-        if (sound != nullptr)
-            sound->setVolume(volume);
-    }
+    dispatchAudio([volume](AudioWorker *worker) {
+        worker->effectVolume = volume;
+        foreach (const QString &key, worker->sounds.keys())
+            worker->sounds[key]->setVolume(volume);
+    });
 }
 
 void Audio::setBGMVolume(float volume)
 {
-    backgroundMusicPlayer.setVolume(volume);
+    dispatchAudio([volume](AudioWorker *worker) { worker->music->setVolume(volume); });
 }
 
 void Audio::playBGM(const QString &fileNames, bool random /* = false*/, bool playAll, bool isGeneralName)
 {
-    if (!Ready)
-        return;
-
-    if (!m_customBackgroundMusicFileName.isEmpty()) {
-        backgroundMusicPlayer.play(m_customBackgroundMusicFileName, random, playAll, isGeneralName);
-    } else {
-        backgroundMusicPlayer.play(fileNames, random, playAll, isGeneralName);
-    }
+    const QString names = m_customBackgroundMusicFileName.isEmpty() ? fileNames : m_customBackgroundMusicFileName;
+    BackgroundPlaying.store(true);
+    if (!dispatchAudio([names, random, playAll, isGeneralName](AudioWorker *worker) { worker->music->play(names, random, playAll, isGeneralName); }))
+        BackgroundPlaying.store(false);
 }
 
 void Audio::stopBGM()
 {
-    backgroundMusicPlayer.stop();
+    BackgroundPlaying.store(false);
+    dispatchAudio([](AudioWorker *worker) { worker->music->stop(); });
 }
 
 bool Audio::isBackgroundMusicPlaying()
 {
-    return backgroundMusicPlayer.isPlaying();
+    return BackgroundPlaying.load();
 }
 
 void Audio::stopAll()
 {
-    foreach (const QString &key, SoundCache.keys()) {
-        OggPlayer *sound = SoundCache[key];
-        if (sound != nullptr)
-            sound->stop();
-    }
-    stopBGM();
-
+    BackgroundPlaying.store(false);
+    dispatchAudio([](AudioWorker *worker) { worker->stopAll(); });
     resetCustomBackgroundMusicFileName();
 }
 

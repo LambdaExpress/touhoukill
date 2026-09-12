@@ -78,6 +78,8 @@ public:
     }
     bool isFull() const;
     bool isFinished() const;
+    void stopGame();
+    bool isGameStopRequested() const;
     bool canPause(ServerPlayer *p) const;
     void tryPause();
 
@@ -468,7 +470,17 @@ private:
         }
         inline bool operator<(const _MoveMergeClassifier &other) const
         {
-            return m_from < other.m_from || m_to < other.m_to || m_to_place < other.m_to_place || m_to_pile_name < other.m_to_pile_name;
+            // This orders the keys of the QMap that merges card moves, so it has to be a
+            // strict weak ordering. A plain "a < b || c < d" chain is not one: two keys can
+            // each compare less than the other, and the tree then keeps one logical key
+            // twice, which yields duplicate entries in the merged move list.
+            if (m_from != other.m_from)
+                return m_from < other.m_from;
+            if (m_to != other.m_to)
+                return m_to < other.m_to;
+            if (m_to_place != other.m_to_place)
+                return m_to_place < other.m_to_place;
+            return m_to_pile_name < other.m_to_pile_name;
         }
         Player *m_from;
         Player *m_to;

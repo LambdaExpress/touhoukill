@@ -4,9 +4,11 @@
 #include "card.h"
 
 #include <QDialog>
+#include <QPixmap>
 #include <QTableWidgetItem>
 
 class MainWindow;
+class QLineEdit;
 namespace Ui {
 class CardOverview;
 }
@@ -28,6 +30,17 @@ private:
     Ui::CardOverview *ui;
 
     void addCard(int i, const Card *card);
+
+#ifdef Q_OS_ANDROID
+    QLineEdit *mobile_search = nullptr;
+    QPixmap mobile_portrait;
+    void setupMobileLayout();
+    void filterMobileCards(const QString &text);
+    void updateMobilePortrait();
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+#endif
 
 private slots:
     void on_femalePlayButton_clicked();

@@ -1,20 +1,25 @@
 #include "choosegeneraldialog.h"
 #include "SkinBank.h"
 #include "client.h"
+#include "dialogsupport.h"
 #include "engine.h"
 #include "general.h"
 #include "protocol.h"
 #include "settings.h"
+#include "skilloverview.h"
 
 #include <QCheckBox>
 #include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QRadioButton>
 #include <QSignalMapper>
 #include <QTabWidget>
 #include <QTimerEvent>
+#include <QTextEdit>
 
 using namespace QSanProtocol;
 
@@ -64,6 +69,103 @@ ChooseGeneralDialog::ChooseGeneralDialog(const QStringList &general_names, QWidg
         const General *general = Sanguosha->getGeneral(general_name);
         generals << general;
     }
+
+#ifdef Q_OS_ANDROID
+    setProperty("sgsMobileLayout", true);
+    QVBoxLayout *root = new QVBoxLayout(this);
+    root->setContentsMargins(12, 8, 12, 8);
+    QLabel *heading = new QLabel(windowTitle());
+    heading->setProperty("sgsHeading", true);
+    if (!view_only && Self != nullptr) {
+        heading->setText(windowTitle() + " · " + tr("Your role is %1").arg(Sanguosha->translate(Self->getRole())));
+        if (Self->getSeat() > 0)
+            heading->setText(heading->text() + " · " + Sanguosha->translate(QString("SEAT(%1)").arg(Self->getSeat())));
+        if (!lord_name.isEmpty())
+            heading->setText(heading->text() + " · " + tr("Lord: %1").arg(Sanguosha->translate(lord_name)));
+    }
+    heading->setWordWrap(true);
+    QHBoxLayout *heading_row = new QHBoxLayout;
+    heading_row->addWidget(heading, 1);
+    if (!lord_name.isEmpty()) {
+        QPushButton *lord_skills = new QPushButton(tr("Lord skills"));
+        connect(lord_skills, &QPushButton::clicked, this, [this, lord_name]() {
+            SkillOverview *page = new SkillOverview(this);
+            page->setAttribute(Qt::WA_DeleteOnClose);
+            page->setGeneral(Sanguosha->getGeneral(lord_name), tr("Lord: %1").arg(Sanguosha->translate(lord_name)));
+            page->show();
+        });
+        heading_row->addWidget(lord_skills);
+    }
+    root->addLayout(heading_row);
+    QHBoxLayout *body = new QHBoxLayout;
+    QListWidget *list = new QListWidget;
+    list->setViewMode(QListView::IconMode);
+    list->setResizeMode(QListView::Adjust);
+    list->setMovement(QListView::Static);
+    list->setSelectionMode(QAbstractItemView::SingleSelection);
+    list->setIconSize(QSize(96, 134));
+    list->setGridSize(QSize(120, 172));
+    list->setWordWrap(true);
+    list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    list->setMinimumWidth(0);
+    body->addWidget(list, 3);
+    QTextEdit *skills = new QTextEdit;
+    skills->setReadOnly(true);
+    skills->setProperty("description", true);
+    skills->setMinimumWidth(0);
+    body->addWidget(skills, 2);
+    foreach (const General *general, generals) {
+        if (general == nullptr)
+            continue;
+        QListWidgetItem *item = new QListWidgetItem(QIcon(G_ROOM_SKIN.getCardMainPixmap(general->objectName())), Sanguosha->translate(general->objectName()), list);
+        item->setData(Qt::UserRole, general->objectName());
+    }
+    connect(list, &QListWidget::currentItemChanged, skills, [skills](QListWidgetItem *item) {
+        if (item != nullptr) {
+            const General *general = Sanguosha->getGeneral(item->data(Qt::UserRole).toString());
+            skills->setHtml(general->getSkillDescription(true, false));
+        }
+    });
+    if (list->count() > 0)
+        list->setCurrentRow(0);
+    root->addLayout(body, 1);
+    QHBoxLayout *footer = new QHBoxLayout;
+    progress_bar = nullptr;
+    if (!view_only && ServerInfo.OperationTimeout != 0) {
+        progress_bar = new QSanCommandProgressBar;
+        progress_bar->setTimerEnabled(true);
+        progress_bar->setCountdown(S_COMMAND_CHOOSE_GENERAL);
+        footer->addWidget(progress_bar, 1);
+        progress_bar->show();
+        connect(progress_bar, &QSanCommandProgressBar::timedOut, this, &QDialog::reject);
+    } else {
+        footer->addStretch();
+    }
+    if (!view_only && ServerInfo.FreeChoose) {
+        QPushButton *free = new QPushButton(tr("Free choose ..."));
+        connect(free, &QPushButton::clicked, this, &ChooseGeneralDialog::freeChoose);
+        footer->addWidget(free);
+    }
+    QPushButton *confirm = new QPushButton(view_only ? tr("Back") : tr("Confirm"));
+    confirm->setMinimumWidth(160);
+    confirm->setProperty("sgsPrimaryAction", true);
+    confirm->setEnabled(view_only || list->count() > 0);
+    connect(confirm, &QPushButton::clicked, this, [this, list, view_only]() {
+        if (!view_only && list->currentItem() != nullptr && ClientInstance != nullptr)
+            ClientInstance->onPlayerChooseGeneral(list->currentItem()->data(Qt::UserRole).toString());
+        accept();
+    });
+    if (!view_only) {
+        const QString defaultName = generals.isEmpty() ? QString() : generals.first()->objectName();
+        connect(this, &QDialog::rejected, this, [defaultName]() {
+            if (ClientInstance != nullptr)
+                ClientInstance->onPlayerChooseGeneral(defaultName);
+        });
+    }
+    footer->addWidget(confirm);
+    root->addLayout(footer);
+    return;
+#endif
 
     QSignalMapper *mapper = new QSignalMapper(this);
     QList<OptionButton *> buttons;
@@ -288,6 +390,9 @@ FreeChooseDialog::FreeChooseDialog(QWidget *parent, bool pair_choose)
 
         if (!generals.isEmpty()) {
             QWidget *tab = createTab(generals);
+#ifdef Q_OS_ANDROID
+            tab = DialogSupport::createScrollArea(tab);
+#endif
             tab_widget->addTab(tab, QIcon(G_ROOM_SKIN.getPixmap(QSanRoomSkin::S_SKIN_KEY_KINGDOM_ICON, kingdom)), Sanguosha->translate(kingdom));
         }
     }
@@ -350,7 +455,11 @@ QWidget *FreeChooseDialog::createTab(const QList<const General *> &generals)
     layout->setOriginCorner(Qt::TopLeftCorner);
     QIcon lord_icon("image/system/roles/lord.png");
 
+#ifdef Q_OS_ANDROID
+    const int columns = 2;
+#else
     const int columns = 4;
+#endif
 
     for (int i = 0; i < generals.length(); i++) {
         const General *general = generals.at(i);

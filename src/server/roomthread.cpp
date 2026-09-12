@@ -55,7 +55,18 @@ RoomThread::RoomThread(Room *room)
     , game_rule(nullptr)
     , nextExtraTurn(nullptr)
     , extraTurnReturn(nullptr)
+    , m_stopRequested(0)
 {
+}
+
+void RoomThread::requestStop()
+{
+    m_stopRequested.storeRelease(1);
+}
+
+bool RoomThread::isStopRequested() const
+{
+    return m_stopRequested.loadAcquire() != 0;
 }
 
 void RoomThread::addPlayerSkills(ServerPlayer *player, bool invoke_game_start)
@@ -347,6 +358,8 @@ void RoomThread::run()
         for (int i = Config.CountDownSeconds; i >= 0; i--) {
             room->doBroadcastNotify(S_COMMAND_START_IN_X_SECONDS, i);
             sleep(1);
+            if (isStopRequested())
+                return;
         }
     } else
         room->doBroadcastNotify(S_COMMAND_START_IN_X_SECONDS, QVariant(0));
@@ -717,6 +730,9 @@ bool RoomThread::trigger(TriggerEvent triggerEvent, Room *room, QVariant &data)
     bool interrupt = false;
     try {
         forever {
+            if (isStopRequested())
+                throw GameFinished;
+
             getSkillAndSort(triggerEvent, room, details, triggered, data);
 
             QList<QSharedPointer<SkillInvokeDetail>> sameTiming;

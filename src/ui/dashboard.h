@@ -245,6 +245,12 @@ protected:
     QSanButton *m_btnReverseSelection;
     QSanButton *m_btnSortHandcard;
     QSanButton *m_btnNoNullification;
+#ifdef Q_OS_ANDROID
+    QSanButton *mobile_previous = nullptr;
+    QSanButton *mobile_next = nullptr;
+    QGraphicsSimpleTextItem *mobile_page_label = nullptr;
+    int mobile_hand_page = 0;
+#endif
     QGraphicsPixmapItem *_m_leftFrame, *_m_middleFrame, *_m_rightFrame;
     // we can not draw bg directly _m_rightFrame because then it will always be
     // under avatar (since it's avatar's parent).

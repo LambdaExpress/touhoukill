@@ -11,6 +11,7 @@
 #include "chooseoptionsbox.h"
 #include "choosetriggerorderbox.h"
 #include "distanceviewdialog.h"
+#include "dialogsupport.h"
 #include "engine.h"
 #include "generaloverview.h"
 #include "indicatoritem.h"
@@ -22,6 +23,7 @@
 #include "recorder.h"
 #include "settings.h"
 #include "sgswindow.h"
+#include "skilloverview.h"
 #include "uiUtils.h"
 
 #include <QApplication>
@@ -316,13 +318,32 @@ RoomScene::RoomScene(QMainWindow *main_window)
     chat_edit->setFont(info_plane_font);
 #endif
 
+#ifdef Q_OS_ANDROID
+    prompt_box = new Window(QString(), QSize(620, 100));
+#else
     prompt_box = new Window(tr("TouhouSatsu"), QSize(480, 200));
+#endif
     prompt_box->setOpacity(0);
     prompt_box->setFlag(QGraphicsItem::ItemIsMovable);
     prompt_box->shift();
     prompt_box->setZValue(10);
     prompt_box->keepWhenDisappear();
 
+#ifdef Q_OS_ANDROID
+    prompt_box->setFlag(QGraphicsItem::ItemIsMovable, false);
+    prompt_box_widget = nullptr;
+    QTextEdit *prompt = new QTextEdit;
+    prompt->setReadOnly(true);
+    prompt->setDocument(ClientInstance->getPromptDoc());
+    DialogSupport::applyMobileStyle(prompt);
+    QFont promptFont = prompt->font();
+    promptFont.setPixelSize(21);
+    prompt->setFont(promptFont);
+    prompt->setFixedSize(600, 84);
+    QGraphicsProxyWidget *promptProxy = new QGraphicsProxyWidget(prompt_box);
+    promptProxy->setWidget(prompt);
+    promptProxy->setPos(10, 8);
+#else
     prompt_box_widget = new QGraphicsTextItem(prompt_box);
     prompt_box_widget->setParent(prompt_box);
     prompt_box_widget->setPos(40, 45);
@@ -336,6 +357,7 @@ RoomScene::RoomScene(QMainWindow *main_window)
     qf.setPixelSize(21);
     qf.setStyleStrategy(QFont::PreferAntialias);
     prompt_box_widget->setFont(qf);
+#endif
 
     addItem(prompt_box);
 
@@ -422,12 +444,45 @@ RoomScene::RoomScene(QMainWindow *main_window)
 
     pindian_from_card = nullptr;
     pindian_to_card = nullptr;
+#ifdef Q_OS_ANDROID
+    QWidget *toolbar = new QWidget;
+    DialogSupport::applyMobileStyle(toolbar);
+    QHBoxLayout *tools = new QHBoxLayout(toolbar);
+    tools->setContentsMargins(0, 0, 0, 0);
+    QPushButton *hand = new QPushButton(tr("Hand cards"));
+    QPushButton *log = new QPushButton(tr("Battle log"));
+    QPushButton *chat = new QPushButton(tr("Chat"));
+    const QList<QPushButton *> buttons = {hand, log, chat};
+    foreach (QPushButton *button, buttons) {
+        button->setMinimumHeight(56);
+        tools->addWidget(button);
+    }
+    QFont toolFont = toolbar->font();
+    toolFont.setPixelSize(20);
+    toolbar->setFont(toolFont);
+    mobile_toolbar = addWidget(toolbar);
+    mobile_toolbar->setZValue(100);
+    connect(log, &QPushButton::clicked, this, [this]() { showMobileInformation(false); });
+    connect(chat, &QPushButton::clicked, this, [this]() { showMobileInformation(true); });
+    connect(hand, &QPushButton::clicked, this, [this]() {
+        CardOverview *overview = CardOverview::getInstance(this->main_window);
+        overview->loadFromList(dashboardPlayer()->getHandcards());
+        overview->exec();
+    });
+    m_tablePile->setScale(0.85);
+#endif
 }
 
 RoomScene::~RoomScene()
 {
     if (RoomSceneInstance == this)
         RoomSceneInstance = nullptr;
+
+    delete skill_overview;
+    skill_overview = nullptr;
+
+    delete m_choiceDialog;
+    m_choiceDialog = nullptr;
 }
 
 void RoomScene::handleGameEvent(const QVariant &args)
@@ -808,7 +863,13 @@ void RoomScene::handleGameEvent(const QVariant &args)
 
 QGraphicsItem *RoomScene::createDashboardButtons()
 {
+#ifdef Q_OS_ANDROID
+    QPixmap background(G_DASHBOARD_LAYOUT.m_buttonSetSize);
+    background.fill(Qt::transparent);
+    QGraphicsItem *widget = new QGraphicsPixmapItem(background);
+#else
     QGraphicsItem *widget = new QGraphicsPixmapItem(G_ROOM_SKIN.getPixmap(QSanRoomSkin::S_SKIN_KEY_DASHBOARD_BUTTON_SET_BG).scaled(G_DASHBOARD_LAYOUT.m_buttonSetSize));
+#endif
 
     ok_button = new QSanButton("platter", "confirm", widget);
     ok_button->setRect(G_DASHBOARD_LAYOUT.m_confirmButtonArea);
@@ -820,17 +881,26 @@ QGraphicsItem *RoomScene::createDashboardButtons()
     connect(cancel_button, SIGNAL(clicked()), this, SLOT(doCancelButton()));
     connect(discard_button, SIGNAL(clicked()), this, SLOT(doDiscardButton()));
 
+#ifndef Q_OS_ANDROID
     trust_button = new QSanButton("platter", "trust", widget);
     trust_button->setStyle(QSanButton::S_STYLE_TOGGLE);
     trust_button->setRect(G_DASHBOARD_LAYOUT.m_trustButtonArea);
     connect(trust_button, SIGNAL(clicked()), this, SLOT(trust()));
+#endif
     connect(Self, SIGNAL(state_changed()), this, SLOT(updateTrustButton()));
 
     // set them all disabled
     ok_button->setEnabled(false);
     cancel_button->setEnabled(false);
     discard_button->setEnabled(false);
+#ifdef Q_OS_ANDROID
+    ok_button->hide();
+    cancel_button->hide();
+    discard_button->hide();
+#endif
+#ifndef Q_OS_ANDROID
     trust_button->setEnabled(false);
+#endif
     return widget;
 }
 
@@ -1026,6 +1096,26 @@ void RoomScene::adjustItems()
     dashboard->setWidth(displayRegion.width());
     dashboard->setY(displayRegion.height() - dashboard->boundingRect().height());
 
+#ifdef Q_OS_ANDROID
+    const int toolbarWidth = 330;
+    mobile_toolbar->setGeometry(QRectF(displayRegion.right() - toolbarWidth - 8, 2, toolbarWidth, 58));
+    const int summaryWidth = qMax(200, qRound(displayRegion.width()) - toolbarWidth - 148);
+    m_rolesBox->setPixmap(m_rolesBoxBackground.scaled(summaryWidth, 58, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+    m_rolesBox->setPos(128, 0);
+    time_label_widget->setPos(132, 2);
+    log_box_widget->hide();
+    chat_box_widget->hide();
+    chat_edit_widget->hide();
+    chat_widget->hide();
+    _m_infoPlane = QRectF(displayRegion.right(), 60, 0, 0);
+    m_tablew = displayRegion.width();
+    m_tableh = displayRegion.height();
+    if (image_path.isEmpty() || !QFile::exists(image_path))
+        image_path = Config.TableBgImage;
+    changeTableBg(image_path);
+    updateRolesBox();
+    return;
+#endif
     // set infoplane
     _m_infoPlane.setWidth(displayRegion.width() * _m_roomLayout->m_infoPlaneWidthPercentage);
     _m_infoPlane.moveRight(displayRegion.right());
@@ -1130,6 +1220,10 @@ void RoomScene::_dispersePhotos(QList<Photo *> &photos, QRectF fillRegion, Qt::O
 
 void RoomScene::updateTable()
 {
+#ifdef Q_OS_ANDROID
+    updateMobileTable();
+    return;
+#endif
     int pad = _m_roomLayout->m_scenePadding + _m_roomLayout->m_photoRoomPadding;
     int tablew = log_box_widget->x() - (pad * 2);
     int tableh = sceneRect().height() - (pad * 2) - dashboard->boundingRect().height();
@@ -1794,6 +1888,38 @@ void RoomScene::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
             change_general_menu->popup(event->screenPos());
         }
     }
+}
+
+bool RoomScene::showSkillOverviewAt(const QPointF &scenePos)
+{
+    const ClientPlayer *player = playerAvatarAt(scenePos);
+    if (player == nullptr)
+        return false;
+
+    if (skill_overview == nullptr)
+        skill_overview = new SkillOverview(main_window);
+    skill_overview->setPlayer(player);
+    skill_overview->show();
+    skill_overview->raise();
+    return true;
+}
+
+const ClientPlayer *RoomScene::playerAvatarAt(const QPointF &scenePos) const
+{
+    QMapIterator<PlayerCardContainer *, const ClientPlayer *> itor(item2player);
+    while (itor.hasNext()) {
+        itor.next();
+        PlayerCardContainer *container = itor.key();
+        if (container == nullptr || itor.value() == nullptr)
+            continue;
+        GraphicsPixmapHoverItem *avatars[2] = {container->getAvartarItem(), container->getSmallAvartarItem()};
+        for (int i = 0; i < 2; i++) {
+            GraphicsPixmapHoverItem *avatar = avatars[i];
+            if (avatar != nullptr && avatar->isVisible() && avatar->sceneBoundingRect().contains(scenePos))
+                return itor.value();
+        }
+    }
+    return nullptr;
 }
 
 void RoomScene::chooseGeneral(const QStringList &generals, const bool single_result, const bool can_convert)
@@ -2758,8 +2884,36 @@ void RoomScene::showPromptBox()
     prompt_box->appear();
 }
 
+#ifdef Q_OS_ANDROID
+void RoomScene::updateActionButtons()
+{
+    bool visible = game_started && (Self != nullptr) && Self->isAlive() && (ClientInstance != nullptr);
+    if (visible) {
+        switch (ClientInstance->getStatus() & Client::ClientStatusBasicMask) {
+        case Client::NotActive:
+        case Client::AskForShowOrPindian:
+        case Client::AskForChoice:
+        case Client::AskForTriggerOrder:
+        case Client::AskForCardChosen:
+        case Client::AskForGeneralTaken:
+        case Client::AskForArrangement:
+            visible = false;
+            break;
+        default:
+            break;
+        }
+    }
+    ok_button->setVisible(visible);
+    cancel_button->setVisible(visible);
+    discard_button->setVisible(visible);
+}
+#endif
+
 void RoomScene::updateStatus(Client::Status oldStatus, Client::Status newStatus)
 {
+#ifdef Q_OS_ANDROID
+    updateActionButtons();
+#endif
     // Do not respond to server action requests while perspective input is locked
     if (m_perspectiveInputLocked)
         return;
@@ -3093,7 +3247,9 @@ void RoomScene::updateTrustButton()
 {
     if (ClientInstance->getReplayer() == nullptr) {
         bool trusting = Self->getState() == "trust";
+#ifndef Q_OS_ANDROID
         trust_button->update();
+#endif
         dashboard->setTrust(trusting);
     }
 }
@@ -3847,6 +4003,11 @@ void RoomScene::killPlayer(const QString &who)
         dashboard->update();
         general = Self->getGeneral();
         item2player.remove(dashboard);
+#ifdef Q_OS_ANDROID
+        ok_button->hide();
+        cancel_button->hide();
+        discard_button->hide();
+#endif
         if (ServerInfo.GameMode == "02_1v1" && general != nullptr)
             self_box->killPlayer(general->objectName());
     } else {
@@ -3877,6 +4038,9 @@ void RoomScene::revivePlayer(const QString &who)
         dashboard->revivePlayer();
         item2player.insert(dashboard, Self);
         updateSkillButtons();
+#ifdef Q_OS_ANDROID
+        updateActionButtons();
+#endif
     } else {
         Photo *photo = name2photo.value(who, nullptr);
         if (photo != nullptr && photo->getPlayer() != nullptr) {
@@ -4151,7 +4315,17 @@ void RoomScene::showPile(const QList<int> &card_ids, const QString &name, const 
         } else
             pileContainer->fillCards(card_ids);
     }
-    pileContainer->setPos(m_tableCenterPos - QPointF(pileContainer->boundingRect().width() / 2, pileContainer->boundingRect().height() / 2));
+    // CardContainer already translates its local origin by half its size.
+    pileContainer->setPos(m_tableCenterPos);
+#ifdef Q_OS_ANDROID
+    const QRectF available = sceneRect().adjusted(14, 14, -14, -14);
+    const QRectF bounds = pileContainer->boundingRect();
+    const qreal scale = qMin<qreal>(1, qMin(available.width() / bounds.width(), available.height() / bounds.height()));
+    pileContainer->setScale(scale);
+    const QRectF mapped = pileContainer->sceneBoundingRect();
+    pileContainer->setPos(pileContainer->pos() + available.center() - mapped.center());
+    pileContainer->addCloseButton();
+#endif
     pileContainer->show();
 }
 
@@ -4244,7 +4418,9 @@ void RoomScene::onGameStart()
     if (!Self->hasFlag("marshalling"))
         log_box->append(QString(tr("<font color='%1'>---------- Game Start ----------</font>").arg(Config.TextEditColor.name())));
 
+#ifndef Q_OS_ANDROID
     trust_button->setEnabled(true);
+#endif
 
 #ifdef AUDIO_SUPPORT
     setLordBGM();
@@ -4252,6 +4428,9 @@ void RoomScene::onGameStart()
 
     setLordBackdrop();
     game_started = true;
+#ifdef Q_OS_ANDROID
+    updateActionButtons();
+#endif
 
     if (isHegemonyGameMode(ServerInfo.GameMode)) {
         dashboard->refresh();
@@ -4486,7 +4665,7 @@ void RoomScene::doLightboxAnimation(const QString & /*unused*/, const QStringLis
     bool reset_size = word.startsWith("_mini_");
     word = Sanguosha->translate(word);
 
-    QRect rect = main_window->rect();
+    QRectF rect = sceneRect();
 
     if (word.startsWith("image=")) {
         QGraphicsRectItem *lightbox = addRect(rect);
@@ -5164,7 +5343,14 @@ void RoomScene::updateRolesBox()
         item->setPos((21 * (i - n / 2)) + centerX, 6);
     }
     m_pileCardNumInfoTextBox->setTextWidth(m_rolesBox->boundingRect().width());
+#ifdef Q_OS_ANDROID
+    m_pileCardNumInfoTextBox->setPos(0, 25);
+    QFont summaryFont(QStringLiteral("sans-serif"));
+    summaryFont.setPixelSize(18);
+    m_pileCardNumInfoTextBox->setFont(summaryFont);
+#else
     m_pileCardNumInfoTextBox->setPos(0, 35);
+#endif
 }
 
 void RoomScene::appendChatEdit(const QString &txt)
@@ -5183,6 +5369,11 @@ void RoomScene::appendChatBox(QString txt)
 
 void RoomScene::setChatBoxVisible(bool show)
 {
+#ifdef Q_OS_ANDROID
+    if (show)
+        showMobileInformation(true);
+    return;
+#endif
     if (!show) {
         chat_box_widget->hide();
         chat_edit->hide();
@@ -5196,6 +5387,109 @@ void RoomScene::setChatBoxVisible(bool show)
         log_box->resize(_m_infoPlane.width(), _m_infoPlane.height() * _m_roomLayout->m_logBoxHeightPercentage);
     }
 }
+
+#ifdef Q_OS_ANDROID
+void RoomScene::updateMobileTable()
+{
+    const QRectF screen = sceneRect();
+    const int count = photos.size();
+    const int rightCount = count > 5 ? (count - 4) / 2 : 0;
+    const int leftCount = count > 5 ? (count - 5) / 2 : 0;
+    const int topCount = count - rightCount - leftCount;
+    const qreal top = 68;
+    const qreal bottom = dashboard->y() - 46;
+    const qreal width = _m_photoLayout->m_normalWidth;
+    const qreal height = _m_photoLayout->m_normalHeight;
+    const int sideRows = qMax(1, qMax(rightCount, leftCount));
+    const qreal sideScale = qMin<qreal>(1, (bottom - top - 8) / (sideRows * (height + 8)));
+    const qreal sideWidth = width * sideScale;
+    const qreal sideHeight = height * sideScale;
+    const qreal sideInset = count > 5 ? sideWidth + 24 : 18;
+    const qreal topWidth = screen.width() - 2 * sideInset;
+    const qreal topScale = qMin<qreal>(1, topWidth / qMax<qreal>(1, topCount * (width + 12)));
+
+    for (int i = 0; i < count; ++i) {
+        Photo *photo = photos.at(i);
+        if (i < rightCount) {
+            photo->setScale(sideScale);
+            photo->setPos(screen.right() - sideWidth / 2 - 12, bottom - sideHeight / 2 - i * (sideHeight + 8));
+        } else if (i < rightCount + topCount) {
+            const int column = i - rightCount;
+            photo->setScale(topScale);
+            photo->setPos(screen.right() - sideInset - topWidth * (column + 0.5) / topCount, top + height * topScale / 2);
+        } else {
+            const int row = i - rightCount - topCount;
+            photo->setScale(sideScale);
+            photo->setPos(screen.left() + sideWidth / 2 + 12, bottom - sideHeight / 2 - (leftCount - row - 1) * (sideHeight + 8));
+        }
+        photo->setFloatingArea(QRect(0, 0, 20, height));
+    }
+
+    const qreal centerTop = top + height * topScale;
+    const qreal centerBottom = dashboard->y() - 72;
+    m_tableCenterPos = QPointF(screen.center().x(), (centerTop + centerBottom) / 2);
+    m_tableRect = QRectF(sideInset, centerTop, screen.width() - sideInset * 2, qMax<qreal>(1, centerBottom - centerTop));
+    dashboard->setFloatingArea(QRect(_m_photoLayout->m_normalWidth + 8, -96, dashboard->getMiddleWidth(), 28));
+    control_panel->setPos(m_tableCenterPos);
+    m_tablePile->setPos(m_tableCenterPos);
+    m_tablePile->setSize(qMax(320, qRound(m_tableRect.width() - 40)), _m_commonLayout->m_cardNormalHeight);
+    m_tablePile->adjustCards();
+    card_container->setPos(m_tableCenterPos);
+    pileContainer->setPos(m_tableCenterPos);
+    guanxing_box->setPos(m_tableCenterPos);
+    const QList<QGraphicsObject *> boxes = {m_chooseGeneralBox, m_chooseOptionsBox, m_chooseTriggerOrderBox, m_playerCardBox};
+    foreach (QGraphicsObject *box, boxes)
+        GraphicsBox::moveToCenter(box);
+    prompt_box->setPos(QPointF(screen.center().x(), dashboard->y() - 124));
+    pausing_item->setRect(screen);
+    pausing_text->setPos(screen.center() - pausing_text->boundingRect().center());
+    if (self_box != nullptr)
+        self_box->setPos(screen.right() - self_box->boundingRect().width() - 12, bottom - self_box->boundingRect().height());
+    if (enemy_box != nullptr)
+        enemy_box->setPos(12, top);
+}
+
+void RoomScene::showMobileInformation(bool chat)
+{
+    QDialog dialog(main_window);
+    dialog.setWindowTitle(chat ? tr("Chat") : tr("Battle log"));
+    dialog.setProperty("sgsMobileLayout", true);
+    QVBoxLayout *layout = new QVBoxLayout(&dialog);
+    QHBoxLayout *header = new QHBoxLayout;
+    QPushButton *back = new QPushButton(tr("Back to game"));
+    connect(back, &QPushButton::clicked, &dialog, &QDialog::reject);
+    header->addWidget(back);
+    QLabel *title = new QLabel(dialog.windowTitle());
+    title->setProperty("sgsHeading", true);
+    header->addWidget(title, 1);
+    layout->addLayout(header);
+    QTextEdit *view = new QTextEdit;
+    view->setReadOnly(true);
+    view->setDocument(chat ? chat_box->document() : log_box->document());
+    layout->addWidget(view, 1);
+    if (chat && !ServerInfo.DisableChat) {
+        QHBoxLayout *input = new QHBoxLayout;
+        QLineEdit *message = new QLineEdit;
+        message->setMaxLength(chat_edit->maxLength());
+        message->setPlaceholderText(chat_edit->placeholderText());
+        QPushButton *send = new QPushButton(tr("Send"));
+        send->setProperty("sgsPrimaryAction", true);
+        auto sendMessage = [this, message]() {
+            if (message->text().trimmed().isEmpty())
+                return;
+            chat_edit->setText(message->text());
+            speak();
+            message->clear();
+        };
+        connect(send, &QPushButton::clicked, &dialog, sendMessage);
+        connect(message, &QLineEdit::returnPressed, &dialog, sendMessage);
+        input->addWidget(message, 1);
+        input->addWidget(send);
+        layout->addLayout(input);
+    }
+    dialog.exec();
+}
+#endif
 
 HeroSkinContainer *RoomScene::findHeroSkinContainer(const QString &generalName) const
 {
@@ -5429,23 +5723,34 @@ void RoomScene::setLordBackdrop(const QString &lord)
 CommandLinkDoubleClickButton::CommandLinkDoubleClickButton(QWidget *parent)
     : QCommandLinkButton(parent)
 {
+#ifdef Q_OS_ANDROID
+    connect(this, &QPushButton::clicked, this, [this]() { emit double_clicked(QPrivateSignal()); });
+#endif
 }
 
 CommandLinkDoubleClickButton::CommandLinkDoubleClickButton(const QString &text, QWidget *parent)
     : QCommandLinkButton(text, parent)
 {
+#ifdef Q_OS_ANDROID
+    connect(this, &QPushButton::clicked, this, [this]() { emit double_clicked(QPrivateSignal()); });
+#endif
 }
 
 CommandLinkDoubleClickButton::CommandLinkDoubleClickButton(const QString &text, const QString &description, QWidget *parent)
     : QCommandLinkButton(text, description, parent)
 {
+#ifdef Q_OS_ANDROID
+    connect(this, &QPushButton::clicked, this, [this]() { emit double_clicked(QPrivateSignal()); });
+#endif
 }
 
 CommandLinkDoubleClickButton::~CommandLinkDoubleClickButton() = default;
 
 void CommandLinkDoubleClickButton::mouseDoubleClickEvent(QMouseEvent *event)
 {
+#ifndef Q_OS_ANDROID
     emit double_clicked(QPrivateSignal());
+#endif
     QCommandLinkButton::mouseDoubleClickEvent(event);
 }
 

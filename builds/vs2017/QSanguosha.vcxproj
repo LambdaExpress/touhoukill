@@ -439,6 +439,7 @@
     <ClCompile Include="..\..\src\dialog\connectiondialog.cpp" />
     <ClCompile Include="..\..\src\dialog\distanceviewdialog.cpp" />
     <ClCompile Include="..\..\src\dialog\generaloverview.cpp" />
+    <ClCompile Include="..\..\src\dialog\skilloverview.cpp" />
     <ClCompile Include="..\..\src\dialog\mainwindow.cpp" />
     <ClCompile Include="..\..\src\dialog\roleassigndialog.cpp" />
     <ClCompile Include="..\..\src\package\exppattern.cpp" />
@@ -642,6 +643,8 @@
     <QtMoc Include="..\..\src\dialog\distanceviewdialog.h">
     </QtMoc>
     <QtMoc Include="..\..\src\dialog\generaloverview.h">
+    </QtMoc>
+    <QtMoc Include="..\..\src\dialog\skilloverview.h">
     </QtMoc>
     <QtMoc Include="..\..\src\dialog\mainwindow.h">
     </QtMoc>

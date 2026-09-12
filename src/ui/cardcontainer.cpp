@@ -20,6 +20,11 @@ CardContainer::CardContainer()
     close_button = new SanCloseButton;
     close_button->setParentItem(this);
     close_button->setPos(517, 21);
+#ifdef Q_OS_ANDROID
+    const qreal closeScale = 56.0 / close_button->boundingRect().height();
+    close_button->setScale(closeScale);
+    close_button->setPos(_m_background.width() - close_button->boundingRect().width() * closeScale - 8, 8);
+#endif
     close_button->hide();
     connect(close_button, SIGNAL(clicked()), this, SLOT(clear()));
 }

@@ -135,7 +135,7 @@ void Settings::init()
 #ifdef Q_OS_WIN32
     UserName = value("UserName", qgetenv("USERNAME")).toString();
 #else
-    UserName = value("USERNAME", qgetenv("USER")).toString();
+    UserName = value("UserName", qgetenv("USER")).toString();
 #endif
 
     if (UserName == "Admin" || UserName == "Administrator")

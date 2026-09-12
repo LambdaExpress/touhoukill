@@ -1,5 +1,6 @@
 #include "configdialog.h"
 #include "audio.h"
+#include "dialogsupport.h"
 #include "engine.h"
 #include "settings.h"
 #include "ui_configdialog.h"
@@ -8,6 +9,8 @@
 #include <QDesktopServices>
 #include <QFileDialog>
 #include <QFontDialog>
+#include <QPushButton>
+#include <QScrollArea>
 
 ConfigDialog::ConfigDialog(QWidget *parent)
     : QDialog(parent)
@@ -82,6 +85,20 @@ ConfigDialog::ConfigDialog(QWidget *parent)
     connect(ui->enableAutoSaveCheckBox, &QCheckBox::toggled, ui->resetRecordPathButton, &QPushButton::setEnabled);
 
     ui->recordPathSetupLineEdit->setText(Config.RecordSavePath);
+#ifdef Q_OS_ANDROID
+    setProperty("sgsMobileLayout", true);
+    QLabel *title = new QLabel(windowTitle());
+    title->setProperty("sgsHeading", true);
+    ui->verticalLayout_9->insertWidget(0, title);
+    for (int i = 0; i < ui->tabWidget->count(); ++i) {
+        QWidget *page = ui->tabWidget->widget(i);
+        const QString label = ui->tabWidget->tabText(i);
+        ui->tabWidget->removeTab(i);
+        ui->tabWidget->insertTab(i, DialogSupport::createScrollArea(page), label);
+    }
+    ui->tabWidget->setCurrentIndex(0);
+    ui->buttonBox->button(QDialogButtonBox::Ok)->setProperty("sgsPrimaryAction", true);
+#endif
 }
 
 void ConfigDialog::showFont(QLineEdit *lineedit, const QFont &font)

@@ -14,6 +14,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QFile>
 #include <QHostAddress>
 #include <QMessageBox>
@@ -80,7 +81,40 @@ Room::Room(QObject *parent, const QString &mode)
 
 Room::~Room()
 {
+    stopGame();
+    if (thread != nullptr && thread->isFinished()) {
+        delete thread;
+        thread = nullptr;
+    }
     lua_close(L); // it cause a huge memory leak if we don't do this when quit
+}
+
+bool Room::isGameStopRequested() const
+{
+    return thread != nullptr && thread->isStopRequested();
+}
+
+void Room::stopGame()
+{
+    if (thread == nullptr)
+        return;
+
+    thread->requestStop();
+
+    foreach (ServerPlayer *player, m_players)
+        player->releaseLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
+    _m_semRaceRequest.release();
+
+    QEventLoop loop;
+    QTimer timer;
+    timer.setSingleShot(true);
+    connect(thread, SIGNAL(finished()), &loop, SLOT(quit()));
+    connect(&timer, SIGNAL(timeout()), &loop, SLOT(quit()));
+    timer.start(5000);
+    if (thread->isRunning())
+        loop.exec(QEventLoop::ExcludeUserInputEvents | QEventLoop::ExcludeSocketNotifiers);
+
+    game_finished = true;
 }
 
 void Room::initCallbacks()
@@ -375,8 +409,14 @@ void Room::updateStateItem()
 
         if (role1 != role2)
             return role1 < role2;
-        else
+
+        // Among players of one role the living ones come first. The alive flags have to be
+        // compared explicitly: returning isAlive() alone made comp(x, x) true, and libc++'s
+        // unguarded partition scan uses the pivot comparison to stop.
+        if (player1->isAlive() != player2->isAlive())
             return player1->isAlive();
+
+        return false;
     });
     QString roles;
     foreach (ServerPlayer *p, players) {
@@ -874,6 +914,8 @@ ServerPlayer *Room::getRaceResult(QList<ServerPlayer *> &players, QSanProtocol::
         time_t timeRemain = timeOut - timer.elapsed();
         if (timeRemain < 0)
             timeRemain = 0;
+        if (isGameStopRequested())
+            break;
         bool tryAcquireResult = true;
         if (Config.OperationNoLimit)
             _m_semRaceRequest.acquire();
@@ -906,8 +948,14 @@ ServerPlayer *Room::getRaceResult(QList<ServerPlayer *> &players, QSanProtocol::
         }
     }
 
-    if (!validResult)
-        _m_semRoomMutex.acquire();
+    if (isGameStopRequested())
+        validResult = false;
+    if (!validResult) {
+        if (isGameStopRequested())
+            _m_semRoomMutex.tryAcquire(1);
+        else
+            _m_semRoomMutex.acquire();
+    }
     _m_raceStarted = false;
     foreach (ServerPlayer *player, players) {
         player->acquireLock(ServerPlayer::SEMA_MUTEX);
@@ -917,7 +965,10 @@ ServerPlayer *Room::getRaceResult(QList<ServerPlayer *> &players, QSanProtocol::
         player->releaseLock(ServerPlayer::SEMA_MUTEX);
     }
     _m_semRoomMutex.release();
-    return _m_raceWinner.fetchAndStoreRelease(nullptr);
+    ServerPlayer *raceWinner = _m_raceWinner.fetchAndStoreRelease(nullptr);
+    if (isGameStopRequested())
+        return nullptr;
+    return raceWinner;
 }
 
 bool Room::doNotify(ServerPlayer *player, QSanProtocol::CommandType command, const QVariant &arg)
@@ -986,10 +1037,12 @@ bool Room::getResult(ServerPlayer *player, time_t timeOut)
     if (player->isOnline()) {
         player->releaseLock(ServerPlayer::SEMA_MUTEX);
 
-        if (Config.OperationNoLimit)
-            player->acquireLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
-        else
-            player->tryAcquireLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE, timeOut);
+        if (!isGameStopRequested()) {
+            if (Config.OperationNoLimit)
+                player->acquireLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE);
+            else
+                player->tryAcquireLock(ServerPlayer::SEMA_COMMAND_INTERACTIVE, timeOut);
+        }
 
         // Note that we rely on processResponse to filter out all unrelevant packet.
         // By the time the lock is released, m_clientResponse must be the right message
@@ -999,7 +1052,7 @@ bool Room::getResult(ServerPlayer *player, time_t timeOut)
         // It is ensured by trustCommand and reportDisconnection that the player reports these status
         // is the player waiting the lock. In these cases, the serial number and command type doesn't matter.
         player->acquireLock(ServerPlayer::SEMA_MUTEX);
-        validResult = player->m_isClientResponseReady;
+        validResult = player->m_isClientResponseReady && !isGameStopRequested();
     }
     player->m_expectedReplyCommand = S_COMMAND_UNKNOWN;
     player->m_isWaitingReply = false;
@@ -4896,11 +4949,11 @@ QList<CardsMoveOneTimeStruct> Room::_mergeMoves(const QList<CardsMoveStruct> &ca
             if (b == nullptr)
                 b = (ServerPlayer *)move2.to;
 
-            if (a == nullptr || b == nullptr)
-                return a != nullptr;
-
-            Room *room = a->getRoom();
-            return room->getFront(a, b) == a;
+            // Must go through the strict action-order predicate: getFront() answers "who acts
+            // first" and returns its second argument when the seat indexes tie, so using
+            // getFront(a, b) == a as a comparator made comp(x, x) true and std::sort's
+            // unguarded partition scan read past the end of the array.
+            return ServerPlayer::CompareByActionOrder(a, b);
         });
     }
 
@@ -4986,11 +5039,8 @@ QList<CardsMoveStruct> Room::_separateMoves(const QList<CardsMoveOneTimeStruct> 
             if (b == nullptr)
                 b = (ServerPlayer *)move2.to;
 
-            if (a == nullptr || b == nullptr)
-                return a != nullptr;
-
-            Room *room = a->getRoom();
-            return room->getFront(a, b) == a;
+            // See _mergeMoves: the comparator has to be a strict weak ordering.
+            return ServerPlayer::CompareByActionOrder(a, b);
         });
     }
     return card_moves;

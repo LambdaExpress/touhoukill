@@ -10,6 +10,8 @@
 #include <QTextEdit>
 
 class QGraphicsSimpleTextItem;
+class QGraphicsProxyWidget;
+class QGridLayout;
 
 class StartScene : public QGraphicsScene
 {
@@ -32,6 +34,10 @@ private:
     QTextEdit *server_log;
     QGraphicsSimpleTextItem *website_text;
     QList<Button *> buttons;
+#ifdef Q_OS_ANDROID
+    QGraphicsProxyWidget *mobile_panel = nullptr;
+    QGridLayout *mobile_grid = nullptr;
+#endif
 };
 
 #endif

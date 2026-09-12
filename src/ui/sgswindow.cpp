@@ -1,18 +1,32 @@
 #include "sgswindow.h"
 #include "button.h"
+#include "dialogsupport.h"
 #include "settings.h"
 
 #include <QGraphicsDropShadowEffect>
+#include <QGraphicsProxyWidget>
+#include <QGraphicsScene>
 #include <QGraphicsRotation>
+#include <QGuiApplication>
 #include <QPainter>
 #include <QParallelAnimationGroup>
 #include <QPropertyAnimation>
+#include <QScreen>
+#include <QTextBrowser>
 
-Window::Window(const QString &title, const QSizeF &size, const QString &path)
-    : size(size)
+Window::Window(const QString &title, const QSizeF &requestedSize, const QString &path)
+    : size(requestedSize)
     , keep_when_disappear(false)
 {
     setFlags(ItemIsMovable);
+#ifdef Q_OS_ANDROID
+    if (QScreen *screen = QGuiApplication::primaryScreen()) {
+        const QSize available = screen->availableGeometry().size() - QSize(24, 24);
+        size.setWidth(qMin<qreal>(size.width(), available.width()));
+        size.setHeight(qMin<qreal>(size.height(), available.height()));
+    }
+    setFlag(ItemIsMovable, false);
+#endif
 
     QPixmap *bg = nullptr;
     if (!path.isEmpty())
@@ -69,6 +83,17 @@ Window::Window(const QString &title, const QSizeF &size, const QString &path)
 
 void Window::addContent(const QString &content)
 {
+#ifdef Q_OS_ANDROID
+    QTextBrowser *text = new QTextBrowser;
+    text->setProperty("description", true);
+    text->setHtml(content);
+    DialogSupport::applyMobileStyle(text);
+    text->setFixedSize(qMax(1, qRound(size.width() - 30)), qMax(1, qRound(size.height() - 120)));
+    QGraphicsProxyWidget *proxy = new QGraphicsProxyWidget(this);
+    proxy->setWidget(text);
+    proxy->setPos(15, 40);
+    return;
+#endif
     QGraphicsTextItem *content_item = new QGraphicsTextItem(this);
     content_item->moveBy(15, 40);
     content_item->setHtml(content);
@@ -99,6 +124,15 @@ Button *Window::addCloseButton(const QString &label)
 
 void Window::shift(int pos_x, int pos_y)
 {
+#ifdef Q_OS_ANDROID
+    if (scene() != nullptr) {
+        const QRectF available = scene()->sceneRect().adjusted(12, 12, -12, -12);
+        const qreal factor = qMin<qreal>(1, qMin(available.width() / size.width(), available.height() / size.height()));
+        setTransform(QTransform::fromScale(factor, factor));
+        setPos(available.center() - QPointF(size.width() * factor / 2, size.height() * factor / 2));
+        return;
+    }
+#endif
     resetTransform();
     setTransform(QTransform::fromTranslate((pos_x - size.width()) / 2, (pos_y - size.height()) / 2), true);
 }

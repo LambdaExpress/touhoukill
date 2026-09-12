@@ -182,10 +182,12 @@ class Server : public QObject
 
 public:
     explicit Server(QObject *parent);
+    ~Server() override;
 
     void broadcast(const QString &msg);
     bool listen();
     void daemonize();
+    void shutdown();
     Room *createNewRoom();
     void signupPlayer(ServerPlayer *player);
 

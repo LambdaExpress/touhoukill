@@ -77,7 +77,11 @@ private:
     QList<GeneralCardItem *> items, selected;
     static const int top_dark_bar = 27;
     static const int top_blank_width = 42;
+#ifdef Q_OS_ANDROID
+    static const int bottom_blank_width = 96;
+#else
     static const int bottom_blank_width = 68;
+#endif
     static const int card_bottom_to_split_line = 23;
     static const int card_to_center_line = 5;
     static const int left_blank_width = 37;

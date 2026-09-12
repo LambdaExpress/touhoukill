@@ -17,8 +17,10 @@ Mogara
 #define _CHOOSE_OPTIONS_BOX_H
 
 #include "graphicsbox.h"
+#include <QPointer>
 
 class Button;
+class QDialog;
 class QSanCommandProgressBar;
 class QGraphicsProxyWidget;
 
@@ -54,6 +56,9 @@ private:
 
     QGraphicsProxyWidget *progressBarItem;
     QSanCommandProgressBar *progressBar;
+#ifdef Q_OS_ANDROID
+    QPointer<QDialog> mobile_dialog;
+#endif
 
     int getButtonWidth() const;
 

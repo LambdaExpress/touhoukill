@@ -11,6 +11,7 @@ class QCommandLinkButton;
 #include <QDialog>
 #include <QGroupBox>
 #include <QLabel>
+#include <QPixmap>
 #include <QSpinBox>
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
@@ -86,6 +87,18 @@ private:
     bool hasSkin(const QString &general_name);
     QString getIllustratorInfo(const QString &general_name);
     QString getOriginInfo(const QString &general_name);
+
+#ifdef Q_OS_ANDROID
+    QLineEdit *mobile_search = nullptr;
+    QLabel *mobile_summary = nullptr;
+    QPixmap mobile_portrait;
+    void setupMobileLayout();
+    void filterMobileGenerals(const QString &text);
+    void updateMobilePortrait();
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+#endif
 
 public slots:
     void startSearch(bool include_hidden, const QString &nickname, const QString &name, const QStringList &genders, const QStringList &kingdoms, int lower, int upper,

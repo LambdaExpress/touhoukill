@@ -55,6 +55,7 @@ SOURCES += \
     src/dialog/distanceviewdialog.cpp \
     src/dialog/dialogsupport.cpp \
     src/dialog/generaloverview.cpp \
+    src/dialog/skilloverview.cpp \
     src/dialog/updatedialog.cpp \
     src/dialog/mainwindow.cpp \
     src/dialog/roleassigndialog.cpp \
@@ -166,6 +167,7 @@ HEADERS += \
     src/dialog/distanceviewdialog.h \
     src/dialog/dialogsupport.h \
     src/dialog/generaloverview.h \
+    src/dialog/skilloverview.h \
     src/dialog/updatedialog.h \
     src/dialog/mainwindow.h \
     src/dialog/roleassigndialog.h \

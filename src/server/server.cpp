@@ -1,6 +1,7 @@
 #include "server.h"
 #include "SkinBank.h"
 #include "choosegeneraldialog.h"
+#include "dialogsupport.h"
 #include "engine.h"
 #include "nativesocket.h"
 #include "protocol.h"
@@ -20,12 +21,24 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QScrollArea>
+#include <QStackedWidget>
 #include <QVBoxLayout>
 
 using namespace QSanProtocol;
 
 static QLayout *HLay(QWidget *left, QWidget *right)
 {
+#ifdef Q_OS_ANDROID
+    if (qobject_cast<QAbstractButton *>(left) != nullptr && qobject_cast<QAbstractButton *>(right) != nullptr) {
+        QVBoxLayout *layout = new QVBoxLayout;
+        layout->addWidget(left);
+        layout->addWidget(right);
+        return layout;
+    }
+    if (QLabel *label = qobject_cast<QLabel *>(left))
+        label->setWordWrap(true);
+#endif
     QHBoxLayout *layout = new QHBoxLayout;
     layout->addWidget(left);
     layout->addWidget(right);
@@ -37,6 +50,35 @@ ServerDialog::ServerDialog(QWidget *parent)
 {
     setWindowTitle(tr("Start server"));
 
+#ifdef Q_OS_ANDROID
+    setProperty("sgsMobileLayout", true);
+    QVBoxLayout *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(12, 8, 12, 8);
+    QLabel *title = new QLabel(windowTitle());
+    title->setProperty("sgsHeading", true);
+    layout->addWidget(title);
+    QHBoxLayout *body = new QHBoxLayout;
+    QVBoxLayout *navigation = new QVBoxLayout;
+    QStackedWidget *pages = new QStackedWidget;
+    QButtonGroup *sections = new QButtonGroup(this);
+    const QStringList labels = {tr("Basic"), tr("Game Package Selection"), tr("Advanced"), tr("Miscellaneous")};
+    const QList<QWidget *> content = {createBasicTab(), createPackageTab(), createAdvancedTab(), createMiscTab()};
+    for (int i = 0; i < content.size(); ++i) {
+        QPushButton *button = new QPushButton(labels.at(i));
+        button->setCheckable(true);
+        button->setMinimumWidth(128);
+        sections->addButton(button, i);
+        navigation->addWidget(button);
+        pages->addWidget(DialogSupport::createScrollArea(content.at(i)));
+        connect(button, &QPushButton::clicked, pages, [pages, i]() { pages->setCurrentIndex(i); });
+    }
+    sections->button(0)->setChecked(true);
+    navigation->addStretch();
+    body->addLayout(navigation);
+    body->addWidget(pages, 1);
+    layout->addLayout(body, 1);
+    layout->addLayout(createButtonLayout());
+#else
     QTabWidget *tab_widget = new QTabWidget;
     tab_widget->addTab(createBasicTab(), tr("Basic"));
     tab_widget->addTab(createPackageTab(), tr("Game Package Selection"));
@@ -49,6 +91,7 @@ ServerDialog::ServerDialog(QWidget *parent)
     setLayout(layout);
 
     setMinimumWidth(300);
+#endif
 }
 
 QWidget *ServerDialog::createBasicTab()
@@ -64,6 +107,9 @@ QWidget *ServerDialog::createBasicTab()
     nolimit_checkbox = new QCheckBox(tr("No limit"));
     nolimit_checkbox->setChecked(Config.OperationNoLimit);
     connect(nolimit_checkbox, SIGNAL(toggled(bool)), timeout_spinbox, SLOT(setDisabled(bool)));
+#ifdef Q_OS_ANDROID
+    timeout_spinbox->setDisabled(Config.OperationNoLimit);
+#endif
 
     // add 1v1 banlist edit button
     QPushButton *edit_button = new QPushButton(tr("Banlist ..."));
@@ -71,13 +117,22 @@ QWidget *ServerDialog::createBasicTab()
     connect(edit_button, SIGNAL(clicked()), this, SLOT(edit1v1Banlist()));
 
     QFormLayout *form_layout = new QFormLayout;
+#ifdef Q_OS_ANDROID
+    form_layout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    form_layout->setRowWrapPolicy(QFormLayout::WrapLongRows);
+#endif
     form_layout->addRow(tr("Server name"), server_name_edit);
     QHBoxLayout *lay = new QHBoxLayout;
     lay->addWidget(timeout_spinbox);
     lay->addWidget(nolimit_checkbox);
+#ifndef Q_OS_ANDROID
     lay->addWidget(edit_button);
+#endif
     form_layout->addRow(tr("Operation timeout"), lay);
     form_layout->addRow(createGameModeBox());
+#ifdef Q_OS_ANDROID
+    form_layout->addRow(edit_button);
+#endif
 
     QWidget *widget = new QWidget;
     widget->setLayout(form_layout);
@@ -108,6 +163,11 @@ QWidget *ServerDialog::createPackageTab()
     int j = 0;
     int row = 0;
     int column = 0;
+#ifdef Q_OS_ANDROID
+    const int columns = 3;
+#else
+    const int columns = 5;
+#endif
     foreach (const QString &extension, extensions) {
         const Package *package = Sanguosha->findChild<const Package *>(extension);
         if (package == nullptr)
@@ -126,16 +186,16 @@ QWidget *ServerDialog::createPackageTab()
         case Package::GeneralPack: {
             if (extension == "standard" || extension == "test")
                 continue;
-            row = i / 5;
-            column = i % 5;
+            row = i / columns;
+            column = i % columns;
             i++;
 
             layout1->addWidget(checkbox, row, column + 1);
             break;
         }
         case Package::CardPack: {
-            row = j / 5;
-            column = j % 5;
+            row = j / columns;
+            column = j % columns;
             j++;
 
             layout2->addWidget(checkbox, row, column + 1);
@@ -293,6 +353,10 @@ QWidget *ServerDialog::createMiscTab()
 
     minimize_dialog_checkbox = new QCheckBox(tr("Minimize the dialog when server runs"));
     minimize_dialog_checkbox->setChecked(Config.EnableMinimizeDialog);
+#ifdef Q_OS_ANDROID
+    minimize_dialog_checkbox->setChecked(false);
+    minimize_dialog_checkbox->hide();
+#endif
 
     surrender_at_death_checkbox = new QCheckBox(tr("Surrender at the time of Death"));
     surrender_at_death_checkbox->setChecked(Config.SurrenderAtDeath);
@@ -635,6 +699,10 @@ QGroupBox *ServerDialog::createRoleBox()
     QFormLayout *l = new QFormLayout;
     l->addRow(tr("Renegade Win with at Most Numbers of Royalists"), royalist);
     l->addRow(tr("Renegade Win with at Most Numbers of Rebels"), rebel);
+#ifdef Q_OS_ANDROID
+    l->setRowWrapPolicy(QFormLayout::WrapAllRows);
+    l->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+#endif
 
     box->setLayout(l);
     return box;
@@ -643,7 +711,7 @@ QGroupBox *ServerDialog::createRoleBox()
 QGroupBox *ServerDialog::createGameModeBox()
 {
     QGroupBox *mode_box = new QGroupBox(tr("Game mode"));
-    mode_group = new QButtonGroup;
+    mode_group = new QButtonGroup(this);
 
     QObjectList item_list;
 
@@ -694,6 +762,42 @@ QGroupBox *ServerDialog::createGameModeBox()
         }
     }
 
+#ifdef Q_OS_ANDROID
+    QVBoxLayout *layout = new QVBoxLayout(mode_box);
+    QComboBox *mode = new QComboBox;
+    mode->setMaxVisibleItems(6);
+    mode->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    mode->setMinimumContentsLength(12);
+    mode->setAccessibleName(tr("Game mode"));
+    layout->addWidget(mode);
+    QList<QGroupBox *> options;
+    foreach (QObject *item, item_list) {
+        if (QRadioButton *button = qobject_cast<QRadioButton *>(item)) {
+            button->setParent(mode_box);
+            button->hide();
+            mode->addItem(button->text(), button->objectName());
+            if (button->isChecked())
+                mode->setCurrentIndex(mode->count() - 1);
+        } else if (QGroupBox *box = qobject_cast<QGroupBox *>(item)) {
+            layout->addWidget(box);
+            box->setVisible(box->isEnabled());
+            options << box;
+        }
+    }
+    if (mode_group->checkedButton() == nullptr && !mode_group->buttons().isEmpty())
+        mode_group->buttons().first()->setChecked(true);
+    connect(mode, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this, mode, options](int index) {
+        const QString name = mode->itemData(index).toString();
+        foreach (QAbstractButton *button, mode_group->buttons()) {
+            if (button->objectName() == name) {
+                button->setChecked(true);
+                break;
+            }
+        }
+        foreach (QGroupBox *box, options)
+            box->setVisible(box->isEnabled());
+    });
+#else
     QVBoxLayout *left = new QVBoxLayout;
     QVBoxLayout *right = new QVBoxLayout;
 
@@ -718,6 +822,7 @@ QGroupBox *ServerDialog::createGameModeBox()
     layout->addLayout(right);
 
     mode_box->setLayout(layout);
+#endif
 
     return mode_box;
 }
@@ -730,6 +835,12 @@ QLayout *ServerDialog::createButtonLayout()
     QPushButton *ok_button = new QPushButton(tr("OK"));
     QPushButton *cancel_button = new QPushButton(tr("Cancel"));
 
+#ifdef Q_OS_ANDROID
+    ok_button->setText(tr("Create room"));
+    ok_button->setProperty("sgsPrimaryAction", true);
+    cancel_button->setMinimumWidth(120);
+    ok_button->setMinimumWidth(180);
+#endif
     button_layout->addWidget(ok_button);
     button_layout->addWidget(cancel_button);
 
@@ -1040,6 +1151,24 @@ Server::Server(QObject *parent)
 
     connect(server, SIGNAL(new_connection(ClientSocket *)), this, SLOT(processNewConnection(ClientSocket *)));
     connect(qApp, SIGNAL(aboutToQuit()), this, SLOT(deleteLater()));
+}
+
+Server::~Server()
+{
+    shutdown();
+}
+
+void Server::shutdown()
+{
+    foreach (Room *room, rooms)
+        room->stopGame();
+
+    rooms.clear();
+    players.clear();
+    addresses.clear();
+    name2objname.clear();
+
+    current = nullptr;
 }
 
 void Server::broadcast(const QString &msg)

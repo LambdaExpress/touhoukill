@@ -5,6 +5,7 @@
 #include "client.h"
 #include "configdialog.h"
 #include "connectiondialog.h"
+#include "dialogsupport.h"
 #include "generaloverview.h"
 #include "lua.hpp"
 #include "pixmapanimation.h"
@@ -32,6 +33,8 @@
 #include <QGraphicsTextItem>
 #include <QGraphicsView>
 #include <QGroupBox>
+#include <QGridLayout>
+#include <QKeyEvent>
 #include <QInputDialog>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -43,6 +46,7 @@
 #include <QProcess>
 #include <QProgressBar>
 #include <QSettings>
+#include <QScrollArea>
 #include <QSpinBox>
 #include <QStatusBar>
 #include <QSystemTrayIcon>
@@ -71,12 +75,23 @@ public:
         // menus. A press that is held without moving becomes a right click.
         m_longPressTimer.setSingleShot(true);
         m_longPressTimer.setInterval(LONG_PRESS_INTERVAL);
-        connect(&m_longPressTimer, &QTimer::timeout, this, [this]() { emitSyntheticRightClick(); });
+        connect(&m_longPressTimer, &QTimer::timeout, this, &FitView::onLongPress);
         viewport()->installEventFilter(this);
 #endif
     }
 
 #ifdef Q_OS_ANDROID
+    void keyPressEvent(QKeyEvent *event) override
+    {
+        if (event->key() == Qt::Key_Back || event->key() == Qt::Key_Escape) {
+            if (MainWindow *window = qobject_cast<MainWindow *>(parentWidget()))
+                window->showMobileMenu();
+            event->accept();
+            return;
+        }
+        QGraphicsView::keyPressEvent(event);
+    }
+
     bool eventFilter(QObject *watched, QEvent *event) override
     {
         if (watched != viewport())
@@ -88,6 +103,7 @@ public:
             if (mouseEvent->button() != Qt::LeftButton)
                 break;
             m_pressPosition = mouseEvent->pos();
+            m_skillPageOpened = false;
             m_longPressTimer.start();
             break;
         }
@@ -99,6 +115,11 @@ public:
         }
         case QEvent::MouseButtonRelease:
             m_longPressTimer.stop();
+            if (m_skillPageOpened) {
+                m_skillPageOpened = false;
+                m_rightClickEmitted = false;
+                return true;
+            }
             if (m_rightClickEmitted) {
                 // The long press already delivered its own right click, so the real
                 // release must not additionally act as a left click.
@@ -147,6 +168,17 @@ public:
 
 #ifdef Q_OS_ANDROID
 private:
+    void onLongPress()
+    {
+        RoomScene *room_scene = qobject_cast<RoomScene *>(scene());
+        if ((room_scene != nullptr) && room_scene->showSkillOverviewAt(mapToScene(m_pressPosition))) {
+            m_skillPageOpened = true;
+            return;
+        }
+
+        emitSyntheticRightClick();
+    }
+
     // A held press stands in for the right button, which a touch screen does not have,
     // but only where the right button does something: a card, a player photo or the
     // table background. A control that declares the left button alone -- the menu
@@ -194,6 +226,7 @@ private:
     QTimer m_longPressTimer;
     QPoint m_pressPosition;
     bool m_rightClickEmitted = false;
+    bool m_skillPageOpened = false;
 
     // Deliberately longer than the platform's 500 ms long press. The gesture is a
     // secondary action here, so mistaking an ordinary press for it is worse than
@@ -247,6 +280,16 @@ MainWindow::MainWindow(QWidget *parent)
 
     setCentralWidget(view);
     restoreFromConfig();
+#ifdef Q_OS_ANDROID
+    menuBar()->hide();
+    statusBar()->hide();
+    view->setFrameShape(QFrame::NoFrame);
+    mobile_menu_button = new QPushButton(tr("Menu"), view->viewport());
+    DialogSupport::applyMobileStyle(mobile_menu_button);
+    mobile_menu_button->setFixedSize(84, 48);
+    mobile_menu_button->move(8, 6);
+    connect(mobile_menu_button, &QPushButton::clicked, this, &MainWindow::showMobileMenu);
+#endif
 
     BackLoader::preload();
     gotoScene(start_scene);
@@ -308,6 +351,10 @@ void MainWindow::gotoScene(QGraphicsScene *scene)
     //QResizeEvent e(QSize(view->size().width() - 4, view->size().height() - 4), view->size());
     QResizeEvent e(QSize(view->size().width(), view->size().height()), view->size());
     view->resizeEvent(&e);
+#ifdef Q_OS_ANDROID
+    mobile_menu_button->setVisible(scene->inherits("RoomScene"));
+    mobile_menu_button->raise();
+#endif
     //play BGM
 #ifdef AUDIO_SUPPORT
     if (Config.EnableBgMusic && !Audio::isBackgroundMusicPlaying()) {
@@ -331,6 +378,9 @@ void MainWindow::on_actionExit_triggered()
 
 void MainWindow::on_actionStart_Server_triggered()
 {
+#ifdef Q_OS_ANDROID
+    startMobileRoom(false);
+#else
     ServerDialog *dialog = new ServerDialog(this);
     if (!dialog->config())
         return;
@@ -352,6 +402,7 @@ void MainWindow::on_actionStart_Server_triggered()
         if (Config.value("EnableMinimizeDialog", false).toBool())
             on_actionMinimize_to_system_tray_triggered();
     }
+#endif
 }
 
 void MainWindow::checkVersion(const QString &server_version, const QString &server_mod)
@@ -456,6 +507,9 @@ void MainWindow::enterRoom()
 
     ui->actionStart_Game->setEnabled(false);
     ui->actionStart_Server->setEnabled(false);
+#ifdef Q_OS_ANDROID
+    ui->actionPC_Console_Start->setEnabled(false);
+#endif
 
     RoomScene *room_scene = new RoomScene(this);
     ui->actionView_Discarded->setEnabled(true);
@@ -492,6 +546,18 @@ void MainWindow::enterRoom()
     connect(room_scene, SIGNAL(return_to_start()), this, SLOT(gotoStartScene()));
 
     gotoScene(room_scene);
+#ifdef Q_OS_ANDROID
+    if (mobile_fill_robots) {
+        auto fill = [this](bool owner) {
+            if (owner && mobile_fill_robots && ClientInstance != nullptr) {
+                mobile_fill_robots = false;
+                ClientInstance->fillRobots();
+            }
+        };
+        connect(Self, &ClientPlayer::owner_changed, this, fill);
+        fill(Self->isOwner());
+    }
+#endif
 }
 
 void MainWindow::gotoStartScene()
@@ -505,7 +571,15 @@ void MainWindow::gotoStartScene()
     }
 #endif
     ServerInfo.DuringGame = false;
+#ifdef Q_OS_ANDROID
+    mobile_fill_robots = false;
+    ui->actionStart_Game->setEnabled(true);
+    ui->actionStart_Server->setEnabled(true);
+    ui->actionPC_Console_Start->setEnabled(true);
+#endif
     QList<Server *> servers = findChildren<Server *>();
+    foreach (Server *server, servers)
+        server->shutdown();
     if (!servers.isEmpty())
         servers.first()->deleteLater();
 
@@ -832,6 +906,9 @@ void MainWindow::on_actionAcknowledgement_triggered()
 
 void MainWindow::on_actionPC_Console_Start_triggered()
 {
+#ifdef Q_OS_ANDROID
+    startMobileRoom(true);
+#else
     ServerDialog *dialog = new ServerDialog(this);
     if (!dialog->config())
         return;
@@ -846,7 +923,104 @@ void MainWindow::on_actionPC_Console_Start_triggered()
 
     Config.HostAddress = "qths://127.0.0.1";
     startConnection();
+#endif
 }
+
+#ifdef Q_OS_ANDROID
+void MainWindow::startMobileRoom(bool practice)
+{
+    ServerDialog dialog(this);
+    if (!dialog.config())
+        return;
+    QList<Server *> old_servers = findChildren<Server *>();
+    foreach (Server *old_server, old_servers) {
+        old_server->shutdown();
+        old_server->deleteLater();
+    }
+    Server *server = new Server(this);
+    if (!server->listen()) {
+        QMessageBox::warning(this, tr("Warning"), tr("Can not start server!"));
+        delete server;
+        return;
+    }
+    server->createNewRoom();
+    mobile_fill_robots = practice && Config.EnableAI;
+    Config.HostAddress = QString("qths://127.0.0.1:%1").arg(Config.ServerPort);
+    startConnection();
+}
+
+void MainWindow::showMobileMenu()
+{
+    QDialog dialog(this);
+    dialog.setProperty("sgsMobileLayout", true);
+    dialog.setWindowTitle(tr("Menu"));
+    QVBoxLayout *root = new QVBoxLayout(&dialog);
+    QHBoxLayout *header = new QHBoxLayout;
+    QPushButton *back = new QPushButton(tr("Back to game"));
+    connect(back, &QPushButton::clicked, &dialog, &QDialog::reject);
+    header->addWidget(back);
+    QLabel *title = new QLabel(tr("Menu"));
+    title->setProperty("sgsHeading", true);
+    header->addWidget(title, 1);
+    root->addLayout(header);
+    QTabWidget *tabs = new QTabWidget;
+    const QList<QMenu *> menus = {ui->menuGame, ui->menuOptions, ui->menuHelp, ui->menuCheat};
+    foreach (QMenu *menu, menus) {
+        if (!menu->isEnabled())
+            continue;
+        QWidget *page = new QWidget;
+        QGridLayout *grid = new QGridLayout(page);
+        int count = 0;
+        foreach (QAction *action, menu->actions()) {
+            if (action->isSeparator() || action == ui->actionEnable_Hotkey)
+                continue;
+            QPushButton *button = new QPushButton(action->text().remove('&'));
+            button->setEnabled(action->isEnabled());
+            button->setCheckable(action->isCheckable());
+            button->setChecked(action->isChecked());
+            grid->addWidget(button, count / 2, count % 2);
+            connect(button, &QPushButton::clicked, &dialog, [&dialog, action]() {
+                dialog.accept();
+                action->trigger();
+            });
+            ++count;
+        }
+        RoomScene *room = qobject_cast<RoomScene *>(scene);
+        if (menu == ui->menuGame && room != nullptr) {
+            QPushButton *automatic = new QPushButton;
+            automatic->setCheckable(true);
+            automatic->setEnabled(room->game_started && !room->isPerspectiveInputLocked() && ClientInstance->getReplayer() == nullptr);
+            auto updateAutomatic = [automatic]() {
+                const bool active = Self != nullptr && Self->getState() == "trust";
+                automatic->setChecked(active);
+                automatic->setText(active ? tr("Resume manual play") : tr("Enable auto play"));
+            };
+            updateAutomatic();
+            connect(Self, &ClientPlayer::state_changed, automatic, updateAutomatic);
+            connect(automatic, &QPushButton::clicked, &dialog, [&dialog, room]() {
+                dialog.accept();
+                room->trust();
+            });
+            grid->addWidget(automatic, count / 2, count % 2);
+            ++count;
+        }
+        grid->setRowStretch((count + 1) / 2, 1);
+        tabs->addTab(DialogSupport::createScrollArea(page), menu->title().remove('&'));
+    }
+    root->addWidget(tabs, 1);
+    if (scene->inherits("RoomScene")) {
+        QPushButton *leave = new QPushButton(tr("Leave room"));
+        root->addWidget(leave);
+        connect(leave, &QPushButton::clicked, &dialog, [this, &dialog]() {
+            if (QMessageBox::question(&dialog, tr("Leave room"), tr("Leave the current game?"), QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+                dialog.accept();
+                gotoStartScene();
+            }
+        });
+    }
+    dialog.exec();
+}
+#endif
 
 void MainWindow::on_actionReplay_file_convert_triggered()
 {

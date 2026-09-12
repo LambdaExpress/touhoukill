@@ -25,6 +25,7 @@ class ChooseGeneralBox;
 class ChooseOptionsBox;
 class ChooseTriggerOrderBox;
 class PlayerCardBox;
+class SkillOverview;
 
 #include <QCommandLinkButton>
 #include <QDialog>
@@ -223,6 +224,8 @@ public:
     HeroSkinContainer *findHeroSkinContainer(const QString &generalName) const;
     QSet<HeroSkinContainer *> getHeroSkinContainers();
 
+    bool showSkillOverviewAt(const QPointF &scenePos);
+
     bool game_started; // from private to public
 
 public slots:
@@ -268,6 +271,7 @@ public slots:
     void doOkButton();
     void doCancelButton();
     void doDiscardButton();
+    void trust();
     void highlightSkillButton(const QString &skill_name, bool highlight);
     bool isHighlightStatus(Client::Status status);
     void setLordBGM(const QString &lord = QString());
@@ -322,7 +326,9 @@ private:
     QSanButton *ok_button;
     QSanButton *cancel_button;
     QSanButton *discard_button;
+#ifndef Q_OS_ANDROID
     QSanButton *trust_button;
+#endif
     QMenu *miscellaneous_menu;
     QMenu *change_general_menu;
     Window *prompt_box;
@@ -332,6 +338,9 @@ private:
     QGraphicsItem *control_panel;
     QMap<PlayerCardContainer *, const ClientPlayer *> item2player;
     QDialog *m_choiceDialog; // Dialog for choosing generals, suits, card/equip, or kingdoms
+    SkillOverview *skill_overview = nullptr;
+
+    const ClientPlayer *playerAvatarAt(const QPointF &scenePos) const;
 
     QGraphicsRectItem *pausing_item;
     QGraphicsSimpleTextItem *pausing_text;
@@ -370,6 +379,12 @@ private:
     QGraphicsProxyWidget *log_box_widget;
     QGraphicsProxyWidget *chat_edit_widget;
     QGraphicsTextItem *prompt_box_widget;
+#ifdef Q_OS_ANDROID
+    QGraphicsProxyWidget *mobile_toolbar = nullptr;
+    void updateMobileTable();
+    void updateActionButtons();
+    void showMobileInformation(bool chat);
+#endif
     ChatWidget *chat_widget;
     QPixmap m_rolesBoxBackground;
     QGraphicsPixmapItem *m_rolesBox;
@@ -544,7 +559,6 @@ private slots:
     void changeGeneral(const QString &general);
     void revealGeneral(bool self, const QString &general);
 
-    void trust();
     void skillInvalidityChange(ClientPlayer *player);
 
     void onPerspectiveChanged(const QString &targetName, const QList<int> &handCardIds, const QVariantMap &piles);

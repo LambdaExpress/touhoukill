@@ -1906,6 +1906,11 @@ void ServerPlayer::copyFrom(ServerPlayer *sp)
 
 bool ServerPlayer::CompareByActionOrder(ServerPlayer *a, ServerPlayer *b)
 {
+    if (a == nullptr || b == nullptr)
+        return a != nullptr;
+    if (a == b)
+        return false;
+
     Room *room = a->getRoom();
     return room->getFront(a, b) == a;
 }

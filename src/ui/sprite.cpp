@@ -171,7 +171,6 @@ void QAnimatedEffect::setStay(bool stay)
 
 SentbackEffect::SentbackEffect(bool stay)
 {
-    grayed = nullptr;
     setObjectName("backsender");
     index = 0;
     this->stay = stay;
@@ -195,31 +194,28 @@ void SentbackEffect::draw(QPainter *painter)
 {
     QPoint offset;
     QPixmap pixmap = sourcePixmap(Qt::LogicalCoordinates, &offset);
+    if (pixmap.isNull())
+        return;
 
-    if (grayed == nullptr) {
-        grayed = new QImage(pixmap.size(), QImage::Format_ARGB32);
-
-        QImage image = pixmap.toImage();
-        int width = image.width();
-        int height = image.height();
-        int gray = 0;
-
-        QRgb col = 0;
-
-        for (int i = 0; i < width; ++i) {
-            for (int j = 0; j < height; ++j) {
-                col = image.pixel(i, j);
-                gray = qGray(col) >> 1;
-                grayed->setPixel(i, j, qRgba(gray, gray, gray, qAlpha(col)));
+    if (source_key != pixmap.cacheKey()) {
+        grayed = pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
+        grayed.setDevicePixelRatio(pixmap.devicePixelRatio());
+        for (int y = 0; y < grayed.height(); ++y) {
+            QRgb *row = reinterpret_cast<QRgb *>(grayed.scanLine(y));
+            for (int x = 0; x < grayed.width(); ++x) {
+                const QRgb color = row[x];
+                const int gray = qGray(color) >> 1;
+                row[x] = qRgba(gray, gray, gray, qAlpha(color));
             }
         }
+        source_key = pixmap.cacheKey();
     }
 
+    painter->save();
     painter->drawPixmap(offset, pixmap);
     painter->setOpacity((40 - qAbs(index - 40)) / 80.0);
-    painter->drawImage(offset, *grayed);
-
-    return;
+    painter->drawImage(offset, grayed);
+    painter->restore();
 }
 
 FadeEffect::FadeEffect(bool stay)

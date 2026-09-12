@@ -31,9 +31,16 @@ QSanButton::QSanButton(const QString &groupName, const QString &buttonName, QGra
     _m_buttonName = buttonName;
     _m_mouseEntered = false;
 
-    for (int i = 0; i < (int)S_NUM_BUTTON_STATES; i++)
-        _m_bgPixmap[i] = G_ROOM_SKIN.getButtonPixmap(groupName, buttonName, (QSanButton::ButtonState)i);
-    setSize(_m_bgPixmap[0].size());
+#ifdef Q_OS_ANDROID
+    if (groupName == "platter" || groupName == "handcard") {
+        setSize(QSize(96, 60));
+    } else
+#endif
+    {
+        for (int i = 0; i < (int)S_NUM_BUTTON_STATES; i++)
+            _m_bgPixmap[i] = G_ROOM_SKIN.getButtonPixmap(groupName, buttonName, (QSanButton::ButtonState)i);
+        setSize(_m_bgPixmap[0].size());
+    }
 
     setAcceptHoverEvents(true);
     setAcceptedMouseButtons(Qt::LeftButton);
@@ -53,16 +60,53 @@ QRectF QSanButton::boundingRect() const
 
 void QSanButton::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
+#ifdef Q_OS_ANDROID
+    if (_m_groupName == "platter" || _m_groupName == "handcard") {
+        const bool active = _m_state == S_STATE_DOWN;
+        const bool enabled = _m_state != S_STATE_DISABLED;
+        const bool primary = _m_buttonName == "confirm";
+        const bool finish = _m_buttonName == "discard";
+        painter->setRenderHint(QPainter::Antialiasing);
+        painter->setPen(QColor(finish ? (enabled ? "#f3a0a0" : "#7b4c55") : (enabled ? "#d3bb84" : "#49586a")));
+        const QColor background = finish ? QColor(!enabled ? "#55333d" : (active ? "#8f2935" : "#bb404d"))
+                                         : QColor(!enabled ? "#24303d" : (active || primary ? "#d2b478" : "#23374b"));
+        painter->setBrush(background);
+        painter->drawRoundedRect(boundingRect().adjusted(1, 1, -1, -1), 9, 9);
+        QString text;
+        if (_m_buttonName == "confirm") text = tr("Confirm");
+        else if (_m_buttonName == "cancel") text = tr("Cancel");
+        else if (_m_buttonName == "discard") text = tr("End turn");
+        else if (_m_buttonName == "sort") text = tr("Sort");
+        else if (_m_buttonName == "reverse-selection") text = tr("Invert");
+        else if (_m_buttonName == "nullification") text = tr("No nullify");
+        else if (_m_buttonName == "previous") text = tr("Previous");
+        else if (_m_buttonName == "next") text = tr("Next");
+        QFont font(QStringLiteral("sans-serif"));
+        font.setPixelSize(20);
+        font.setBold(primary);
+        painter->setFont(font);
+        painter->setPen(QColor(finish ? (enabled ? "#fff2f1" : "#bb929a") : (!enabled ? "#84909b" : (active || primary ? "#142332" : "#f5eddb"))));
+        painter->drawText(boundingRect().adjusted(4, 2, -4, -2), Qt::AlignCenter, text);
+        return;
+    }
+#endif
     painter->drawPixmap(0, 0, _m_bgPixmap[(int)_m_state]);
 }
 
 void QSanButton::setSize(QSize newSize)
 {
+    prepareGeometryChange();
     _m_size = newSize;
     if (_m_size.width() == 0 || _m_size.height() == 0) {
         _m_mask = QRegion();
         return;
     }
+#ifdef Q_OS_ANDROID
+    if (_m_groupName == "platter" || _m_groupName == "handcard" || _m_groupName == QSanRoomSkin::S_SKIN_KEY_BUTTON_SKILL) {
+        _m_mask = QRegion(QRect(QPoint(), newSize));
+        return;
+    }
+#endif
     Q_ASSERT(!_m_bgPixmap[0].isNull());
     QPixmap pixmap = _m_bgPixmap[0];
     _m_mask = QRegion(pixmap.mask().scaled(newSize));
@@ -362,6 +406,10 @@ void QSanSkillButton::setEnabled(bool enabled)
 
 void QSanInvokeSkillButton::_repaint()
 {
+#ifdef Q_OS_ANDROID
+    setSize(QSize(136, 56));
+    update();
+#else
     for (int i = 0; i < (int)S_NUM_BUTTON_STATES; i++) {
         _m_bgPixmap[i] = G_ROOM_SKIN.getSkillButtonPixmap((ButtonState)i, _m_skillType, _m_enumWidth);
         Q_ASSERT(!_m_bgPixmap[i].isNull());
@@ -387,10 +435,25 @@ void QSanInvokeSkillButton::_repaint()
                        Qt::AlignCenter, skillName);
     }
     setSize(_m_bgPixmap[0].size());
+#endif
 }
 
 void QSanInvokeSkillButton::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
+#ifdef Q_OS_ANDROID
+    const bool active = getState() == S_STATE_DOWN;
+    const bool available = getState() != S_STATE_DISABLED;
+    painter->setRenderHint(QPainter::Antialiasing);
+    painter->setPen(QColor(available ? "#d2b478" : "#5a6376"));
+    painter->setBrush(QColor(active ? "#d2b478" : "#243247"));
+    painter->drawRoundedRect(boundingRect().adjusted(1, 1, -1, -1), 7, 7);
+    QFont font(QStringLiteral("sans-serif"));
+    font.setPixelSize(19);
+    font.setBold(available);
+    painter->setFont(font);
+    painter->setPen(QColor(active ? "#152331" : (available ? "#f6e7be" : "#9aabc0")));
+    painter->drawText(boundingRect().adjusted(5, 3, -5, -3), Qt::AlignCenter | Qt::TextWordWrap, Sanguosha->translate(_m_skill->objectName()));
+#else
     painter->drawPixmap(0, 0, _m_bgPixmap[(int)_m_state]);
     if (_m_skillType == S_SKILL_ATTACHEDLORD) {
         int nline = _m_skill->objectName().indexOf("-");
@@ -440,6 +503,7 @@ void QSanInvokeSkillButton::paint(QPainter *painter, const QStyleOptionGraphicsI
         }
     }
 
+#endif
     if (Self->isSkillInvalid(_m_skill->objectName())) { //for SkillInvalid
         painter->setRenderHints(QPainter::HighQualityAntialiasing);
         QPen pen(Qt::red);
@@ -512,6 +576,20 @@ void QSanInvokeSkillDock::update()
         }
         all_buttons = regular_buttons + lordskill_buttons;
 
+#ifdef Q_OS_ANDROID
+        const int columns = _m_width >= 150 ? 2 : 1;
+        const int mobileRows = (all_buttons.size() + columns - 1) / columns;
+        const int buttonWidth = qMax(72, _m_width / columns - 4);
+        for (int i = 0; i < all_buttons.size(); ++i) {
+            QSanInvokeSkillButton *button = all_buttons.at(i);
+            if (button->getButtonWidth() != QSanInvokeSkillButton::S_WIDTH_WIDE)
+                button->setButtonWidth(QSanInvokeSkillButton::S_WIDTH_WIDE);
+            button->setSize(QSize(buttonWidth, 56));
+            button->setPos((i % columns) * (buttonWidth + 4), (i / columns - mobileRows) * 60);
+        }
+        QGraphicsObject::update();
+        return;
+#endif
         int numButtons = regular_buttons.length();
         int lordskillNum = lordskill_buttons.length();
         //Q_ASSERT(lordskillNum <= 6); // HuangTian, ZhiBa, DrJiuYuan and XianSi

@@ -11,6 +11,7 @@
 #include <QListWidget>
 
 class QLabel;
+class QStackedWidget;
 class UdpDetector;
 
 class AvatarModel : public QAbstractListModel
@@ -52,6 +53,9 @@ private:
     QComboBox *hostComboBox;
     QLabel *avatarPixmap;
     QListView *avatarList;
+#ifdef Q_OS_ANDROID
+    QStackedWidget *mobile_pages = nullptr;
+#endif
 
     QSize shrinkSize;
     QSize expandSize;

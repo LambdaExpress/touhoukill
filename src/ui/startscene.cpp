@@ -1,9 +1,13 @@
 #include "startscene.h"
 #include "audio.h"
+#include "dialogsupport.h"
 #include "engine.h"
 
 #include <QGraphicsDropShadowEffect>
 #include <QGraphicsSimpleTextItem>
+#include <QGraphicsProxyWidget>
+#include <QGridLayout>
+#include <QPushButton>
 #include <QNetworkInterface>
 #include <QParallelAnimationGroup>
 #include <QPropertyAnimation>
@@ -20,10 +24,40 @@ StartScene::StartScene()
     website_text = addSimpleText(tr("TouhouSatsu QQ Qun: 384318315"), website_font);
     website_text->setBrush(Qt::white);
     server_log = nullptr;
+#ifdef Q_OS_ANDROID
+    QWidget *panel = new QWidget;
+    panel->setObjectName("mobilePanel");
+    DialogSupport::applyMobileStyle(panel);
+    mobile_grid = new QGridLayout(panel);
+    mobile_grid->setContentsMargins(16, 16, 16, 16);
+    mobile_grid->setSpacing(12);
+    mobile_panel = addWidget(panel);
+    QFont captionFont(QStringLiteral("sans-serif"));
+    captionFont.setPixelSize(14);
+    website_text->setFont(captionFont);
+#endif
 }
 
 void StartScene::addButton(QAction *action)
 {
+#ifdef Q_OS_ANDROID
+    QString text = action->text();
+    if (action->objectName() == "actionStart_Game")
+        text = tr("Online play");
+    else if (action->objectName() == "actionStart_Server")
+        text = tr("Create room");
+    else if (action->objectName() == "actionPC_Console_Start")
+        text = tr("Solo practice");
+    QPushButton *button = new QPushButton(text);
+    button->setMinimumHeight(52);
+    button->setProperty("sgsPrimaryAction", action->objectName() == "actionStart_Game" || action->objectName() == "actionPC_Console_Start");
+    button->setEnabled(action->isEnabled());
+    connect(action, &QAction::changed, button, [button, action]() { button->setEnabled(action->isEnabled()); });
+    connect(button, &QPushButton::clicked, action, &QAction::trigger);
+    const int index = mobile_grid->count();
+    mobile_grid->addWidget(button, index / 2, index % 2);
+    adjustItems();
+#else
     Button *button = new Button(action->text());
     button->setMute(false);
 
@@ -32,6 +66,7 @@ void StartScene::addButton(QAction *action)
 
     buttons << button;
     adjustItems();
+#endif
 }
 
 void StartScene::adjustItems()
@@ -40,6 +75,19 @@ void StartScene::adjustItems()
     if (rect.isEmpty())
         return;
 
+#ifdef Q_OS_ANDROID
+    if (server_log == nullptr) {
+        const qreal panelWidth = rect.width() * 0.54;
+        const qreal panelHeight = qMin<qreal>(rect.height() - 24, 292);
+        mobile_panel->setGeometry(QRectF(rect.right() - panelWidth - 12, rect.center().y() - panelHeight / 2, panelWidth, panelHeight));
+        const qreal logoScale = qMin((rect.width() * 0.40) / 418.0, (rect.height() * 0.40) / 167.0);
+        logo->setTransform(QTransform::fromScale(logoScale, logoScale));
+        const qreal centerX = rect.left() + rect.width() * 0.22;
+        logo->setPos(centerX - 209 * logoScale, rect.center().y() - 100 * logoScale);
+        website_text->setPos(centerX - website_text->boundingRect().width() / 2, rect.center().y() + 94 * logoScale);
+        return;
+    }
+#endif
     if (server_log != nullptr) {
         // The server console keeps to the right of the shrunken logo and inside the
         // scene, whatever the scene rect is.

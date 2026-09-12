@@ -4,6 +4,7 @@
 #include <QEasingCurve>
 #include <QGraphicsEffect>
 #include <QGraphicsItem>
+#include <QImage>
 #include <QMap>
 #include <QObject>
 #include <QTimer>
@@ -98,7 +99,8 @@ protected:
     QRectF boundingRectFor(const QRectF &sourceRect) const override;
 
 private:
-    QImage *grayed;
+    QImage grayed;
+    qint64 source_key = 0;
 };
 
 class FadeEffect : public QAnimatedEffect

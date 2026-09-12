@@ -16,6 +16,7 @@ class QSystemTrayIcon;
 class Server;
 class QTextEdit;
 class QToolButton;
+class QPushButton;
 class QGroupBox;
 class RoomItem;
 class QProgressBar;
@@ -68,9 +69,17 @@ private:
     QSystemTrayIcon *systray;
 
     void restoreFromConfig();
+#ifdef Q_OS_ANDROID
+    QPushButton *mobile_menu_button = nullptr;
+    bool mobile_fill_robots = false;
+    void startMobileRoom(bool practice);
+#endif
 
 public slots:
     void startConnection();
+#ifdef Q_OS_ANDROID
+    void showMobileMenu();
+#endif
 
 private slots:
     void on_actionAbout_GPLv3_triggered();

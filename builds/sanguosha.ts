@@ -81,6 +81,14 @@
 <context>
     <name>CardOverview</name>
     <message>
+        <source>Back</source>
+        <translation>返回</translation>
+    </message>
+    <message>
+        <source>Search cards</source>
+        <translation>搜索卡牌名称或类型</translation>
+    </message>
+    <message>
         <location filename="../src/dialog/cardoverview.ui" line="14"/>
         <source>Card Overvew</source>
         <translation>卡牌一览</translation>
@@ -181,6 +189,22 @@
 </context>
 <context>
     <name>ChooseGeneralDialog</name>
+    <message>
+        <source>Back</source>
+        <translation>返回</translation>
+    </message>
+    <message>
+        <source>Confirm</source>
+        <translation>确认出战</translation>
+    </message>
+    <message>
+        <source>Lord: %1</source>
+        <translation>主公：%1</translation>
+    </message>
+    <message>
+        <source>Lord skills</source>
+        <translation>主公技能</translation>
+    </message>
     <message>
         <location filename="../src/dialog/choosegeneraldialog.cpp" line="51"/>
         <source>Choose general</source>
@@ -730,6 +754,10 @@
 <context>
     <name>ConnectionDialog</name>
     <message>
+        <source>Back</source>
+        <translation>返回</translation>
+    </message>
+    <message>
         <location filename="../src/dialog/connectiondialog.cpp" line="176"/>
         <location filename="../src/dialog/connectiondialog.cpp" line="178"/>
         <source>Connection setup</source>
@@ -1183,6 +1211,26 @@
 <context>
     <name>GeneralOverview</name>
     <message>
+        <source>Back</source>
+        <translation>返回</translation>
+    </message>
+    <message>
+        <source>Search name or title</source>
+        <translation>搜索人物或称号</translation>
+    </message>
+    <message>
+        <source>Filters</source>
+        <translation>筛选</translation>
+    </message>
+    <message>
+        <source>Credits</source>
+        <translation>资料</translation>
+    </message>
+    <message>
+        <source>No matching generals</source>
+        <translation>没有符合条件的人物</translation>
+    </message>
+    <message>
         <location filename="../src/dialog/generaloverview.ui" line="29"/>
         <source>General Overview</source>
         <translation>人物一览</translation>
@@ -1437,6 +1485,30 @@
 </context>
 <context>
     <name>MainWindow</name>
+    <message>
+        <source>Enable auto play</source>
+        <translation>开启托管</translation>
+    </message>
+    <message>
+        <source>Resume manual play</source>
+        <translation>取消托管</translation>
+    </message>
+    <message>
+        <source>Menu</source>
+        <translation>菜单</translation>
+    </message>
+    <message>
+        <source>Back to game</source>
+        <translation>返回游戏</translation>
+    </message>
+    <message>
+        <source>Leave room</source>
+        <translation>离开房间</translation>
+    </message>
+    <message>
+        <source>Leave the current game?</source>
+        <translation>确定离开当前对局吗？</translation>
+    </message>
     <message>
         <location filename="../src/dialog/mainwindow.ui" line="28"/>
         <source>Game</source>
@@ -2330,6 +2402,26 @@
 <context>
     <name>RoomScene</name>
     <message>
+        <source>Hand cards</source>
+        <translation>手牌</translation>
+    </message>
+    <message>
+        <source>Battle log</source>
+        <translation>战报</translation>
+    </message>
+    <message>
+        <source>Chat</source>
+        <translation>聊天</translation>
+    </message>
+    <message>
+        <source>Back to game</source>
+        <translation>返回对局</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation>发送</translation>
+    </message>
+    <message>
         <location filename="../src/ui/roomscene.cpp" line="285"/>
         <source>Please enter text to chat ... </source>
         <translation>聊天请在此输入 ...</translation>
@@ -2825,6 +2917,10 @@ P = 你自己, R = 你所在的房间</translation>
 </context>
 <context>
     <name>ServerDialog</name>
+    <message>
+        <source>Create room</source>
+        <translation>创建房间</translation>
+    </message>
     <message>
         <location filename="../src/server/server.cpp" line="38"/>
         <source>Start server</source>
@@ -3425,7 +3521,38 @@ P = 你自己, R = 你所在的房间</translation>
     </message>
 </context>
 <context>
+    <name>SkillOverview</name>
+    <message>
+        <source>Back</source>
+        <translation>返回</translation>
+    </message>
+    <message>
+        <source>Character skills</source>
+        <translation>技能一览</translation>
+    </message>
+    <message>
+        <source>MaxHP %1</source>
+        <translation>体力上限 %1</translation>
+    </message>
+    <message>
+        <source>The character is not revealed yet</source>
+        <translation>该角色尚未明置</translation>
+    </message>
+</context>
+<context>
     <name>StartScene</name>
+    <message>
+        <source>Online play</source>
+        <translation>联机对战</translation>
+    </message>
+    <message>
+        <source>Create room</source>
+        <translation>创建房间</translation>
+    </message>
+    <message>
+        <source>Solo practice</source>
+        <translation>单机练习</translation>
+    </message>
     <message>
         <location filename="../src/ui/startscene.cpp" line="108"/>
         <source>Your LAN address: %1, this address is available only for hosts that in the same LAN</source>
@@ -3660,6 +3787,48 @@ Download pack checksum mismatch.</source>
 Cannot download the update pack.</source>
         <translation>下载更新包失败。
 无法下载更新包。</translation>
+    </message>
+</context>
+<context>
+    <name>MobileUI</name>
+    <message>
+        <source>Back</source>
+        <translation>返回</translation>
+    </message>
+</context>
+<context>
+    <name>QSanButton</name>
+    <message>
+        <source>Confirm</source>
+        <translation>确定</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <source>End turn</source>
+        <translation>结束</translation>
+    </message>
+    <message>
+        <source>Sort</source>
+        <translation>排序</translation>
+    </message>
+    <message>
+        <source>Invert</source>
+        <translation>反选</translation>
+    </message>
+    <message>
+        <source>No nullify</source>
+        <translation>不无懈</translation>
+    </message>
+    <message>
+        <source>Previous</source>
+        <translation>上页</translation>
+    </message>
+    <message>
+        <source>Next</source>
+        <translation>下页</translation>
     </message>
 </context>
 </TS>

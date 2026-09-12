@@ -1,6 +1,7 @@
 #include "connectiondialog.h"
 #include "SkinBank.h"
 #include "detector.h"
+#include "dialogsupport.h"
 #include "engine.h"
 #include "settings.h"
 
@@ -21,6 +22,8 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QScrollArea>
+#include <QStackedWidget>
 #include <QTimer>
 #include <QUrl>
 #include <QWidget>
@@ -59,10 +62,15 @@ QVariant AvatarModel::data(const QModelIndex &index, int role) const
 
 void ConnectionDialog::hideAvatarList()
 {
+#ifdef Q_OS_ANDROID
+    if (mobile_pages != nullptr)
+        mobile_pages->setCurrentIndex(0);
+#else
     if (!avatarList->isVisible())
         return;
     avatarList->hide();
     setFixedSize(shrinkSize);
+#endif
 }
 
 void ConnectionDialog::showAvatarList()
@@ -70,7 +78,9 @@ void ConnectionDialog::showAvatarList()
     if (avatarList->isVisible())
         return;
 
+#ifndef Q_OS_ANDROID
     setFixedSize(QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX));
+#endif
 
     if (avatarList->model() == nullptr) {
         QList<const General *> generals = Sanguosha->findChildren<const General *>();
@@ -84,11 +94,15 @@ void ConnectionDialog::showAvatarList()
         model->setParent(this);
         avatarList->setModel(model);
     }
+#ifdef Q_OS_ANDROID
+    mobile_pages->setCurrentWidget(avatarList);
+#else
     avatarList->show();
     if (expandSize.isEmpty())
         expandSize = size();
 
     setFixedSize(expandSize);
+#endif
 }
 
 void ConnectionDialog::accept()
@@ -179,6 +193,7 @@ ConnectionDialog::ConnectionDialog(QWidget *parent)
 
     nameLineEdit = new QLineEdit;
     hostComboBox = new QComboBox;
+    hostComboBox->setEditable(true);
 
     QFormLayout *connlayout = new QFormLayout;
     connlayout->addRow(tr("Name:"), nameLineEdit);
@@ -234,20 +249,61 @@ ConnectionDialog::ConnectionDialog(QWidget *parent)
 
     QVBoxLayout *llayout = new QVBoxLayout;
     llayout->addWidget(gb);
+#ifndef Q_OS_ANDROID
     llayout->addLayout(btnglayout);
+#endif
 
     avatarList = new QListView;
     avatarList->setIconSize(QSize(80, 80));
     avatarList->setGridSize(QSize(85, 95));
     avatarList->setViewMode(QListView::IconMode);
     // avatarList->setUniformItemSizes(true);
+#ifdef Q_OS_ANDROID
+    avatarList->setMinimumWidth(0);
+    avatarList->setGridSize(QSize(112, 118));
+    avatarList->setResizeMode(QListView::Adjust);
+    avatarList->setMovement(QListView::Static);
+    avatarList->setWordWrap(true);
+    connect(avatarList, &QListView::clicked, this, &ConnectionDialog::on_avatarList_doubleClicked);
+#else
     avatarList->setMinimumWidth(500);
+#endif
     avatarList->hide();
     connect(avatarList, &QListView::doubleClicked, this, &ConnectionDialog::on_avatarList_doubleClicked);
 
+#ifdef Q_OS_ANDROID
+    setProperty("sgsMobileLayout", true);
+    QVBoxLayout *totlayout = new QVBoxLayout;
+    totlayout->setContentsMargins(12, 8, 12, 8);
+    QHBoxLayout *header = new QHBoxLayout;
+    QPushButton *back = new QPushButton(tr("Back"));
+    connect(back, &QPushButton::clicked, this, [this]() {
+        if (mobile_pages->currentIndex() == 1)
+            hideAvatarList();
+        else
+            reject();
+    });
+    header->addWidget(back);
+    QLabel *title = new QLabel(windowTitle());
+    title->setProperty("sgsHeading", true);
+    header->addWidget(title, 1);
+    totlayout->addLayout(header);
+    QWidget *connection = new QWidget;
+    connection->setLayout(llayout);
+    mobile_pages = new QStackedWidget;
+    mobile_pages->addWidget(DialogSupport::createScrollArea(connection));
+    mobile_pages->addWidget(avatarList);
+    totlayout->addWidget(mobile_pages, 1);
+    totlayout->addLayout(btnglayout);
+    connectbtn->setProperty("sgsPrimaryAction", true);
+    connectbtn->setMinimumWidth(180);
+    hostComboBox->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    hostComboBox->setMinimumContentsLength(16);
+#else
     QHBoxLayout *totlayout = new QHBoxLayout;
     totlayout->addLayout(llayout);
     totlayout->addWidget(avatarList);
+#endif
 
     setLayout(totlayout);
 
@@ -260,7 +316,6 @@ void ConnectionDialog::showEvent(QShowEvent *e)
 {
     nameLineEdit->setText(Config.UserName);
 
-    hostComboBox->setEditable(true);
     hostComboBox->clear();
     hostComboBox->addItems(Config.HistoryIPs);
 
@@ -275,10 +330,12 @@ void ConnectionDialog::showEvent(QShowEvent *e)
     hideAvatarList();
 
     QDialog::showEvent(e);
+#ifndef Q_OS_ANDROID
     if (shrinkSize.isEmpty())
         shrinkSize = size();
 
     setFixedSize(shrinkSize);
+#endif
 }
 
 void ConnectionDialog::on_changeAvatarButton_clicked()

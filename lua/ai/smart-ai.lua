@@ -3442,6 +3442,9 @@ function SmartAI:getCardNeedPlayer(cards, include_self)
 	local keptslash = 0
 	local friends={}
 	local cmpByAction = function(a,b)
+		-- getFront() answers "who acts first" and returns its second argument when both seat
+		-- indexes tie, so it is true for a == b. table.sort needs a strict order instead.
+		if a:objectName() == b:objectName() then return false end
 		return a:getRoom():getFront(a, b):objectName() == a:objectName()
 	end
 

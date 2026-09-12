@@ -465,6 +465,10 @@ void PlayerCardContainer::updatePile(const QString &pile_name)
                 text.append(QString("(%1)").arg(pile.length()));
             button->setText(text);
 
+#ifdef Q_OS_ANDROID
+            disconnect(button, &QPushButton::clicked, this, &PlayerCardContainer::showPile);
+            connect(button, &QPushButton::clicked, this, &PlayerCardContainer::showPile);
+#else
             disconnect(button, &QPushButton::pressed, this, &PlayerCardContainer::showPile);
             connect(button, &QPushButton::pressed, this, &PlayerCardContainer::showPile);
 
@@ -472,6 +476,7 @@ void PlayerCardContainer::updatePile(const QString &pile_name)
                 disconnect(button, &QPushButton::released, this, &PlayerCardContainer::hidePile);
                 connect(button, &QPushButton::released, this, &PlayerCardContainer::hidePile);
             }
+#endif
         }
     }
     //set treasure pile at first

@@ -2,6 +2,7 @@
 #include "SkinBank.h"
 #include "client.h"
 #include "clientstruct.h"
+#include "dialogsupport.h"
 #include "engine.h"
 #include "settings.h"
 #include "ui_generaloverview.h"
@@ -9,8 +10,14 @@
 #include <QClipboard>
 #include <QCommandLinkButton>
 #include <QGroupBox>
+#include <QFormLayout>
 #include <QMessageBox>
 #include <QRadioButton>
+#include <QHeaderView>
+#include <QScrollArea>
+#include <QSignalBlocker>
+#include <QTabWidget>
+#include <QTimer>
 
 static QLayout *HLay(QWidget *left, QWidget *right)
 {
@@ -164,8 +171,13 @@ QWidget *GeneralSearch::createInfoTab()
 
         package_buttons->addButton(checkbox);
 
-        int row = i / 5;
-        int column = i % 5;
+#ifdef Q_OS_ANDROID
+        const int columns = 3;
+#else
+        const int columns = 5;
+#endif
+        int row = i / columns;
+        int column = i % columns;
         i++;
         packages_layout->addWidget(checkbox, row, column + 1);
     }
@@ -295,10 +307,134 @@ GeneralOverview::GeneralOverview(QWidget *parent)
     connect(ui->searchButton, SIGNAL(clicked()), general_search, SLOT(show()));
     ui->returnButton->hide();
     connect(ui->returnButton, SIGNAL(clicked()), this, SLOT(fillAllGenerals()));
+#ifdef Q_OS_ANDROID
+    setupMobileLayout();
+#endif
 }
+
+#ifdef Q_OS_ANDROID
+void GeneralOverview::setupMobileLayout()
+{
+    setProperty("sgsMobileLayout", true);
+    setMinimumSize(0, 0);
+    QWidget *desktop = new QWidget(this);
+    desktop->setLayout(layout());
+    desktop->hide();
+
+    QVBoxLayout *root = new QVBoxLayout(this);
+    root->setContentsMargins(12, 8, 12, 8);
+    QHBoxLayout *header = new QHBoxLayout;
+    QPushButton *back = new QPushButton(tr("Back"));
+    connect(back, &QPushButton::clicked, this, &QDialog::reject);
+    header->addWidget(back);
+    QLabel *title = new QLabel(origin_window_title);
+    title->setProperty("sgsHeading", true);
+    header->addWidget(title);
+    mobile_search = new QLineEdit;
+    mobile_search->setPlaceholderText(tr("Search name or title"));
+    mobile_search->setClearButtonEnabled(true);
+    header->addWidget(mobile_search, 1);
+    ui->searchButton->setText(tr("Filters"));
+    header->addWidget(ui->searchButton);
+    root->addLayout(header);
+
+    QHBoxLayout *body = new QHBoxLayout;
+    QVBoxLayout *list = new QVBoxLayout;
+    ui->tableWidget->setMinimumSize(0, 0);
+    ui->tableWidget->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
+    ui->tableWidget->horizontalHeader()->hide();
+    ui->tableWidget->verticalHeader()->hide();
+    ui->tableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    ui->tableWidget->setShowGrid(false);
+    ui->tableWidget->setWordWrap(false);
+    ui->tableWidget->setProperty("sgsRowHeight", 64);
+    ui->tableWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    for (int i = 0; i < ui->tableWidget->columnCount(); ++i)
+        ui->tableWidget->setColumnHidden(i, i != 1);
+    list->addWidget(ui->tableWidget, 1);
+    list->addWidget(ui->returnButton);
+    body->addLayout(list, 3);
+
+    QVBoxLayout *portrait = new QVBoxLayout;
+    ui->generalPhoto->setMinimumSize(0, 0);
+    ui->generalPhoto->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+    ui->generalPhoto->setAlignment(Qt::AlignCenter);
+    portrait->addWidget(ui->generalPhoto, 1);
+    portrait->addWidget(ui->changeHeroSkinButton);
+    body->addLayout(portrait, 2);
+
+    QVBoxLayout *detail = new QVBoxLayout;
+    mobile_summary = new QLabel;
+    mobile_summary->setWordWrap(true);
+    mobile_summary->setMinimumWidth(0);
+    mobile_summary->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    detail->addWidget(mobile_summary);
+    QTabWidget *tabs = new QTabWidget;
+    ui->skillTextEdit->setMinimumSize(0, 0);
+    tabs->addTab(ui->skillTextEdit, tr("Skill"));
+    QWidget *credits = new QWidget;
+    QFormLayout *creditsLayout = new QFormLayout(credits);
+    creditsLayout->setRowWrapPolicy(QFormLayout::WrapAllRows);
+    creditsLayout->addRow(ui->label, ui->illustratorLineEdit);
+    creditsLayout->addRow(ui->label_2, ui->originLineEdit);
+    creditsLayout->addRow(ui->designerLabel, ui->designerLineEdit);
+    creditsLayout->addRow(ui->cvLabel, ui->cvLineEdit);
+    ui->companionLineEdit->setReadOnly(true);
+    creditsLayout->addRow(ui->companionLabel, ui->companionLineEdit);
+    tabs->addTab(DialogSupport::createScrollArea(credits), tr("Credits"));
+    ui->scrollArea->setMaximumWidth(QWIDGETSIZE_MAX);
+    ui->scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    tabs->addTab(ui->scrollArea, tr("Effects"));
+    detail->addWidget(tabs, 1);
+    QHBoxLayout *actions = new QHBoxLayout;
+    actions->addWidget(ui->changeGeneralButton);
+    actions->addWidget(ui->changeGeneral2Button);
+    detail->addLayout(actions);
+    body->addLayout(detail, 5);
+    root->addLayout(body, 1);
+    delete desktop;
+    connect(mobile_search, &QLineEdit::textChanged, this, &GeneralOverview::filterMobileGenerals);
+}
+
+void GeneralOverview::filterMobileGenerals(const QString &text)
+{
+    QSignalBlocker blocker(ui->tableWidget);
+    const QString query = text.trimmed();
+    int first = -1;
+    for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
+        QTableWidgetItem *item = ui->tableWidget->item(row, 1);
+        const bool matches = item != nullptr && item->text().contains(query, Qt::CaseInsensitive);
+        ui->tableWidget->setRowHidden(row, !matches);
+        if (matches && first < 0)
+            first = row;
+    }
+    const int current = ui->tableWidget->currentRow();
+    if (first < 0)
+        ui->tableWidget->setCurrentItem(nullptr);
+    else if (current < 0 || ui->tableWidget->isRowHidden(current))
+        ui->tableWidget->setCurrentCell(first, 1);
+    blocker.unblock();
+    on_tableWidget_itemSelectionChanged();
+}
+
+void GeneralOverview::updateMobilePortrait()
+{
+    if (ui->generalPhoto->size().isEmpty() || mobile_portrait.isNull())
+        ui->generalPhoto->clear();
+    else
+        ui->generalPhoto->setPixmap(mobile_portrait.scaled(ui->generalPhoto->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+}
+
+void GeneralOverview::resizeEvent(QResizeEvent *event)
+{
+    QDialog::resizeEvent(event);
+    QTimer::singleShot(0, this, &GeneralOverview::updateMobilePortrait);
+}
+#endif
 
 void GeneralOverview::fillGenerals(const QList<const General *> &generals, bool init)
 {
+    QSignalBlocker blocker(ui->tableWidget);
     QList<const General *> copy_generals;
     foreach (const General *general, generals) {
         if (!general->isTotallyHidden())
@@ -356,6 +492,10 @@ void GeneralOverview::fillGenerals(const QList<const General *> &generals, bool 
         QTableWidgetItem *name_item = new QTableWidgetItem(name);
         name_item->setTextAlignment(Qt::AlignCenter);
         name_item->setData(Qt::UserRole, general_name);
+#ifdef Q_OS_ANDROID
+        name_item->setText(name + "\n" + nickname_item->text());
+        name_item->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+#endif
         if (general->isLord()) {
             name_item->setIcon(lord_icon);
             name_item->setTextAlignment(Qt::AlignCenter);
@@ -415,7 +555,12 @@ void GeneralOverview::fillGenerals(const QList<const General *> &generals, bool 
     ui->tableWidget->setColumnWidth(3, 60);
     ui->tableWidget->setColumnWidth(4, 85);
 
+    blocker.unblock();
+#ifdef Q_OS_ANDROID
+    filterMobileGenerals(mobile_search->text());
+#else
     ui->tableWidget->setCurrentItem(ui->tableWidget->item(0, 0));
+#endif
 }
 
 void GeneralOverview::resetButtons()
@@ -425,6 +570,7 @@ void GeneralOverview::resetButtons()
         QWidget *widget = child->widget();
         if (widget != nullptr)
             delete widget;
+        delete child;
     }
 }
 
@@ -553,9 +699,35 @@ void GeneralOverview::copyLines()
 void GeneralOverview::on_tableWidget_itemSelectionChanged()
 {
     int row = ui->tableWidget->currentRow();
+    if (row < 0 || ui->tableWidget->item(row, 0) == nullptr) {
+#ifdef Q_OS_ANDROID
+        mobile_summary->setText(tr("No matching generals"));
+        mobile_portrait = QPixmap();
+        ui->generalPhoto->clear();
+        ui->skillTextEdit->clear();
+        ui->illustratorLineEdit->clear();
+        ui->originLineEdit->clear();
+        ui->designerLineEdit->clear();
+        ui->cvLineEdit->clear();
+        ui->companionLineEdit->clear();
+        ui->changeHeroSkinButton->hide();
+        ui->changeGeneralButton->setEnabled(false);
+        ui->changeGeneral2Button->setEnabled(false);
+        resetButtons();
+#endif
+        return;
+    }
     QString general_name = ui->tableWidget->item(row, 0)->data(Qt::UserRole).toString();
     const General *general = Sanguosha->getGeneral(general_name);
+#ifdef Q_OS_ANDROID
+    mobile_portrait = G_ROOM_SKIN.getCardMainPixmap(general->objectName());
+    mobile_summary->setText(ui->tableWidget->item(row, 1)->text().section('\n', 0, 0) + "  ·  "
+                           + ui->tableWidget->item(row, 2)->text() + "  ·  " + tr("MaxHP") + " "
+                           + ui->tableWidget->item(row, 3)->text() + "  ·  " + ui->tableWidget->item(row, 4)->text());
+    updateMobilePortrait();
+#else
     ui->generalPhoto->setPixmap(G_ROOM_SKIN.getCardMainPixmap(general->objectName()));
+#endif
     ui->changeHeroSkinButton->setVisible(hasSkin(general_name));
 
     QList<const Skill *> skills = general->getVisibleSkillList();
@@ -618,6 +790,7 @@ void GeneralOverview::on_tableWidget_itemSelectionChanged()
     button_layout->addStretch();
     ui->skillTextEdit->append(general->getSkillDescription(true, false));
     ui->changeGeneralButton->setEnabled((Self != nullptr) && Self->getGeneralName() != general->objectName());
+    ui->changeGeneral2Button->setEnabled((Self != nullptr) && Self->getGeneral2Name() != general->objectName());
 }
 
 void GeneralOverview::playAudioEffect()
@@ -656,6 +829,8 @@ void GeneralOverview::on_tableWidget_itemDoubleClicked(QTableWidgetItem * /*unus
 void GeneralOverview::askChangeSkin()
 {
     int row = ui->tableWidget->currentRow();
+    if (row < 0 || ui->tableWidget->item(row, 0) == nullptr)
+        return;
     QString general_name = ui->tableWidget->item(row, 0)->data(Qt::UserRole).toString();
     QString unique_general = general_name;
     if (unique_general.endsWith("_hegemony"))
@@ -679,7 +854,12 @@ void GeneralOverview::askChangeSkin()
         } else
             return;
     }
+#ifdef Q_OS_ANDROID
+    mobile_portrait = pixmap;
+    updateMobilePortrait();
+#else
     ui->generalPhoto->setPixmap(pixmap);
+#endif
     ui->illustratorLineEdit->setText(getIllustratorInfo(general_name)); //unique_general
     ui->originLineEdit->setText(getOriginInfo(general_name)); //unique_general
 }
@@ -742,6 +922,10 @@ void GeneralOverview::startSearch(bool include_hidden, const QString &nickname, 
 
 void GeneralOverview::fillAllGenerals()
 {
+#ifdef Q_OS_ANDROID
+    const QSignalBlocker blocker(mobile_search);
+    mobile_search->clear();
+#endif
     ui->returnButton->hide();
     setWindowTitle(origin_window_title);
     fillGenerals(all_generals, false);

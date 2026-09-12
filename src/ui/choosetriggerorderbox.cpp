@@ -31,7 +31,11 @@
 #include <QPropertyAnimation>
 
 static qreal initialOpacity = 0.8;
+#ifdef Q_OS_ANDROID
+static int optionButtonHeight = 60;
+#else
 static int optionButtonHeight = 40;
+#endif
 
 const int ChooseTriggerOrderBox::top_dark_bar = 27;
 const int ChooseTriggerOrderBox::m_topBlankWidth = 42;
@@ -159,7 +163,12 @@ void TriggerOptionButton::construct()
 QFont TriggerOptionButton::defaultFont()
 {
     QFont font = Config.SmallFont;
+#ifdef Q_OS_ANDROID
+    font.setFamily(QStringLiteral("sans-serif"));
+    font.setPixelSize(22);
+#else
     font.setPixelSize(Config.TinyFont.pixelSize());
+#endif
     return font;
 }
 

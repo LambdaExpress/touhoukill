@@ -34,6 +34,18 @@ void Button::init()
     setAcceptHoverEvents(true);
     setAcceptedMouseButtons(Qt::LeftButton);
 
+#ifdef Q_OS_ANDROID
+    size.setHeight(qMax<qreal>(56, size.height()));
+    size.setWidth(qMax<qreal>(96, size.width()));
+    font.setFamily(QStringLiteral("sans-serif"));
+    font.setPixelSize(20);
+    title = nullptr;
+    outimg = nullptr;
+    title_item = nullptr;
+    glow = 0;
+    timer_id = 0;
+    return;
+#endif
     title = new QPixmap(size.toSize());
     title->fill(QColor(0, 0, 0, 0));
     QPainter pt(title);
@@ -105,6 +117,11 @@ void Button::setMute(bool mute)
 void Button::setFont(const QFont &font)
 {
     this->font = font;
+#ifdef Q_OS_ANDROID
+    this->font.setPixelSize(qMax(18, font.pixelSize()));
+    update();
+    return;
+#endif
     title->fill(QColor(0, 0, 0, 0));
     QPainter pt(title);
     pt.setFont(font);
@@ -131,8 +148,14 @@ void Button::mousePressEvent(QGraphicsSceneMouseEvent *event)
     event->accept();
 }
 
-void Button::mouseReleaseEvent(QGraphicsSceneMouseEvent * /*event*/)
+void Button::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
+#ifdef Q_OS_ANDROID
+    if (!boundingRect().contains(event->pos()))
+        return;
+#else
+    Q_UNUSED(event);
+#endif
     if (!mute)
         Sanguosha->playSystemAudioEffect("button-down");
     emit clicked();
@@ -147,8 +170,18 @@ void Button::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*
 {
     QRectF rect = boundingRect();
 
+#ifdef Q_OS_ANDROID
+    painter->setRenderHint(QPainter::Antialiasing);
+    painter->setPen(QColor(isEnabled() ? "#d2b478" : "#546072"));
+    painter->setBrush(QColor(isEnabled() ? "#263a4f" : "#202c3a"));
+    painter->drawRoundedRect(rect.adjusted(1, 1, -1, -1), 8, 8);
+    painter->setPen(QColor(isEnabled() ? "#f1e1bc" : "#8793a3"));
+    painter->setFont(font);
+    painter->drawText(rect.adjusted(6, 2, -6, -2), Qt::AlignCenter | Qt::TextWordWrap, label);
+#else
     painter->drawImage(rect, *outimg);
     painter->fillRect(rect, QColor(255, 255, 255, glow * 10));
+#endif
 }
 
 void Button::timerEvent(QTimerEvent * /*event*/)

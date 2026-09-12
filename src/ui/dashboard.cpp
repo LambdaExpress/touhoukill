@@ -167,7 +167,11 @@ void Dashboard::_createLeft()
 int Dashboard::getButtonWidgetWidth() const
 {
     Q_ASSERT(button_widget);
+#ifdef Q_OS_ANDROID
+    return 0;
+#else
     return button_widget->boundingRect().width();
+#endif
 }
 
 void Dashboard::_createMiddle()
@@ -288,6 +292,13 @@ void Dashboard::_createRight()
 
     _m_skillDock->setObjectName("left");
     _m_rightSkillDock->setObjectName("right");
+#ifdef Q_OS_ANDROID
+    const int avatarWidth = ServerInfo.Enable2ndGeneral ? rwidth / 2 : rwidth;
+    _m_skillDock->setPos(6, avatar.bottom() + skillDockBaseline);
+    _m_skillDock->setWidth(avatarWidth - 12);
+    _m_rightSkillDock->setPos(avatarWidth + 6, avatar2.bottom() + skillDockBaseline);
+    _m_rightSkillDock->setWidth(avatarWidth - 12);
+#endif
 
     //hegemony
     if (isHegemonyGameMode(ServerInfo.GameMode)) {
@@ -324,8 +335,14 @@ void Dashboard::_updateFrames()
     trusting_text->setPos((rect2.width() - Config.BigFont.pixelSize() * 4.5) / 2, (rect2.height() - Config.BigFont.pixelSize()) / 2);
     _m_rightFrame->setX(_m_width - rwidth);
     Q_ASSERT(button_widget);
+#ifdef Q_OS_ANDROID
+    button_widget->setParentItem(this);
+    button_widget->setPos(G_DASHBOARD_LAYOUT.m_leftWidth + (rect.width() - button_widget->boundingRect().width()) / 2, -66);
+    button_widget->setZValue(100);
+#else
     button_widget->setX(rect.width() - getButtonWidgetWidth());
     button_widget->setY(0);
+#endif
 }
 
 void Dashboard::setTrust(bool trust)
@@ -588,9 +605,15 @@ QRectF Dashboard::boundingRect() const
 void Dashboard::setWidth(int width)
 {
     prepareGeometryChange();
+#ifdef Q_OS_ANDROID
+    _m_width = width;
+    _updateFrames();
+    adjustCards(false);
+#else
     adjustCards(true);
     _m_width = width;
     _updateFrames();
+#endif
     _updateDeathIcon();
 }
 
@@ -706,6 +729,29 @@ void Dashboard::_createExtraButtons()
     connect(m_btnReverseSelection, SIGNAL(clicked()), this, SLOT(reverseSelection()));
     connect(m_btnSortHandcard, SIGNAL(clicked()), this, SLOT(sortCards()));
     connect(m_btnNoNullification, SIGNAL(clicked()), this, SLOT(cancelNullification()));
+
+#ifdef Q_OS_ANDROID
+    mobile_previous = new QSanButton("handcard", "previous", this);
+    mobile_next = new QSanButton("handcard", "next", this);
+    mobile_page_label = new QGraphicsSimpleTextItem(this);
+    QFont pageFont(QStringLiteral("sans-serif"));
+    pageFont.setPixelSize(18);
+    mobile_page_label->setFont(pageFont);
+    mobile_page_label->setBrush(QColor("#edce8c"));
+    connect(mobile_previous, &QSanButton::clicked, this, [this]() {
+        --mobile_hand_page;
+        adjustCards(false);
+    });
+    connect(mobile_next, &QSanButton::clicked, this, [this]() {
+        ++mobile_hand_page;
+        adjustCards(false);
+    });
+    const QList<QSanButton *> controls = {mobile_previous, mobile_next, m_btnSortHandcard, m_btnReverseSelection, m_btnNoNullification};
+    foreach (QSanButton *button, controls) {
+        button->setSize(QSize(82, 46));
+        button->setZValue(10000);
+    }
+#endif
 
     //_m_carditem_context_menu = new QMenu(RoomSceneInstance->mainWindow());
     //QAction *reverseSelectionAction = _m_carditem_context_menu->addAction(tr("Reverse selection"));
@@ -892,6 +938,45 @@ void Dashboard::adjustCards(bool playAnimation)
 
 void Dashboard::_adjustCards()
 {
+#ifdef Q_OS_ANDROID
+    const int left = _dlayout->m_leftWidth;
+    const int available = qMax(93, getMiddleWidth());
+    const int capacity = qMax(1, available / 82);
+    const int count = m_handCards.length();
+    const int pages = qMax(1, (count + capacity - 1) / capacity);
+    mobile_hand_page = qBound(0, mobile_hand_page, pages - 1);
+    const int first = mobile_hand_page * capacity;
+    QList<CardItem *> row;
+    for (int i = 0; i < count; ++i) {
+        CardItem *card = m_handCards.at(i);
+        const bool visible = i >= first && i < first + capacity;
+        card->setVisible(visible);
+        if (visible)
+            row << card;
+    }
+    if (mobile_previous != nullptr) {
+        mobile_previous->setPos(left, 0);
+        mobile_previous->setEnabled(mobile_hand_page > 0);
+        mobile_next->setPos(left + available - 82, 0);
+        mobile_next->setEnabled(mobile_hand_page + 1 < pages);
+        m_btnSortHandcard->setPos(left + 88, 0);
+        m_btnReverseSelection->setPos(left + 176, 0);
+        m_btnNoNullification->setPos(left + 264, 0);
+        mobile_page_label->setText(QString("%1 / %2").arg(mobile_hand_page + 1).arg(pages));
+        mobile_page_label->setPos(left + available - 152, 12);
+    }
+    if (!row.isEmpty()) {
+        const int height = G_COMMON_LAYOUT.m_cardNormalHeight;
+        const QRect rowRect(left, _dlayout->m_normalHeight - height - 3, available, height);
+        _m_highestZ = count;
+        _disperseCards(row, rowRect, Qt::AlignLeft, true, true);
+        foreach (CardItem *card, row) {
+            if (card->isSelected())
+                card->setHomePos(card->homePos() + QPointF(0, -18));
+        }
+    }
+    return;
+#else
     int maxCards = Config.MaxCards;
 
     int n = m_handCards.length();
@@ -931,6 +1016,7 @@ void Dashboard::_adjustCards()
             card->setHomePos(newPos);
         }
     }
+#endif
 }
 
 int Dashboard::getMiddleWidth()
