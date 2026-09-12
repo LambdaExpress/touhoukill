@@ -12,6 +12,10 @@ namespace DialogSupport {
 // Installs the filter. Must be called after the QApplication exists.
 void install(QApplication *application);
 
+// Draws push buttons as lacquered panels. Call after the QApplication exists and
+// before the stylesheet is applied.
+void installMobileButtonStyle(QApplication *application);
+
 QScrollArea *createScrollArea(QWidget *content);
 void applyMobileStyle(QWidget *widget);
 

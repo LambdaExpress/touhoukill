@@ -49,7 +49,6 @@ void StartScene::addButton(QAction *action)
     else if (action->objectName() == "actionPC_Console_Start")
         text = tr("Solo practice");
     QPushButton *button = new QPushButton(text);
-    button->setMinimumHeight(52);
     button->setProperty("sgsPrimaryAction", action->objectName() == "actionStart_Game" || action->objectName() == "actionPC_Console_Start");
     button->setEnabled(action->isEnabled());
     connect(action, &QAction::changed, button, [button, action]() { button->setEnabled(action->isEnabled()); });

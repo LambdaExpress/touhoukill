@@ -97,6 +97,9 @@ int main(int argc, char *argv[])
         DialogSupport::install(qApp);
 
 #ifdef Q_OS_ANDROID
+        // Draws every push button as the game's own lacquered panel. Installed before
+        // the stylesheet is applied, so the sheet ends up wrapping this style.
+        DialogSupport::installMobileButtonStyle(qApp);
         configureAndroidWindow();
 #endif
 
