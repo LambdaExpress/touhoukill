@@ -382,6 +382,13 @@ void Photo::playBattleArrayAnimations()
 
 void Photo::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 {
+#ifdef Q_OS_ANDROID
+    // Spectating is hidden on the phone. A double tap is what a quick pair of taps
+    // becomes, so it fires while a player is merely tapping around, and the price is
+    // the whole board: the view switches to another player and the input locks. The
+    // feature itself is untouched -- the desktop still enters and leaves it the way
+    // it always did -- and only this gesture is taken away.
+#else
     if (Self != nullptr && m_player != nullptr && !Self->isAlive()) {
         if (m_player->isAlive()) {
             ClientInstance->requestPerspectiveSwitch(m_player->objectName());
@@ -393,5 +400,6 @@ void Photo::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
             return;
         }
     }
+#endif
     PlayerCardContainer::mouseDoubleClickEvent(event);
 }
