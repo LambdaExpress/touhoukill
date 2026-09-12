@@ -19,6 +19,51 @@
 #include <QTextStream>
 #include <QVersionNumber>
 
+#ifdef Q_OS_ANDROID
+namespace {
+
+// Android's sans-serif cannot draw the suit characters the translations use for
+// hearts, spades, clubs and diamonds. The one system font that carries them,
+// NotoSansSymbols-Regular-Subsetted2.ttf, is declared for lang="und-Zsym" in the
+// system's fonts.xml, and the font set Qt builds from that file never falls back to
+// it, so a skill or a card that spells out a suit came out with a gap in the
+// sentence. The interface's own suit art is substituted instead, the way
+// Card::getSuitString() already draws a suit in the battle log.
+QString suitGlyphsAsImages(const QString &text)
+{
+    bool has_suit = false;
+    for (const QChar &character : text) {
+        const ushort code = character.unicode();
+        if (code >= 0x2660 && code <= 0x2666) {
+            has_suit = true;
+            break;
+        }
+    }
+    if (!has_suit)
+        return text;
+
+    static const struct {
+        ushort code;
+        const char *file;
+    } suits[] = {
+        { 0x2665, "heart" },
+        { 0x2660, "spade" },
+        { 0x2663, "club" },
+        { 0x2666, "diamond" },
+    };
+
+    QString expanded = text;
+    for (const auto &suit : suits) {
+        const QChar glyph(suit.code);
+        if (expanded.contains(glyph))
+            expanded.replace(glyph, QString("<img src='image/system/cardsuit/%1.png' height = 18/>").arg(QLatin1String(suit.file)));
+    }
+    return expanded;
+}
+
+} // namespace
+#endif
+
 Q_GLOBAL_STATIC(Engine, EngineInstance)
 
 void Engine::addPackage(const QString &name)
@@ -294,7 +339,11 @@ QString Engine::translate(const QString &to_translate, bool addHegemony) const
             res.append(translations.value(str, str));
     }
 
+#ifdef Q_OS_ANDROID
+    return suitGlyphsAsImages(res);
+#else
     return res;
+#endif
 }
 
 int Engine::getRoleIndex() const
